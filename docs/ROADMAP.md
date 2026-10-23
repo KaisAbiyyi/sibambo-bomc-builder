@@ -33,7 +33,7 @@ Targets overlap *intentionally* when task dependency locks allow. Dates are indi
 - No wait for Sibambo Rooms data; optional enhancement.
 - No forced API key or integrated agent in first milestone.
 - Separate projects remain untouched: exporter perf and native acceptance unaffected by this plan.
-- Public builder currently GPL-3.0; retain until owner/provenance review explicitly approves a change.
+- BMB-003 owner decision: retain GPL-3.0, independently implement Builder (no import/copy of private Editor kernel), and publish synthetic-only fixtures. Third-party provenance still requires per-change checks. See [policy](LICENSE-IP-FIXTURE-POLICY.md).
 
 ## Core success scenario
 A prompt requests 2 bedrooms, 1 bathroom, 1 living room, lot dimensions and a simple roof. External agent plans the building, creates modules with typed tools, edits one room without regenerating the others, validates port/adjacency/walls/area, compiles actual BOMC, and independent Editor/Model-Eval readers load it. Benchmark tool calls, context tokens, elapsed, retries, binary size and deterministic SHA; visualize with a separately tracked owner acceptance gate.

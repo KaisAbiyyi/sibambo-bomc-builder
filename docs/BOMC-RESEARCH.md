@@ -8,7 +8,7 @@ This is a **source-backed planning assessment**, not an implemented builder or a
 3. **Coordinates**: existing Model-Eval contract describes right-handed, +Z-up, metres; conversions to Three.js must be explicit and fixture-tested. See [Model-Eval BOMC](https://github.com/KaisAbiyyi/sibambo-model-eval/blob/main/docs/BOMC_MODEL_EVAL.md).
 4. **Existing authoring**: Editor contains the private **@sibambo/bomc-document** authoring kernel. It can edit a typed graph and read/write a **web-core-v1** subset of BOMC 1.2. Supports supplied polygon loops/holes and valid triangulations, mesh-backed extrusions, flat RGBA/opacity, shared definitions and affine transforms. It **does not** triangulate or repair topology, edit arbitrary imported E4, author texture/UV/scenes/tags/clips/fallback media. Its package.json sets private:true. See [package contract](https://github.com/KaisAbiyyi/sibambo-editor/blob/main/packages/bomc-document/README.md), [types](https://github.com/KaisAbiyyi/sibambo-editor/blob/main/packages/bomc-document/src/types.ts).
 5. **Readers**: Editor e4-import checks magic/version, section bounds/CRC/decode; Model-Eval is an independent BOMC consumer. Never claim compatibility until a pinned golden file passes both. See [Editor container](https://github.com/KaisAbiyyi/sibambo-editor/blob/main/packages/e4-import/src/container.ts).
-6. **License/IP warning**: public builder repository currently has **GNU GPL v3** LICENSE; previous Apache2 advice did not change it. Other repositories are private and should not be copied into this public repository without an explicit ownership/provenance/license decision. See [LICENSE](https://github.com/KaisAbiyyi/sibambo-bomc-builder/blob/main/LICENSE).
+6. **BMB-003 owner decision:** retain GPL-3.0; owner attests original code ownership; implement Builder independently without copying existing implementation; public fixtures must be synthetic-only. Third-party permissions still require checking. See [decision and audit limits](LICENSE-IP-FIXTURE-POLICY.md).
 
 ## Architectural conclusion
 - **Authoring transport ≠ BOMC binary**. Store tiny, versioned, agent-diffable modules and one building manifest. Validate/merge a graph, then compile one BOMC with a deterministic writer. Byte-append of individually generated BOMC containers would break offsets, references, deduplication and ownership.
@@ -20,7 +20,7 @@ This is a **source-backed planning assessment**, not an implemented builder or a
 ## Unknowns / blockers before production code
 - BMB-001: pin producer HEAD and enumerate v1.2+ section versions and required writer rules, beyond historical 1.1 prose.
 - BMB-002: establish interoperable editor authoring subset and whether source sharing is authorized; distinguish reuse-vs-clean-room adapter.
-- BMB-003: GPL-3.0 vs permissive license and code/fixture rights; do not silently switch.
+- BMB-003: decision recorded in [License/IP/Fixture Policy](LICENSE-IP-FIXTURE-POLICY.md); per-change provenance checks remain open.
 - BMB-005/007: synthetic public fixtures and cross-repo golden import matrix.
 - Surface triangulation, door openings, shared wall seams, and consumers' tolerance for authoring metadata remain unproven.
 

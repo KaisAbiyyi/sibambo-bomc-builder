@@ -47,5 +47,5 @@ ADR-002: flexible granularity, fixed module contract.
 ADR-003: one deterministic graph-level BOMC compiler; do not concatenate binary BOMC.
 ADR-004: local geometry guards are deterministic; agent reasoning guides higher-level designs.
 ADR-005: cloud-first and Rooms-independent MVP.
-ADR-006: GPL/private-to-public gate before sharing existing private kernel implementation.
+ADR-006: GPL-3.0 retained, clean-room independent Builder (no private kernel source-copy/import), synthetic-only public fixture policy. See [BMB-003 decision](LICENSE-IP-FIXTURE-POLICY.md).
 ADR-007: no claim of arbitrary legacy BOMC edit or true SketchUp Exact acceptance.
