@@ -4,6 +4,8 @@ Headless, agent-operable modular building construction into a deterministic comp
 
 ## Project planning
 - [Technical BOMC research](docs/BOMC-RESEARCH.md)
+- [Pinned BOMC 1.2 producer contract (BMB-001)](docs/BOMC-PRODUCER-CONTRACT.md)
+- [Forward-compatible BOMC versioning / adapter policy](docs/BOMC-VERSIONING.md)
 - [Modular architecture & invariants](docs/ARCHITECTURE.md)
 - [Roadmap through December 2026](docs/ROADMAP.md)
 - [Agent construction guide (proposed tools)](docs/AGENT-CONSTRUCTION-GUIDE.md)
