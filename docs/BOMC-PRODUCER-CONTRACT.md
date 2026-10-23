@@ -31,6 +31,8 @@ All evidence is specific to these source revisions; newer producer behavior requ
 | Compression codec in directory | `0=STORE`, `1=zlib-wrapped DEFLATE`; deflate is selected only if shorter when compression is requested. Unknown container compression codec rejected by reference parser |
 | Integrity | reader validates magic/version/endian, bounds, overlap, alignment, optional CRC32 (default on), expanded size and decoded length; CRC32 is accidental-corruption detection, **not authentication** |
 
+**Metadata caveat:** the writer also reports a hardcoded `FORMAT_VERSION = '1.2'` in its returned result, even when the 40-byte legacy writer path emits a 1.0 header. Trust the validated binary header and pinned spec over the result label for artifact version detection. [Writer return field](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/bomc_writer.rb#L256-L260).
+
 **Version gate:** pinned `Container.read_directory` accepts **only major 1, minor 0–2**, explicitly rejecting 1.3 / 2.0. Merely bumping a version field is not supported interoperability. [Source](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/bomc_format.rb#L344-L361).
 
 **Reference decoder's current limits, not permanent BOMC format limits:** max input 80 MiB, expanded bytes 120 MiB, allocation 256 MiB, sections 64, depth 64 ([decode_budget.rb](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/decode_budget.rb)). These are implementation safety budgets; must not be mistaken for wire-format maxima or promised large-model acceptance. In the compact layout, u32 offsets/lengths additionally constrain section byte ranges. Consumers can impose different limits.
@@ -75,7 +77,7 @@ The table captures **all defined section IDs** from the pinned producer and whet
 | 19 | SCENES — scene states | Added only if scene list nonempty |
 | 20 | ENCODING_CONTRACT — fidelity/profile contract | **Required by writer** |
 | 21 | CLIP_PLANES — scene clip planes | Added only if clip list nonempty |
-| 240 | DEBUG — debug metadata | Added only for debug profile |
+| 240 | DEBUG — debug metadata | Considered only for debug profile; omitted when its record count is 0 and sparse mode is enabled |
 | 241 | **No producer constant or exporter emission** at this SHA; Editor's private `web-core-v1` authoring section | **Editor-specific observation**, never treat as canonical producer section or required general BOMC 1.2 |
 
 Evidence: [section constants](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/bomc_format.rb#L29-L50), [writer registry](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/bomc_writer.rb#L22-L45), [writer assembly and sparsity](https://github.com/KaisAbiyyi/sibambo-bom-engine-plugin/blob/988c4ef250e098d627f480a6f571693975227fee/bom_engine/bomc_writer.rb#L185-L226), [Editor contract](https://github.com/KaisAbiyyi/sibambo-editor/blob/641a6f84a28ba3ed50610aaabd47b76d913c4e22/packages/bomc-document/README.md).
