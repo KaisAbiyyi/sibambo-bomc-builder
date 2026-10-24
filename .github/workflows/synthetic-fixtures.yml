@@ -1,0 +1,40 @@
+name: BMB-007 synthetic container vectors
+on:
+  pull_request:
+    paths:
+      - 'tools/bomc_fixture_harness.py'
+      - 'tests/test_fixture_harness.py'
+      - 'docs/SYNTHETIC-FIXTURE-HARNESS.md'
+      - 'fixtures/container-only-reference-sha256.json'
+      - '.github/workflows/synthetic-fixtures.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/bomc_fixture_harness.py'
+      - 'tests/test_fixture_harness.py'
+      - 'docs/SYNTHETIC-FIXTURE-HARNESS.md'
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/bomc_fixture_harness.py --selftest
+      - run: python -m unittest discover -s tests -p 'test_fixture_harness.py' -v
+      - name: Two cold-process writes and reference checks
+        shell: bash
+        run: |
+          python tools/bomc_fixture_harness.py --write "$RUNNER_TEMP/goldens-a"
+          python tools/bomc_fixture_harness.py --write "$RUNNER_TEMP/goldens-b"
+          diff -r "$RUNNER_TEMP/goldens-a" "$RUNNER_TEMP/goldens-b"
+          python tools/bomc_fixture_harness.py --check "$RUNNER_TEMP/goldens-a"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-bomc-container-only-not-semantic-goldens
+          path: ${{ runner.temp }}/goldens-a
+          if-no-files-found: error
+          retention-days: 14
