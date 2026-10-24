@@ -4,12 +4,14 @@ on:
     paths:
       - 'compatibility/**'
       - 'tests/test_compatibility_matrix.py'
+      - 'docs/COMPATIBILITY-MATRIX.md'
       - '.github/workflows/compatibility.yml'
   push:
     branches: [main]
     paths:
       - 'compatibility/**'
       - 'tests/test_compatibility_matrix.py'
+      - 'docs/COMPATIBILITY-MATRIX.md'
 permissions:
   contents: read
 jobs:
