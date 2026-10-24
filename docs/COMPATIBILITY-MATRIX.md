@@ -59,4 +59,12 @@ The real private Model-Eval `BomcContainer` and `BomcLoader` were executed in te
 
 Both original private consumers also processed six immutable [BMB-007 container-only test vectors](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/40) from source `eafc5270abfab27c7f73d78b5ff7f3274e1180f8`: container-level parsing succeeded, semantic admission failed as expected. Those six files **are not valid geometry goldens** and cannot establish positive producer→consumer pairing.
 
-No private implementation was copied into this public repo. Separate original consumer PRs carry their test bodies and exact-CI receipts. BMB-005 remains in Review until required cross-source semantic pairings are executed and validated.
+No private implementation was copied into this public repo. Separate original consumer PRs carry their test bodies and exact-CI receipts.
+
+## Acceptance split — baseline vs. semantic interoperability (2026-10-24)
+
+**BMB-005 acceptance is the evidence-backed compatibility *baseline*, not production cross-consumer certification.** Close this task once the pinned producer/consumer versions and required/optional sections, narrow Builder 1.2 target subset, evidence-tagged writer/reader pairings (PASS/SOURCE_ONLY/NOT_RUN/UNSUPPORTED), negative-case inventory, clean-room review and matrix consistency CI all pass. The confirmed original-consumer *native* test results are recorded only within their actual scope.
+
+**Deferred to [BMB-021](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/21)** after [BMB-019 writer](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/19) and [BMB-020 compiler](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/20): Ruby 1.2 → Editor E4/Model-Eval real valid semantic binary acceptance, Editor writer → Model-Eval, Builder writer → both, exact face/holes/materials/transform/count parity, and negative cases against *each real consumer* (including 241/version/flags/corruption/budgets). Record fixture SHA, tested source/consumer SHA, CI logs and PASS/FAIL/NOT_RUN individually. Ruby → strict editable Editor remains **UNSUPPORTED_BY_SOURCE** without section 241; do not reclassify without proof.
+
+**Dependency direction:** BMB-019 requires BMB-005/007 *baseline acceptance only*. BMB-021 is the downstream semantic qualification gate, not a retroactive prerequisite for BMB-005; the untested case statuses remain NOT_RUN after baseline merge.
