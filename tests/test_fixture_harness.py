@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import json
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -11,10 +12,16 @@ class FixtureHarnessTests(unittest.TestCase):
     def test_deterministic_synthetic_containers(self):
         blobs, manifest = module.build_all()
         self.assertEqual(len(blobs), 6)
+        ledger = json.loads((ROOT / "fixtures/container-only-reference-sha256.json").read_text(encoding="utf8"))
+        self.assertEqual(ledger["qualification"], "CONTAINER_ONLY_NON_SEMANTIC")
+        pinned = {item["name"]: item for item in ledger["cases"]}
+        self.assertEqual(set(pinned), set(blobs))
         for row in manifest["cases"]:
             blob = blobs[row["name"]]
             self.assertEqual(blob, module.generate(row["name"]))
             self.assertEqual(row["sha256"], module.hashlib.sha256(blob).hexdigest())
+            self.assertEqual(row["sha256"], pinned[row["name"]]["sha256"])
+            self.assertEqual(row["byteSize"], pinned[row["name"]]["bytes"])
             self.assertEqual(len(module.inspect_container(blob)), row["sectionCount"])
 
     def test_reject_structural_corruption(self):
