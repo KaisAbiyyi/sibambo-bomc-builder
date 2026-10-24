@@ -19,11 +19,11 @@ Targets overlap *intentionally* when task dependency locks allow. Dates are indi
 
 ## Immediate true parallelism
 
-**Now (4 independent P0 tasks)**: BMB-001 (producer spec), BMB-002 (Editor authoring), BMB-003 (license/IP), BMB-004 (MCP/security+baseline). No code from private repos may be transferred without decision. Each is Ready but unclaimed.
+**Accepted baseline (2026-10-24):** BMB-005 evidence-classified BOMC compatibility matrix [PR #38](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/38) and BMB-007 deterministic **container-only** synthetic fixtures [PR #40](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/40) are merged with final-head CI PASS. Neither certifies independent valid semantic BOMC interoperability. Both tasks retain explicit NOT_RUN for such pairings; the consumer semantic gate is owned by **BMB-021** after independently authored BMB-019 writer and BMB-020 compiler.
 
-**Up Next (3 P0/P1 tasks)**: BMB-005 (compatibility matrix), BMB-006 (module IR), BMB-007 (synthetic fixtures), AFTER 001/002 evidence. Dependencies must genuinely pass before promotions.
+**Now (eligible, no task limit):** BMB-008 (stable IDs), 009 (graph transforms), 013 (floor), 014 (wall), 018 (materials), 019 (BOMC writer adapter). **Up Next, direct successors only:** BMB-010,011,015,016,017. Statuses and claims must be rechecked against live Notion; Focus Lane is not Status. All other tasks remain governed by dependency graph, no hidden global task cap.
 
-**Subsequent waves**: after IR, ID/revision (008) and transform graph (009) can be parallel. After IR+fixtures, floor (013), wall (014), appearances (018) can run parallel. Doors (015) depend on walls, roof (016) on floor+walls; writer subset adapter (019) can progress in parallel with geometry if 005/007 are satisfied. CLI/MCP/context retrieval (022–024) are not gated on Windows SketchUp; E2E (026) depends on geometric and compiled output. Editor extension is another repo's follow-up, not an invisible dependency of core.
+**Subsequent waves**: after IR, ID/revision (008) and transform graph (009) can be parallel. After IR+container-fixture baseline, floor (013), wall (014), appearances (018) can run parallel. Doors (015) depend on walls, roof (016) on floor+walls; writer subset adapter (019) can progress in parallel with geometry because 005/007 baseline gates are satisfied. **BMB-021** (valid semantic golden files, real Editor/Model-Eval positive import and corruption) waits for BMB-020, *not* as a backwards prerequisite for 005/007. CLI/MCP/context retrieval (022–024) are not gated on Windows SketchUp; E2E (026) depends on geometric and compiled output. Editor extension is another repo's follow-up, not an invisible dependency of core.
 
 ## Critical design decisions
 - Module granularity **flexible** (whole building / room / wall / face), but module contract and coordinates fixed.
