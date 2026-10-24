@@ -10,14 +10,23 @@ class TestMatrix(unittest.TestCase):
         matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
         profiles = matrix["profiles"]
         ids = set()
+        passed = set()
         for row in matrix["cases"]:
             self.assertNotIn(row["id"], ids)
             ids.add(row["id"])
             self.assertIn(row["reader"], profiles)
             self.assertIn(row["writer"], profiles | {"builderWriter12": {}})
             self.assertIn(row["status"], matrix["statusLegend"])
-            self.assertNotEqual(row["status"], "PASS")
+            if row["status"] == "PASS":
+                passed.add(row["id"])
+                self.assertEqual(row["evidence"]["repo"], "KaisAbiyyi/sibambo-editor")
+                self.assertIn("/actions/runs/", row["evidence"]["ciRun"])
+                self.assertEqual(len(row["evidence"]["testedPrHeadSha"]), 40)
         self.assertEqual(len(ids), 8)
+        self.assertEqual(passed, {"EDITOR12_EDITOR_WEB_EDIT", "EDITOR12_EDITOR_E4_VIEW"})
+        checks = matrix["actualConsumerChecks"]
+        self.assertEqual({entry["repo"] for entry in checks}, {"KaisAbiyyi/sibambo-editor", "KaisAbiyyi/sibambo-model-eval"})
+        self.assertTrue(all(entry["result"] == "PASS" and entry["failed"] == 0 for entry in checks))
 
     def test_section_gate(self):
         m = json.loads(MATRIX.read_text(encoding="utf-8"))["profiles"]
