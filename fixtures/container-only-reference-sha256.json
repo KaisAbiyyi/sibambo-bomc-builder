@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "source": "GitHub Actions workflow run 40063418837",
+    "headSha": "c6fc502a7d763962d2bb9c290e4e6231da32526d",
+    "jobId": 120781558657,
+    "generator": "bmb-007-container-only-v1",
+    "note": "Source SHA pinned from GitHub cloud run logs; opaque marker payloads, not semantic BOMC."
+  },
+  "qualification": "CONTAINER_ONLY_NON_SEMANTIC",
+  "cases": [
+    {
+      "name": "concave",
+      "sha256": "6a11942890edca44f720536578b7cd74f4e6d22e94ae55db60daaf0953ccab52",
+      "bytes": 1178
+    },
+    {
+      "name": "face-materials",
+      "sha256": "4e08bc1d80a7a9a13216cf4ee7900eb98b1cf33b7867b749f35ba46ba92bd937",
+      "bytes": 1313
+    },
+    {
+      "name": "floor",
+      "sha256": "4d89bf61e62960a4cfcfb7bc59f4cf2fa5604c83340a2a64aa1dfe3c4a1cb578",
+      "bytes": 1176
+    },
+    {
+      "name": "holed-wall",
+      "sha256": "e66ce4a11920ccfb76ad294f8639389ec297f0597c54882e5afb301a38affaf1",
+      "bytes": 1277
+    },
+    {
+      "name": "minimal",
+      "sha256": "0b888965a0069bebfd232242a7b656a0cd6d30af0d59c24e844ed2e8d4f019c6",
+      "bytes": 698
+    },
+    {
+      "name": "nested-affine",
+      "sha256": "047f0b398837e63fb371d363d341280ece5f716c142b7d11538f5edb5fd8808d",
+      "bytes": 1184
+    }
+  ]
+}
