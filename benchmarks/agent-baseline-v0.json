@@ -86,7 +86,7 @@
       "effect": "write",
       "key": "create-modules-v0",
       "expected": "PASS",
-      "assert": "four stable room IDs plus floor, walls and roof, one shared wall owner"
+      "assert": "repeat module_create per room/floor/wall/roof with distinct receipts; stable module IDs and exactly one shared-wall owner"
     },
     {
       "step": 5,
