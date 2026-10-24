@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "1.0.0",
+  "modules": [
+    {
+      "schemaVersion": "1.0.0",
+      "moduleId": "house/floor-1/living",
+      "parentId": "house/floor-1",
+      "revision": 1,
+      "localFrame": {
+        "unit": "m",
+        "handedness": "right",
+        "upAxis": "+Z",
+        "forwardAxis": "+Y",
+        "transform": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          4,
+          3,
+          2.8
+        ]
+      },
+      "operations": [
+        {
+          "kind": "floor-slab",
+          "opId": "floor-1",
+          "role": "floor",
+          "materialId": "concrete",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "thickness": 0.15,
+          "elevation": 0
+        },
+        {
+          "kind": "wall-run",
+          "opId": "east-wall",
+          "role": "wall",
+          "materialId": "plaster",
+          "path": [
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              3
+            ]
+          ],
+          "thickness": 0.15,
+          "height": 2.8,
+          "baseElevation": 0
+        },
+        {
+          "kind": "opening-cut",
+          "opId": "door-1",
+          "role": "opening",
+          "targetWallOpId": "east-wall",
+          "offset": 1,
+          "width": 0.9,
+          "height": 2.1,
+          "sillHeight": 0,
+          "openingType": "door"
+        }
+      ],
+      "materials": [
+        {
+          "materialId": "concrete",
+          "rgba": [
+            180,
+            180,
+            180,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "floor"
+        },
+        {
+          "materialId": "plaster",
+          "rgba": [
+            245,
+            244,
+            242,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "wall"
+        }
+      ],
+      "ports": [
+        {
+          "portId": "hall-door",
+          "kind": "doorway",
+          "normal": [
+            1,
+            0,
+            0
+          ],
+          "localTransform": [
+            1,
+            0,
+            0,
+            4,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "width": 0.9,
+          "height": 2.1,
+          "peer": {
+            "moduleId": "house/floor-1/hall",
+            "portId": "living-door"
+          },
+          "seamId": "east-shared"
+        }
+      ],
+      "ownedSeams": [
+        {
+          "seamId": "east-shared",
+          "ownerModuleId": "house/floor-1/living",
+          "participants": [
+            "house/floor-1/living",
+            "house/floor-1/hall"
+          ],
+          "surfaceOpId": "east-wall"
+        }
+      ],
+      "dependencies": [],
+      "provenance": {
+        "origin": "synthetic",
+        "generator": "bmb-006-handcrafted",
+        "note": "Entirely fictitious floor dimensions"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "moduleId": "house/floor-1/hall",
+      "parentId": "house/floor-1",
+      "revision": 0,
+      "localFrame": {
+        "unit": "m",
+        "handedness": "right",
+        "upAxis": "+Z",
+        "forwardAxis": "+Y",
+        "transform": [
+          1,
+          0,
+          0,
+          4,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          2,
+          3,
+          2.8
+        ]
+      },
+      "operations": [
+        {
+          "kind": "floor-slab",
+          "opId": "floor-1",
+          "role": "floor",
+          "materialId": "tile",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "thickness": 0.15,
+          "elevation": 0
+        }
+      ],
+      "materials": [
+        {
+          "materialId": "tile",
+          "rgba": [
+            220,
+            220,
+            214,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "floor"
+        }
+      ],
+      "ports": [
+        {
+          "portId": "living-door",
+          "kind": "doorway",
+          "normal": [
+            -1,
+            0,
+            0
+          ],
+          "localTransform": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "width": 0.9,
+          "height": 2.1,
+          "peer": {
+            "moduleId": "house/floor-1/living",
+            "portId": "hall-door"
+          },
+          "seamId": "east-shared"
+        }
+      ],
+      "ownedSeams": [],
+      "dependencies": [
+        {
+          "moduleId": "house/floor-1/living",
+          "minRevision": 1
+        }
+      ],
+      "provenance": {
+        "origin": "synthetic",
+        "generator": "bmb-006-handcrafted"
+      }
+    }
+  ]
+}
