@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/blob/main/schemas/module-ir-v1.schema.json",
+  "title": "BOMC Builder module IR v1 (not binary BOMC)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "modules"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/module"
+      }
+    }
+  },
+  "$defs": {
+    "moduleId": {
+      "type": "string",
+      "maxLength": 180,
+      "pattern": "^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$"
+    },
+    "smallId": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "vec2": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": false
+    },
+    "vec3": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3,
+      "items": false
+    },
+    "transform": {
+      "type": "array",
+      "description": "Row-major affine local-to-parent 4x4; translation at indices 3,7,11; last row fixed; invertibility is a semantic gate.",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "const": 0
+        },
+        {
+          "const": 0
+        },
+        {
+          "const": 0
+        },
+        {
+          "const": 1
+        }
+      ],
+      "minItems": 16,
+      "maxItems": 16,
+      "items": false
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min",
+        "max"
+      ],
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/vec3"
+        },
+        "max": {
+          "$ref": "#/$defs/vec3"
+        }
+      }
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "materialId",
+        "rgba",
+        "opacity"
+      ],
+      "properties": {
+        "materialId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "rgba": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          ],
+          "minItems": 4,
+          "maxItems": 4,
+          "items": false
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "semanticRole": {
+          "enum": [
+            "floor",
+            "wall",
+            "roof",
+            "door",
+            "window",
+            "other"
+          ]
+        }
+      }
+    },
+    "floor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "opId",
+        "footprint",
+        "thickness",
+        "elevation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "floor-slab"
+        },
+        "opId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "materialId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "role": {
+          "enum": [
+            "floor",
+            "wall",
+            "ceiling",
+            "roof",
+            "opening",
+            "door",
+            "window",
+            "structural",
+            "other"
+          ]
+        },
+        "footprint": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/vec2"
+          }
+        },
+        "thickness": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "elevation": {
+          "type": "number"
+        }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "opId",
+        "path",
+        "thickness",
+        "height",
+        "baseElevation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "wall-run"
+        },
+        "opId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "materialId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "role": {
+          "enum": [
+            "floor",
+            "wall",
+            "ceiling",
+            "roof",
+            "opening",
+            "door",
+            "window",
+            "structural",
+            "other"
+          ]
+        },
+        "path": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/vec2"
+          }
+        },
+        "thickness": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "baseElevation": {
+          "type": "number"
+        }
+      }
+    },
+    "opening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "opId",
+        "targetWallOpId",
+        "offset",
+        "width",
+        "height",
+        "sillHeight",
+        "openingType"
+      ],
+      "properties": {
+        "kind": {
+          "const": "opening-cut"
+        },
+        "opId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "materialId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "role": {
+          "enum": [
+            "floor",
+            "wall",
+            "ceiling",
+            "roof",
+            "opening",
+            "door",
+            "window",
+            "structural",
+            "other"
+          ]
+        },
+        "targetWallOpId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "offset": {
+          "type": "number",
+          "minimum": 0
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sillHeight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "openingType": {
+          "enum": [
+            "door",
+            "window"
+          ]
+        }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "portId",
+        "kind",
+        "normal",
+        "localTransform",
+        "width",
+        "height",
+        "peer",
+        "seamId"
+      ],
+      "properties": {
+        "portId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "kind": {
+          "enum": [
+            "doorway",
+            "shared-boundary",
+            "service",
+            "exterior"
+          ]
+        },
+        "normal": {
+          "$ref": "#/$defs/vec3"
+        },
+        "localTransform": {
+          "$ref": "#/$defs/transform"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "peer": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "moduleId",
+                "portId"
+              ],
+              "properties": {
+                "moduleId": {
+                  "$ref": "#/$defs/moduleId"
+                },
+                "portId": {
+                  "$ref": "#/$defs/smallId"
+                }
+              }
+            }
+          ]
+        },
+        "seamId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/smallId"
+            }
+          ]
+        }
+      }
+    },
+    "seam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seamId",
+        "ownerModuleId",
+        "participants",
+        "surfaceOpId"
+      ],
+      "properties": {
+        "seamId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "ownerModuleId": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "participants": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/moduleId"
+          }
+        },
+        "surfaceOpId": {
+          "$ref": "#/$defs/smallId"
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "moduleId",
+        "minRevision"
+      ],
+      "properties": {
+        "moduleId": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "minRevision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "moduleId",
+        "parentId",
+        "revision",
+        "localFrame",
+        "bounds",
+        "operations",
+        "materials",
+        "ports",
+        "ownedSeams",
+        "dependencies",
+        "provenance"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "moduleId": {
+          "$ref": "#/$defs/moduleId"
+        },
+        "parentId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/moduleId"
+            }
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "localFrame": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unit",
+            "handedness",
+            "upAxis",
+            "forwardAxis",
+            "transform"
+          ],
+          "properties": {
+            "unit": {
+              "const": "m"
+            },
+            "handedness": {
+              "const": "right"
+            },
+            "upAxis": {
+              "const": "+Z"
+            },
+            "forwardAxis": {
+              "const": "+Y"
+            },
+            "transform": {
+              "$ref": "#/$defs/transform"
+            }
+          }
+        },
+        "bounds": {
+          "$ref": "#/$defs/bounds"
+        },
+        "operations": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/floor"
+              },
+              {
+                "$ref": "#/$defs/wall"
+              },
+              {
+                "$ref": "#/$defs/opening"
+              }
+            ]
+          }
+        },
+        "materials": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/material"
+          }
+        },
+        "ports": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        },
+        "ownedSeams": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/seam"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "origin",
+            "generator"
+          ],
+          "properties": {
+            "origin": {
+              "enum": [
+                "synthetic",
+                "user-authored"
+              ]
+            },
+            "generator": {
+              "type": "string",
+              "maxLength": 160
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 400
+            }
+          }
+        }
+      }
+    }
+  }
+}
