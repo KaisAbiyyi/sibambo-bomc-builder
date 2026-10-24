@@ -10,7 +10,7 @@ This prompt is a **synthetic design request**, not proof of engineering, code co
 
 ## 2. Reproducible scenario
 
-The JSON script is the normative ordered plan; a real agent may add bounded inspection/retry calls but must preserve the invariants. Suggested phases:
+The JSON script is the normative sequence of **logical phases**, NOT a claim that one \`module_create\` call creates every room. Repeat the named typed operation per module under separate mutation receipts; real tool-call counts must be measured. A real agent may add bounded inspection/retry calls but must preserve the invariants. Suggested phases:
 
 1. Discover supported versions/capabilities and read project metadata/budget (no assumption that MCP's 2026 protocol has session initialization).
 2. Create project with fixed brief hash and `idempotency_key`. Repeat same request with same key: state must not duplicate.
