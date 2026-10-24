@@ -4,6 +4,7 @@ on:
     paths:
       - 'tools/bomc_fixture_harness.py'
       - 'tests/test_fixture_harness.py'
+      - 'docs/SYNTHETIC-FIXTURE-HARNESS.md'
       - 'fixtures/container-only-reference-sha256.json'
       - '.github/workflows/synthetic-fixtures.yml'
   push:
@@ -11,6 +12,7 @@ on:
     paths:
       - 'tools/bomc_fixture_harness.py'
       - 'tests/test_fixture_harness.py'
+      - 'docs/SYNTHETIC-FIXTURE-HARNESS.md'
 permissions:
   contents: read
 jobs:
