@@ -2,6 +2,8 @@
 
 ## Universal execution board — direct successors only (2026-10-24)
 
+**UNLIMITED TASK COUNT RULE (2026-10-24, OWNER-APPROVED):** `02 · Now` and `03 · Up Next` have **NO MAXIMUM, NO DEFAULT OF ONE, AND NO FIVE-CARD CAP**. Enumerate **every** task that is currently actionable/eligible (all AND prerequisites accepted, lock/authorization constraints verified) in Now, including Ready, Claimed, Review and real Local/Owner gates. Enumerate **every** direct successor blocked by one or more tasks in Now in Up Next, provided every other prerequisite is Done or also in Now. These cards can be numerous even if competing execution locks require sequential implementation later; never omit a direct successor solely because it shares a lock or because a column looks crowded. Do not show unrelated backlog, tasks with unfinished external prerequisites, or any already-ready task in Up Next. `01 · Last Done` alone retains **maximum five accepted tasks**. Recompute the full DAG projection on each claim/merge/handoff, retaining truthful Status, exact-head gates and owner consent. This paragraph supersedes contrary historic one-card/default-one/wave-size limits below.
+
 This repository follows the universal project board policy on the Notion `Projects` page, covering CoSoS, Mind Place, Sibambo and its children, BOMC Modular Builder, and future projects. This rule supersedes old unrelated blocked-task and arbitrary one-card Up Next examples.
 
 - **02 · Now:** all task(s) currently active or genuinely eligible, including parallel Ready/Claimed/Review/Local Gate/Owner Gate work only where the live AND-prerequisites, ownership, environment, consent and resource locks permit. Focus Lane does not itself alter task Status.
