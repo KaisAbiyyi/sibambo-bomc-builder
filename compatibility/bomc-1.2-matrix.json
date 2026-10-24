@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "statusLegend": {
+    "SOURCE_ONLY": "Observed in pinned source; not executed by this task",
+    "NOT_RUN": "Executable integration gate not run",
+    "UNSUPPORTED_BY_SOURCE": "Pinned reader explicitly rejects or lacks required authoring payload",
+    "PASS": "Original private consumer test actually executed and passed at immutable source/CI head; only the named pairing is certified."
+  },
+  "sourcePins": {
+    "producer": {
+      "repo": "KaisAbiyyi/sibambo-bom-engine-plugin",
+      "sha": "988c4ef250e098d627f480a6f571693975227fee"
+    },
+    "editor": {
+      "repo": "KaisAbiyyi/sibambo-editor",
+      "sha": "641a6f84a28ba3ed50610aaabd47b76d913c4e22"
+    },
+    "modelEval": {
+      "repo": "KaisAbiyyi/sibambo-model-eval",
+      "sha": "7be03cdccc7ce2b390c639d4ceb7e16d7ecbb254",
+      "limitation": "Indexed revision identified; consumer version acceptance not independently tested"
+    }
+  },
+  "profiles": {
+    "rubyProducer12": {
+      "version": "1.2",
+      "required": [
+        1,
+        2,
+        11,
+        12,
+        13,
+        17,
+        20
+      ],
+      "optional": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21,
+        240
+      ],
+      "special": [],
+      "flags": "profile/scope dependent",
+      "directoryBytes": 24
+    },
+    "rubyDecoder12": {
+      "version": "1.2",
+      "required": [
+        1,
+        2,
+        11,
+        12,
+        13,
+        17
+      ],
+      "optional": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        14,
+        15,
+        16,
+        18,
+        19,
+        20,
+        21,
+        240
+      ],
+      "special": [],
+      "directoryBytes": 24
+    },
+    "editorWebCore12": {
+      "version": "1.2",
+      "required": [
+        1,
+        2,
+        11,
+        12,
+        13,
+        17,
+        20,
+        241
+      ],
+      "optional": [
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        14
+      ],
+      "special": [
+        241
+      ],
+      "flags": "0x11",
+      "directoryBytes": 24,
+      "forbiddenForEditable": [
+        4,
+        10,
+        15,
+        16,
+        18,
+        19,
+        21,
+        240
+      ]
+    },
+    "editorE4Viewer": {
+      "version": "1.2",
+      "required": [],
+      "optional": [],
+      "special": [],
+      "limitation": "Viewer loader is not the editable document reader; exact required-set gates require integration tests"
+    },
+    "modelEvalViewer": {
+      "version": "1.0/1.1/1.2 (self-contained BOMC 1.2 exercised in CI)",
+      "required": [],
+      "optional": [],
+      "special": [],
+      "limitation": "Real Model-Eval 1.2 semantic loader PASS in private CI, but no Ruby/Editor-to-ModelEval producer pairing has been executed."
+    }
+  },
+  "cases": [
+    {
+      "id": "RUBY12_RUBYDECODER",
+      "writer": "rubyProducer12",
+      "reader": "rubyDecoder12",
+      "status": "SOURCE_ONLY",
+      "claim": "Pinned implementation contains compatible 1.2 producer and decoder; no fixture execution"
+    },
+    {
+      "id": "RUBY12_EDITOR_WEB_EDIT",
+      "writer": "rubyProducer12",
+      "reader": "editorWebCore12",
+      "status": "UNSUPPORTED_BY_SOURCE",
+      "claim": "Producer does not emit section 241 required by strict editable restoration"
+    },
+    {
+      "id": "RUBY12_EDITOR_E4_VIEW",
+      "writer": "rubyProducer12",
+      "reader": "editorE4Viewer",
+      "status": "NOT_RUN",
+      "claim": "Requires pinned 1.2 fixture import and semantic counters"
+    },
+    {
+      "id": "RUBY12_MODEL_EVAL",
+      "writer": "rubyProducer12",
+      "reader": "modelEvalViewer",
+      "status": "NOT_RUN",
+      "claim": "Model-Eval actual 1.2 source reader and fixture gate not executed"
+    },
+    {
+      "id": "EDITOR12_EDITOR_WEB_EDIT",
+      "writer": "editorWebCore12",
+      "reader": "editorWebCore12",
+      "status": "PASS",
+      "claim": "Actual Editor writer -> strict editable readback exact graph equality in cloud CI; hole, nested, color, section 241.",
+      "evidence": {
+        "repo": "KaisAbiyyi/sibambo-editor",
+        "sourceBaseSha": "641a6f84a28ba3ed50610aaabd47b76d913c4e22",
+        "testedPrHeadSha": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+        "mergedCommitSha": "f5feb660a05a274aa2726ee0603ad1e53c69cb40",
+        "ciRun": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+        "scope": "three semantic Editor-authored fixtures and existing roundtrip regression suite, NOT external Ruby/Builder output"
+      }
+    },
+    {
+      "id": "EDITOR12_EDITOR_E4_VIEW",
+      "writer": "editorWebCore12",
+      "reader": "editorE4Viewer",
+      "status": "PASS",
+      "claim": "Actual Editor writer -> original E4 viewer semantics in cloud CI; hole, nested and two-sided materials.",
+      "evidence": {
+        "repo": "KaisAbiyyi/sibambo-editor",
+        "sourceBaseSha": "641a6f84a28ba3ed50610aaabd47b76d913c4e22",
+        "testedPrHeadSha": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+        "mergedCommitSha": "f5feb660a05a274aa2726ee0603ad1e53c69cb40",
+        "ciRun": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+        "scope": "three semantic Editor-authored fixtures and existing roundtrip regression suite, NOT external Ruby/Builder output"
+      }
+    },
+    {
+      "id": "EDITOR12_MODEL_EVAL",
+      "writer": "editorWebCore12",
+      "reader": "modelEvalViewer",
+      "status": "NOT_RUN",
+      "claim": "Unknown section 241 and version support must be tested, not inferred"
+    },
+    {
+      "id": "BUILDER12_ANY",
+      "writer": "builderWriter12",
+      "reader": "editorE4Viewer",
+      "status": "NOT_RUN",
+      "claim": "BMB-019 writer does not exist at this stage; no valid binary parity claim"
+    }
+  ],
+  "negatives": [
+    {
+      "id": "UNKNOWN_VERSION",
+      "input": "header 1.3/2.0",
+      "expected": "reject before semantic decoding",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "UNKNOWN_COMPRESSION",
+      "input": "directory codec 2",
+      "expected": "reject",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "BAD_CRC",
+      "input": "flip stored payload byte",
+      "expected": "reject",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "BAD_DIRECTORY",
+      "input": "truncated, misaligned or overlapping offsets",
+      "expected": "reject",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "UNKNOWN_HEADER_FLAGS",
+      "input": "unsupported critical flag",
+      "expected": "fail closed where strict; source-gate per consumer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "EDITOR_MISSING_241",
+      "input": "Ruby 1.2 without 241",
+      "expected": "strict editable reader reject",
+      "status": "UNSUPPORTED_BY_SOURCE"
+    },
+    {
+      "id": "FAKE_241",
+      "input": "invented or malformed BWEB payload",
+      "expected": "strict editable reader reject even if CRC valid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "EXPANSION_BOMB",
+      "input": "oversized raw length or zip bomb",
+      "expected": "bounded rejection",
+      "status": "NOT_RUN"
+    }
+  ],
+  "actualConsumerChecks": [
+    {
+      "repo": "KaisAbiyyi/sibambo-editor",
+      "pr": 10,
+      "prHead": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+      "run": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+      "result": "PASS",
+      "passed": 38,
+      "failed": 0,
+      "capability": "Editor writer to strict editable and E4 viewer. Six BMB-007 containers structurally parse, strict authoring correctly rejects."
+    },
+    {
+      "repo": "KaisAbiyyi/sibambo-model-eval",
+      "pr": 3,
+      "prHead": "b11af1394eef8e7fa110a5a4db9adbc380a8aa07",
+      "run": "https://github.com/KaisAbiyyi/sibambo-model-eval/actions/runs/40064799201",
+      "result": "PASS",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 2,
+      "capability": "Real BOMC 1.2 semantic loader works on native synthetic models. Six BMB-007 containers structurally parse but semantic load correctly rejects; external pairing NOT_RUN."
+    }
+  ]
+}

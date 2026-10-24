@@ -1,0 +1,25 @@
+name: BMB-005 compatibility inventory
+on:
+  pull_request:
+    paths:
+      - 'compatibility/**'
+      - 'tests/test_compatibility_matrix.py'
+      - 'docs/COMPATIBILITY-MATRIX.md'
+      - '.github/workflows/compatibility.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'compatibility/**'
+      - 'tests/test_compatibility_matrix.py'
+      - 'docs/COMPATIBILITY-MATRIX.md'
+permissions:
+  contents: read
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -p 'test_compatibility_matrix.py' -v
