@@ -1,0 +1,175 @@
+{
+  "schema_version": "bmb-agent-baseline/0.1",
+  "fixture_id": "bmb004-agent-baseline-v0",
+  "kind": "design-only-synthetic",
+  "format_target": "bomc/1.2-declared-subset",
+  "coordinate_system": {
+    "units": "metres",
+    "handedness": "right",
+    "up": "+Z",
+    "north": "+Y"
+  },
+  "prompt": "Design a simple one-storey house within a 10 m × 14 m site, with a total enclosed footprint no greater than 85 m². Include one living room at least 16 m², two bedrooms each at least 9 m², and one bathroom at least 4 m². The main entry faces south; each bedroom is connected to the living room through an accessible circulation path and every specified doorway must be an actual wall cutout at least 0.80 m clear width. Use one floor slab, 0.15 m nominal wall thickness, 2.8 m nominal wall height, and one simple roof. The coordinate system is metres, right-handed, +Z up, north at +Y. Give shared walls exactly one owning module. Build from named modules, validate, revise the living-room doorway from 0.90 m to 0.95 m without rewriting unrelated modules, then compile one deterministic BOMC 1.2 file. Return manifest/revisions, validation failures and recoveries, compiled SHA256, independent Editor and Model-Eval import results, and per-run token/tool/time/memory statistics. If a tool or evidence is unavailable, report NOT_RUN; do not invent success.",
+  "site": {
+    "width_m": 10,
+    "depth_m": 14,
+    "max_footprint_m2": 85,
+    "storeys": 1
+  },
+  "rooms": [
+    {
+      "id": "house/f1/living",
+      "type": "living",
+      "min_area_m2": 16
+    },
+    {
+      "id": "house/f1/bed-a",
+      "type": "bedroom",
+      "min_area_m2": 9
+    },
+    {
+      "id": "house/f1/bed-b",
+      "type": "bedroom",
+      "min_area_m2": 9
+    },
+    {
+      "id": "house/f1/bath",
+      "type": "bathroom",
+      "min_area_m2": 4
+    }
+  ],
+  "walls": {
+    "thickness_m": 0.15,
+    "height_m": 2.8,
+    "unique_shared_wall_owner": true
+  },
+  "door": {
+    "module_id": "house/f1/living",
+    "initial_clear_width_m": 0.9,
+    "final_clear_width_m": 0.95,
+    "minimum_clear_width_m": 0.8,
+    "requires_real_cutout": true
+  },
+  "trial_policy": {
+    "cold_trials": 3,
+    "same_input_twice_compiled": true,
+    "require_independent_editor_and_model_eval": true,
+    "native_visual_gate": "NOT_RUN"
+  },
+  "script": [
+    {
+      "step": 1,
+      "tool": "project_info",
+      "effect": "read",
+      "expected": "PASS",
+      "assert": "capabilities and limits visible"
+    },
+    {
+      "step": 2,
+      "tool": "project_create",
+      "effect": "write",
+      "key": "create-house-v0",
+      "expected": "PASS",
+      "assert": "new project and revision receipt"
+    },
+    {
+      "step": 3,
+      "tool": "project_create",
+      "effect": "replay",
+      "key": "create-house-v0",
+      "expected": "PASS",
+      "assert": "same receipt no revision advancement"
+    },
+    {
+      "step": 4,
+      "tool": "module_create",
+      "effect": "write",
+      "key": "create-modules-v0",
+      "expected": "PASS",
+      "assert": "four stable room IDs plus floor, walls and roof, one shared wall owner"
+    },
+    {
+      "step": 5,
+      "tool": "module_inspect",
+      "effect": "read",
+      "expected": "PASS",
+      "assert": "scoped living + neighbors and revision only"
+    },
+    {
+      "step": 6,
+      "tool": "assembly_validate",
+      "effect": "read",
+      "expected": "PASS",
+      "assert": "structured constraints and actionable diagnostics"
+    },
+    {
+      "step": 7,
+      "tool": "module_patch",
+      "effect": "negative-write",
+      "key": "stale-living-v0",
+      "expected": "REVISION_CONFLICT",
+      "assert": "stale expected revision rejected with zero writes"
+    },
+    {
+      "step": 8,
+      "tool": "module_patch",
+      "effect": "write",
+      "key": "patch-living-v1",
+      "expected": "PASS",
+      "assert": "living doorway 0.95m; unrelated module hashes unchanged"
+    },
+    {
+      "step": 9,
+      "tool": "module_patch",
+      "effect": "replay",
+      "key": "patch-living-v1",
+      "expected": "PASS",
+      "assert": "same receipt, no duplicate change"
+    },
+    {
+      "step": 10,
+      "tool": "assembly_validate",
+      "effect": "read",
+      "expected": "PASS",
+      "assert": "nonblocking diagnostics; door connectivity and no double-owned wall"
+    },
+    {
+      "step": 11,
+      "tool": "bomc_compile",
+      "effect": "derived-write",
+      "key": "compile-v0",
+      "expected": "PASS",
+      "assert": "compiled BOMC declared subset with valid CRC"
+    },
+    {
+      "step": 12,
+      "tool": "bomc_inspect",
+      "effect": "read",
+      "expected": "PASS",
+      "assert": "2 isolated cold compiles matching SHA256"
+    },
+    {
+      "step": 13,
+      "tool": "consumer_readback",
+      "effect": "external-check",
+      "expected": "PASS",
+      "assert": "Editor and Model-Eval import independently"
+    }
+  ],
+  "required_gates": [
+    "security",
+    "geometry",
+    "revision_locality",
+    "determinism",
+    "editor_import",
+    "model_eval_import"
+  ],
+  "initial_evidence": {
+    "status": "NOT_RUN",
+    "recorded_tool_calls": null,
+    "elapsed_ms": null,
+    "token_count": null,
+    "rss_peak_bytes": null,
+    "bomc_sha256": null
+  }
+}
