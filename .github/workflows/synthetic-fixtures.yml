@@ -4,6 +4,7 @@ on:
     paths:
       - 'tools/bomc_fixture_harness.py'
       - 'tests/test_fixture_harness.py'
+      - 'fixtures/container-only-reference-sha256.json'
       - '.github/workflows/synthetic-fixtures.yml'
   push:
     branches: [main]
