@@ -13,6 +13,8 @@ An independently authored Python stdlib harness generates **six deterministic BO
 - Run `python tools/bomc_fixture_harness.py --check DIRECTORY`; byte-for-byte compare against the original recipe.
 - GitHub CI performs two cold process runs and checks all generated outputs and hashes, retaining a 14-day **container-only** artifact.
 
+The [committed cloud reference SHA ledger](../fixtures/container-only-reference-sha256.json) fixes the six generated SHA256 and file lengths from successful CI run 40063418837; the unit test fails on unexpected bytes. This ledger still certifies **container integrity only**.
+
 ## Negative cases and budgets
 
 Ten independent vectors must fail under the strict structural reader: invalid magic, 1.3 and 2.0 versions, unknown header bit, truncation, CRC mutation, unsupported codec, oversized expanded allocation, payload overlap with directory, and duplicate section. Guards: maximum input and expanded bytes 2 MiB, maximum sections 64. These are harness safety budgets, not normative BOMC maxima. The harness is a strict synthetic test reader, not a replacement for producer or consumer decoders.
