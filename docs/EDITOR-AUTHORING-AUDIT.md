@@ -76,7 +76,7 @@ The writer supports `compressionMode: 'auto' | 'store-only'` (`auto` considers D
 | Polygon loops/holes/extruded meshes | Accepted **only with supplied valid triangles** | Independently create + triangulate/validate in BMB-013–017 |
 | Editable imported arbitrary BOMC / opaque section preservation after edits | **Not** supported | Fail closed; do not offer editing by `copyUnchanged` |
 | Tags, UVs, textures, scene/clip state, fallback, arbitrary E4 features | Unsupported in authoring profile | Exclude from MVP; explicit capability error rather than drop |
-| BSON or future BOMC versions 1.3/2.0 | No evidence of support | Version-dispatch adapters only after new pinned schema + golden tests |
+| Future BOMC versions 1.3/2.0 | No evidence of support | Version-dispatch adapters only after new pinned schema + golden tests |
 | Atomic graph edit, cache invalidation | Supported within one in-memory document | Independent Builder mutation core + durable module journal/revision discipline; no source reuse |
 | Production consumer compatibility | Existing test definitions for three viewer loaders; not run here | BMB-005 matrix and BMB-007/021 actual fixture+consumer CI gates |
 
