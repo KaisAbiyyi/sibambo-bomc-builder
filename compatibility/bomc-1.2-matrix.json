@@ -3,7 +3,8 @@
   "statusLegend": {
     "SOURCE_ONLY": "Observed in pinned source; not executed by this task",
     "NOT_RUN": "Executable integration gate not run",
-    "UNSUPPORTED_BY_SOURCE": "Pinned reader explicitly rejects or lacks required authoring payload"
+    "UNSUPPORTED_BY_SOURCE": "Pinned reader explicitly rejects or lacks required authoring payload",
+    "PASS": "Original private consumer test actually executed and passed at immutable source/CI head; only the named pairing is certified."
   },
   "sourcePins": {
     "producer": {
@@ -129,11 +130,11 @@
       "limitation": "Viewer loader is not the editable document reader; exact required-set gates require integration tests"
     },
     "modelEvalViewer": {
-      "version": "unknown from executed test",
+      "version": "1.0/1.1/1.2 (self-contained BOMC 1.2 exercised in CI)",
       "required": [],
       "optional": [],
       "special": [],
-      "limitation": "Historical docs describe 1.0/1.1; support for 1.2 and section 241 unverified"
+      "limitation": "Real Model-Eval 1.2 semantic loader PASS in private CI, but no Ruby/Editor-to-ModelEval producer pairing has been executed."
     }
   },
   "cases": [
@@ -169,15 +170,31 @@
       "id": "EDITOR12_EDITOR_WEB_EDIT",
       "writer": "editorWebCore12",
       "reader": "editorWebCore12",
-      "status": "SOURCE_ONLY",
-      "claim": "Private package declares web-core-v1 write/read and test definitions; execution not observed"
+      "status": "PASS",
+      "claim": "Actual Editor writer -> strict editable readback exact graph equality in cloud CI; hole, nested, color, section 241.",
+      "evidence": {
+        "repo": "KaisAbiyyi/sibambo-editor",
+        "sourceBaseSha": "641a6f84a28ba3ed50610aaabd47b76d913c4e22",
+        "testedPrHeadSha": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+        "mergedCommitSha": "f5feb660a05a274aa2726ee0603ad1e53c69cb40",
+        "ciRun": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+        "scope": "three semantic Editor-authored fixtures and existing roundtrip regression suite, NOT external Ruby/Builder output"
+      }
     },
     {
       "id": "EDITOR12_EDITOR_E4_VIEW",
       "writer": "editorWebCore12",
       "reader": "editorE4Viewer",
-      "status": "NOT_RUN",
-      "claim": "Viewer tests defined in Editor repository but not run here"
+      "status": "PASS",
+      "claim": "Actual Editor writer -> original E4 viewer semantics in cloud CI; hole, nested and two-sided materials.",
+      "evidence": {
+        "repo": "KaisAbiyyi/sibambo-editor",
+        "sourceBaseSha": "641a6f84a28ba3ed50610aaabd47b76d913c4e22",
+        "testedPrHeadSha": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+        "mergedCommitSha": "f5feb660a05a274aa2726ee0603ad1e53c69cb40",
+        "ciRun": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+        "scope": "three semantic Editor-authored fixtures and existing roundtrip regression suite, NOT external Ruby/Builder output"
+      }
     },
     {
       "id": "EDITOR12_MODEL_EVAL",
@@ -242,6 +259,29 @@
       "input": "oversized raw length or zip bomb",
       "expected": "bounded rejection",
       "status": "NOT_RUN"
+    }
+  ],
+  "actualConsumerChecks": [
+    {
+      "repo": "KaisAbiyyi/sibambo-editor",
+      "pr": 10,
+      "prHead": "17f224bd57e67fdcf35ee628efa7e9d681e72285",
+      "run": "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/40064796823",
+      "result": "PASS",
+      "passed": 38,
+      "failed": 0,
+      "capability": "Editor writer to strict editable and E4 viewer. Six BMB-007 containers structurally parse, strict authoring correctly rejects."
+    },
+    {
+      "repo": "KaisAbiyyi/sibambo-model-eval",
+      "pr": 3,
+      "prHead": "b11af1394eef8e7fa110a5a4db9adbc380a8aa07",
+      "run": "https://github.com/KaisAbiyyi/sibambo-model-eval/actions/runs/40064799201",
+      "result": "PASS",
+      "passed": 40,
+      "failed": 0,
+      "skipped": 2,
+      "capability": "Real BOMC 1.2 semantic loader works on native synthetic models. Six BMB-007 containers structurally parse but semantic load correctly rejects; external pairing NOT_RUN."
     }
   ]
 }
