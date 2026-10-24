@@ -1,0 +1,35 @@
+name: BMB-004 design-contract checks
+
+on:
+  push:
+    branches:
+      - docs/bmb-004-mcp-threat-baseline
+    paths:
+      - 'benchmarks/agent-baseline-v0.json'
+      - 'scripts/validate_bmb004_baseline.py'
+      - 'tests/test_bmb004_baseline.py'
+      - '.github/workflows/bmb004-design-contract.yml'
+  pull_request:
+    paths:
+      - 'benchmarks/agent-baseline-v0.json'
+      - 'scripts/validate_bmb004_baseline.py'
+      - 'tests/test_bmb004_baseline.py'
+      - '.github/workflows/bmb004-design-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  design-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate synthetic baseline contract
+        run: python scripts/validate_bmb004_baseline.py
+      - name: Run adversarial contract-lint tests
+        run: python -m unittest discover -s tests -p 'test_bmb004_*.py' -v
