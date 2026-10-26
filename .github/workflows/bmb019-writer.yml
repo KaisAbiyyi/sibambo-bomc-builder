@@ -1,0 +1,30 @@
+name: BMB-019 writer subset
+on:
+  push:
+    paths:
+      - "bomc/adapter/**"
+      - "tests/test_bmb019_writer.py"
+      - ".github/workflows/bmb019-writer.yml"
+  pull_request:
+    paths:
+      - "bomc/adapter/**"
+      - "tests/test_bmb019_writer.py"
+      - ".github/workflows/bmb019-writer.yml"
+  workflow_dispatch:
+
+jobs:
+  semantic-subset:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Writer semantic subset and rejection regression
+        run: python -m unittest discover -s tests -p test_bmb019_writer.py -v
+      - name: Existing BMB-007 container regression
+        run: python tools/bomc_fixture_harness.py --selftest
