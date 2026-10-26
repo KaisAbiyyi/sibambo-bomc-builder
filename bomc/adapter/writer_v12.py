@@ -51,15 +51,24 @@ def _name(value: object, label: str) -> str:
     _require(isinstance(value, str) and 1 <= len(value) <= 128,
              f"{label}: must be nonempty text up to 128 characters")
     _require(not any(ord(ch) < 32 for ch in value), f"{label}: control characters unsupported")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise UnsupportedFeature(f"{label}: invalid Unicode") from exc
     return value
 
 
 def _affine(value: object, label: str) -> tuple[float, ...]:
     _require(isinstance(value, list) and len(value) == 16,
              f"{label}: requires 16 column-major scalars")
-    _require(all(type(v) in (float, int) and math.isfinite(v) for v in value),
-             f"{label}: non-finite/non-numeric transform")
-    matrix = tuple(float(v) for v in value)
+    _require(all(type(v) in (float, int) for v in value),
+             f"{label}: non-numeric transform")
+    try:
+        matrix = tuple(float(v) for v in value)
+    except (OverflowError, ValueError) as exc:
+        raise UnsupportedFeature(f"{label}: transform number exceeds budget") from exc
+    _require(all(math.isfinite(v) for v in matrix),
+             f"{label}: non-finite transform")
     _require(matrix[3] == matrix[7] == matrix[11] == 0.0 and matrix[15] == 1.0,
              f"{label}: only affine transforms supported")
     a, b, c, d, e, f, g, h, i = (matrix[k] for k in (0, 4, 8, 1, 5, 9, 2, 6, 10))

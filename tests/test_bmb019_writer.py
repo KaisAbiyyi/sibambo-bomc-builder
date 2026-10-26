@@ -111,6 +111,8 @@ class WriterTests(unittest.TestCase):
         self.assert_rejected(lambda d: d["nodes"][0].update(parentId="child"))
         self.assert_rejected(lambda d: d["nodes"][1].update(transform=[0] * 16))
         self.assert_rejected(lambda d: d["nodes"][0]["transform"].__setitem__(12, float("nan")))
+        self.assert_rejected(lambda d: d["nodes"][0]["transform"].__setitem__(12, 10 ** 500))
+        self.assert_rejected(lambda d: d["nodes"][0].update(name="bad\\ud800"))
         self.assert_rejected(lambda d: d["nodes"][0]["transform"].__setitem__(0, 0.0))
         self.assert_rejected(lambda d: d["nodes"][0]["transform"].__setitem__(3, 1.0))
         self.assert_rejected(lambda d: d["nodes"].append(copy.deepcopy(d["nodes"][0])))
