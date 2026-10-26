@@ -28,3 +28,44 @@ jobs:
         run: python -m unittest discover -s tests -p test_bmb019_writer.py -v
       - name: Existing BMB-007 container regression
         run: python tools/bomc_fixture_harness.py --selftest
+
+  pinned-ruby-decoder-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Read-only checkout of BMB-001 pinned public reference consumer
+        uses: actions/checkout@v4
+        with:
+          repository: KaisAbiyyi/sibambo-bom-engine-plugin
+          ref: 988c4ef250e098d627f480a6f571693975227fee
+          path: _pinned_producer
+          persist-credentials: false
+      - name: Generate independent synthetic metadata fixture
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from bomc.adapter.writer_v12 import IDENTITY, encode_graph
+          g = {"schemaVersion": "bmb-writer-graph-v1", "name": "Synthetic tree",
+               "nodes": [
+                   {"id": "root", "kind": "root", "name": "Synthetic tree",
+                    "parentId": None, "transform": list(IDENTITY)},
+                   {"id": "child", "kind": "group", "name": "Empty group",
+                    "parentId": "root", "transform": list(IDENTITY)},
+               ]}
+          Path("subset-smoke.bomc").write_bytes(encode_graph(g))
+          PY
+      - name: Actual Ruby decoder smoke — no source vendoring
+        shell: bash
+        run: |
+          ruby -I _pinned_producer -r ./_pinned_producer/bom_engine/bomc_decoder -e '
+            doc = BOMEngine::BOMCDecoder.decode(File.binread("subset-smoke.bomc"))
+            abort "wrong format" unless doc[:format][:version] == "1.2"
+            abort "wrong metadata" unless doc[:definitions].size == 2 && doc[:instances].size == 2
+            abort "wrong hierarchy" unless doc[:instances][1][:owner_definition] == 0
+            abort "unexpected geometry" unless doc[:meshes].empty? && doc[:coverage][:eligible] == 0
+            puts "PASS pinned Ruby reader minimal metadata subset"
+          '
