@@ -54,3 +54,13 @@ python -m unittest discover -s tests -p 'test_bmb019_writer.py' -v
   module IR conversion are **NOT_RUN**, assigned to BMB-020/021.
 - GPL-3.0; clean-room independent Python code. **Synthetic-only** examples.
   No producer/Editor/Model-Eval implementation copied or linked into Builder.
+
+## 2026-10-26 cloud test access boundary
+
+An exploratory pinned Ruby reference-reader checkout in PR #42 GitHub Actions
+could not fetch `KaisAbiyyi/sibambo-bom-engine-plugin` with the builder
+repository's workflow token (GitHub returned `Repository not found`). The
+reader was **never executed**; this is an **access/infrastructure blocker** for
+the optional cross-repo smoke, **NOT_RUN**, not a semantic parser PASS or FAIL.
+The non-mandatory checkout job was removed from the required CI path; BMB-021
+owns properly credentialed independent semantic consumer certification.
