@@ -122,6 +122,12 @@ class SemanticFaceTests(unittest.TestCase):
         with self.assertRaises(SemanticFaceError):
             decode_semantic_module(altered)
 
+    def test_reference_table_budgets_fail_closed(self):
+        self.assert_semantic_rejected(lambda d: d["materials"].extend(
+            {"materialId": "mat-" + str(i)} for i in range(2001)))
+        self.assert_semantic_rejected(lambda d: d["operations"].extend(
+            {"opId": "op-" + str(i)} for i in range(10_001)))
+
     def test_nan_in_other_fields_is_not_serialized(self):
         self.assert_semantic_rejected(lambda d: d["materials"][0].update(opacity=float("nan")))
 

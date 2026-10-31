@@ -56,6 +56,8 @@ def inspect_semantic_faces(module: dict) -> list[dict]:
     faces = module.get("semanticFaces", [])
     _need(isinstance(materials, list) and isinstance(operations, list),
           "module requires material and operation arrays")
+    _need(len(materials) <= 2000 and len(operations) <= 10_000,
+          "module semantic reference arrays exceed IR budgets")
     _need(isinstance(faces, list) and len(faces) <= MAX_FACES,
           "semanticFaces must be a bounded array")
 
