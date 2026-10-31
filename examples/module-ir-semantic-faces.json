@@ -1,0 +1,211 @@
+{
+  "schemaVersion": "1.0.0",
+  "modules": [
+    {
+      "schemaVersion": "1.0.0",
+      "moduleId": "house/test/finishes",
+      "parentId": null,
+      "revision": 0,
+      "localFrame": {
+        "unit": "m",
+        "handedness": "right",
+        "upAxis": "+Z",
+        "forwardAxis": "+Y",
+        "transform": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          4,
+          3,
+          3
+        ]
+      },
+      "operations": [
+        {
+          "kind": "floor-slab",
+          "opId": "floor-plate",
+          "role": "floor",
+          "materialId": "tile",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "thickness": 0.15,
+          "elevation": 0
+        },
+        {
+          "kind": "wall-run",
+          "opId": "north-wall",
+          "role": "wall",
+          "materialId": "plaster",
+          "path": [
+            [
+              0,
+              3
+            ],
+            [
+              4,
+              3
+            ]
+          ],
+          "thickness": 0.15,
+          "height": 2.8,
+          "baseElevation": 0
+        },
+        {
+          "kind": "floor-slab",
+          "opId": "roof-plate",
+          "role": "roof",
+          "materialId": "roofing",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              0,
+              3
+            ]
+          ],
+          "thickness": 0.18,
+          "elevation": 2.82
+        }
+      ],
+      "materials": [
+        {
+          "materialId": "tile",
+          "rgba": [
+            214,
+            203,
+            180,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "floor"
+        },
+        {
+          "materialId": "concrete",
+          "rgba": [
+            159,
+            159,
+            159,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "other"
+        },
+        {
+          "materialId": "plaster",
+          "rgba": [
+            240,
+            236,
+            230,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "wall"
+        },
+        {
+          "materialId": "brick",
+          "rgba": [
+            174,
+            87,
+            69,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "wall"
+        },
+        {
+          "materialId": "roofing",
+          "rgba": [
+            91,
+            98,
+            107,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "roof"
+        }
+      ],
+      "semanticFaces": [
+        {
+          "faceId": "floor-top",
+          "ownerOpId": "floor-plate",
+          "role": "floor",
+          "label": "Living floor top",
+          "frontMaterialId": "tile",
+          "backMaterialId": "concrete"
+        },
+        {
+          "faceId": "north-wall-exterior",
+          "ownerOpId": "north-wall",
+          "role": "wall",
+          "label": "North wall finish",
+          "frontMaterialId": "plaster",
+          "backMaterialId": "brick"
+        },
+        {
+          "faceId": "roof-top",
+          "ownerOpId": "roof-plate",
+          "role": "roof",
+          "label": "Flat roof top",
+          "frontMaterialId": "roofing",
+          "backMaterialId": "concrete"
+        }
+      ],
+      "ports": [],
+      "ownedSeams": [],
+      "dependencies": [],
+      "provenance": {
+        "origin": "synthetic",
+        "generator": "bmb-018-clean-room",
+        "note": "Authoring intent only; no generated faces or consumer semantic guarantee"
+      }
+    }
+  ]
+}

@@ -625,6 +625,54 @@
               "maxLength": 400
             }
           }
+        },
+        "semanticFaces": {
+          "type": "array",
+          "description": "Optional per-module solid face semantics. ownerOpId and material IDs are validated against this module; orientation and actual topology remain downstream.",
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/semanticFace"
+          }
+        }
+      }
+    },
+    "semanticFace": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Builder-authoring semantic annotation for one face of a future solid; not a tessellated or BOMC binary face.",
+      "required": [
+        "faceId",
+        "ownerOpId",
+        "role",
+        "label",
+        "frontMaterialId",
+        "backMaterialId"
+      ],
+      "properties": {
+        "faceId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "ownerOpId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "role": {
+          "enum": [
+            "wall",
+            "floor",
+            "roof"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Human-readable authoring label; no control characters (semantic validator)."
+        },
+        "frontMaterialId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "backMaterialId": {
+          "$ref": "#/$defs/smallId"
         }
       }
     }
