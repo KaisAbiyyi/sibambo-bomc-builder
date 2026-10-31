@@ -10,7 +10,7 @@ Faces are planar polygon loops (counter-clockwise seen from outside, outward uni
 
 ## Validation (fail closed, nothing returned on error)
 
-- thickness finite, in (0, 100] m; all numbers finite, real (bool/str rejected), |value| ≤ 1e4 m.
+- thickness finite, in (0, 100] m; all numbers finite, real (bool/str rejected), |value| ≤ 1e4 m (out-of-range integers are rejected before float conversion, so no OverflowError).
 - footprint 3..1024 vertices (stricter than the schema's 4096 because the simplicity check is O(n²)); each edge ≥ 1 µm; area ≥ 1e-6 m².
 - footprint must be a simple polygon: no self-intersection, touching, repeated vertex, repeated closing point or edges folding back on themselves. Orientation tests use exact rational arithmetic. Collinear extra vertices are allowed.
 - ids follow the IR slug pattern; role is one of the IR roles; unknown fields rejected.

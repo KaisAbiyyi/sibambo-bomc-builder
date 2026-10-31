@@ -98,6 +98,21 @@ class SlabTests(unittest.TestCase):
         s = build_floor_slab(op(((0, 0), (2, 0), (4, 0), (4, 3), (0, 3))))
         self.assertAlmostEqual(s.area, 12.0)
 
+    def test_collinear_vertex_at_every_index_and_orientation(self):
+        ring = [(0, 0), (2, 0), (4, 0), (4, 3), (0, 3)]  # (2,0) is straight-through
+        for rev in (False, True):
+            base = ring[::-1] if rev else ring
+            for k in range(len(base)):  # every rotation puts the collinear vertex at a different index
+                s = build_floor_slab(op(base[k:] + base[:k]))
+                self.assertAlmostEqual(s.area, 12.0)
+        self.assertAlmostEqual(build_floor_slab(op(((2, 0), (4, 0), (4, 3), (0, 3), (0, 0)))).area, 12.0)
+
+    def test_spike_rejected_at_every_index(self):
+        ring = [(0, 0), (4, 0), (2, 0), (2, 3)]  # (4,0)->(2,0) folds back
+        for k in range(len(ring)):
+            with self.assertRaises(FloorError, msg=str(k)):
+                build_floor_slab(op(ring[k:] + ring[:k]))
+
     def test_deterministic(self):
         self.assertEqual(build_floor_slab(op(L_SHAPE)), build_floor_slab(op(L_SHAPE)))
 
@@ -116,6 +131,12 @@ class RejectionTests(unittest.TestCase):
     def test_thickness(self):
         for t in (0, -0.1, math.nan, math.inf, "0.1", None, True, 101, 1e300):
             self.bad(op(thickness=t))
+
+    def test_giant_integers_raise_floorerror_not_overflow(self):
+        for big in (10 ** 400, -10 ** 400, 10 ** 5):
+            self.bad(op(thickness=big))
+            self.bad(op(elevation=big))
+            self.bad(op(((0, 0), (big, 0), (big, 3), (0, 3))))
 
     def test_elevation_and_numbers(self):
         for e in (math.nan, "0", None, 1e9):

@@ -35,6 +35,8 @@ def _need(test: bool, reason: str) -> None:
 
 def _number(value: object, label: str) -> float:
     _need(type(value) in (int, float), f"{label}: must be a number")
+    if type(value) is int:  # reject before float(): huge ints raise OverflowError
+        _need(abs(value) <= MAX_ABS_VALUE, f"{label}: non-finite or out of range")
     v = float(value)
     _need(math.isfinite(v) and abs(v) <= MAX_ABS_VALUE, f"{label}: non-finite or out of range")
     return v + 0.0
@@ -86,18 +88,20 @@ def _check_simple(pts: list[tuple[float, float]]) -> None:
     for i in range(n):
         a, b = edges[i]
         _need(math.hypot(b[0] - a[0], b[1] - a[1]) >= MIN_EDGE, f"edge {i}: shorter than {MIN_EDGE} m")
-        for j in range(i + 1, n):
+    # consecutive edges (including the closing wraparound) share one vertex; a collinear
+    # reversal there is a spike. Straight-through collinear vertices are fine at any index.
+    for k in range(n):
+        p, v, q = pts[k - 1], pts[k], pts[(k + 1) % n]
+        if _orient(p, v, q) == 0:
+            dot = (Fraction(v[0]) - Fraction(p[0])) * (Fraction(q[0]) - Fraction(v[0])) \
+                + (Fraction(v[1]) - Fraction(p[1])) * (Fraction(q[1]) - Fraction(v[1]))
+            _need(dot > 0, f"vertex {k}: edges fold back on each other")
+    for i in range(n):
+        a, b = edges[i]
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue  # adjacent through the wraparound vertex, handled above
             c, d = edges[j]
-            if j == i + 1 or (i == 0 and j == n - 1):
-                # neighbours share exactly one endpoint; collinear overlap means a spike
-                shared_cross = _orient(a, b, d) if j == i + 1 else _orient(c, d, b)
-                other = d if j == i + 1 else b
-                if shared_cross == 0:
-                    s, t = (b, a) if j == i + 1 else (a, b)  # shared vertex, far end of first edge
-                    _need((Fraction(s[0]) - Fraction(t[0])) * (Fraction(other[0]) - Fraction(s[0]))
-                          + (Fraction(s[1]) - Fraction(t[1])) * (Fraction(other[1]) - Fraction(s[1])) > 0,
-                          f"edges {i} and {j}: fold back on each other")
-                continue
             if (max(a[0], b[0]) < min(c[0], d[0]) or max(c[0], d[0]) < min(a[0], b[0])
                     or max(a[1], b[1]) < min(c[1], d[1]) or max(c[1], d[1]) < min(a[1], b[1])):
                 continue
