@@ -1,0 +1,32 @@
+name: BMB-018 authored face semantics
+on:
+  pull_request:
+    paths:
+      - 'core/geometry/semantics.py'
+      - 'schemas/module-ir-v1.schema.json'
+      - 'tests/test_bmb018_semantics.py'
+      - '.github/workflows/bmb018-semantics.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/geometry/semantics.py'
+      - 'schemas/module-ir-v1.schema.json'
+      - 'tests/test_bmb018_semantics.py'
+      - '.github/workflows/bmb018-semantics.yml'
+permissions:
+  contents: read
+jobs:
+  authored-semantics:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install jsonschema==4.23.0
+      - run: python -m unittest discover -s tests -p 'test_bmb018_semantics.py' -v
+      - run: python -m unittest discover -s tests -p 'test_module_ir_schema.py' -v

@@ -625,6 +625,51 @@
               "maxLength": 400
             }
           }
+        },
+        "faceAnnotations": {
+          "type": "array",
+          "maxItems": 8192,
+          "items": {
+            "$ref": "#/$defs/faceAnnotation"
+          }
+        }
+      }
+    },
+    "faceAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opId",
+        "faceKey",
+        "role",
+        "frontMaterialId",
+        "backMaterialId",
+        "label"
+      ],
+      "properties": {
+        "opId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "faceKey": {
+          "$ref": "#/$defs/smallId"
+        },
+        "role": {
+          "enum": [
+            "floor",
+            "wall",
+            "roof"
+          ]
+        },
+        "frontMaterialId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "backMaterialId": {
+          "$ref": "#/$defs/smallId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
         }
       }
     }

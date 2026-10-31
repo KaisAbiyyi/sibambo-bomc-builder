@@ -1,0 +1,36 @@
+name: BMB-014 parametric wall geometry
+on:
+  pull_request:
+    paths:
+      - 'core/geometry/wall.py'
+      - 'tests/test_bmb014_wall.py'
+      - 'docs/BMB-014-WALLS.md'
+      - '.github/workflows/bmb014-wall.yml'
+      - 'examples/module-ir-two-rooms.json'
+  push:
+    branches: [main]
+    paths:
+      - 'core/geometry/wall.py'
+      - 'tests/test_bmb014_wall.py'
+      - '.github/workflows/bmb014-wall.yml'
+permissions:
+  contents: read
+jobs:
+  wall-shape-seams:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install schema test dependency
+        run: python -m pip install 'jsonschema==4.23.0'
+      - name: Test BMB-014 wall geometry and join seams
+        run: python -m unittest discover -s tests -p 'test_bmb014_wall.py' -v
+      - name: Test existing builder regression suite
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
