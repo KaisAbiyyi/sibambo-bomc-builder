@@ -112,6 +112,7 @@ class SemanticFaceTests(unittest.TestCase):
         payload = encode_semantic_module(self.module)
         for corrupt in (b'{"materials":[],"materials":[],"operations":[]}',
                         b'{"materials":[],"operations":[],"semanticFaces":[],"x":NaN}',
+                        b'{"materials":[],"operations":[],"semanticFaces":[],"x":1e999}',
                         b"\xff\xfe",
                         b" " * (2 * 1024 * 1024 + 1),
                         b"[]"):

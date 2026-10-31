@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
 
 ID = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
@@ -149,14 +150,20 @@ def _constant(value):
     raise SemanticFaceError(f"non-JSON numeric constant: {value}")
 
 
+def _finite_float(value: str) -> float:
+    number = float(value)
+    _need(math.isfinite(number), "non-finite JSON floating-point magnitude")
+    return number
+
+
 def decode_semantic_module(payload: bytes) -> dict:
     """Decode strict UTF-8 JSON with duplicate-key and semantic guards."""
     _need(isinstance(payload, bytes) and len(payload) <= MAX_DOCUMENT_BYTES,
           "semantic module requires bounded bytes")
     try:
         doc = json.loads(payload.decode("utf-8"), object_pairs_hook=_unique_pairs,
-                         parse_constant=_constant)
-    except (UnicodeError, ValueError, TypeError) as exc:
+                         parse_constant=_constant, parse_float=_finite_float)
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise SemanticFaceError("invalid semantic module JSON") from exc
     _need(isinstance(doc, dict), "module JSON must be an object")
     inspect_semantic_faces(doc)
