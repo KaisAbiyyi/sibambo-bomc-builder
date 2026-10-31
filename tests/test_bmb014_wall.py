@@ -35,9 +35,11 @@ def check_watertight(test, solid):
         test.assertGreaterEqual(len(vertices), 4)
         n = face["normal"]
         test.assertAlmostEqual(math.sqrt(dot(n, n)), 1)
-        geometric = cross(sub(vertices[1], vertices[0]),
-                          sub(vertices[2], vertices[1]))
-        test.assertGreater(dot(geometric, n), 1e-7, face["role"])
+        # A concave polygon's first three vertices can form a reflex corner.
+        # Accumulate the full oriented area vector instead of trusting one triad.
+        area_normal = tuple(sum(cross(vertices[i], vertices[(i + 1) % len(vertices)])[axis]
+                                for i in range(len(vertices))) for axis in range(3))
+        test.assertGreater(dot(area_normal, n), 1e-7, face["role"])
         for i, a in enumerate(vertices):
             b = vertices[(i + 1) % len(vertices)]
             ka = tuple(round(v, 9) for v in a)
