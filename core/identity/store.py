@@ -122,8 +122,8 @@ class ModuleStore:
         _need(type(expected_revision) is int and expected_revision >= 0, "expected_revision must be a non-negative int")
         _slug(KEY_PATTERN, idempotency_key, "idempotency key")
         _need(isinstance(ops, list) and 0 < len(ops) <= MAX_OPS_PER_BATCH, "ops must be 1..256 entries")
-        _need(isinstance(min_revisions or {}, dict), "min_revisions must be an object")
-        mins = dict(min_revisions or {})
+        _need(min_revisions is None or isinstance(min_revisions, dict), "min_revisions must be an object or None")
+        mins = {} if min_revisions is None else dict(min_revisions)
         for dep, need in mins.items():
             _slug(MODULE_ID_PATTERN, dep, "dependency")
             _need(type(need) is int and need >= 0, f"dependency {dep}: minimum revision must be a non-negative int")

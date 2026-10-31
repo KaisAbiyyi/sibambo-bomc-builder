@@ -66,6 +66,23 @@ class RevisionTests(unittest.TestCase):
         with self.assertRaises(StaleDependencyError):
             s.apply(M, 1, "k2", [add("wall-b")], {"house/missing": 0})
 
+    def test_malformed_falsy_min_revisions_fail_closed(self):
+        s = store()
+        s.create_module("house/kitchen")
+        s.apply(M, 0, "k0", [add("wall-a")])
+        before = s.snapshot(M)
+        for bad in ([], False, 0, "", (), "x", 3, [("house/kitchen", 1)]):
+            with self.assertRaises(IdentityError, msg=repr(bad)):
+                s.apply(M, 1, "kbad", [add("wall-b")], bad)
+            self.assertEqual((s.revision(M), s.snapshot(M)), (1, before))
+        # the rejected key was not consumed: it still works once the guard is well-formed
+        self.assertEqual(s.apply(M, 1, "kbad", [add("wall-b")], None).revision, 2)
+        self.assertEqual(s.apply(M, 2, "kok", [add("wall-c")], {}).revision, 3)
+        with self.assertRaises(StaleDependencyError):
+            s.apply(M, 3, "kdep", [add("wall-d")], {"house/kitchen": 1})
+        s.apply("house/kitchen", 0, "kk", [add("wall-a")])
+        self.assertEqual(s.apply(M, 3, "kdep", [add("wall-d")], {"house/kitchen": 1}).revision, 4)
+
 
 class IdempotencyTests(unittest.TestCase):
     def test_repeated_key_cannot_duplicate_blocks(self):
