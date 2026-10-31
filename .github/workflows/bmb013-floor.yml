@@ -1,0 +1,30 @@
+name: BMB-013 floor slab
+on:
+  push:
+    paths:
+      - "core/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb013_floor.py"
+      - ".github/workflows/bmb013-floor.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb013_floor.py"
+      - ".github/workflows/bmb013-floor.yml"
+  workflow_dispatch:
+
+jobs:
+  floor:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Floor slab geometry tests
+        run: python -m unittest discover -s tests -p test_bmb013_floor.py -v
