@@ -5,9 +5,9 @@ without bridging a hole through the outside.  All geometric predicates, sweep
 intersections and area accounting use exact rationals of the supplied finite
 float coordinates.  The public result is non-indexed, outward-wound 3D triangles.
 
-This is a triangle *soup*, not a welded/indexed manifold. Adjacent sweep cells
-may introduce T-junctions along their internal edges. Downstream consumers that
-require welded indexed topology must normalize/split shared edges separately.
+This is a non-indexed conforming triangulation: sweep-boundary edges are split
+at all incident vertices to eliminate T-junctions. Indexed solid/manifold
+interoperability still requires downstream mesh-level verification.
 """
 from __future__ import annotations
 
@@ -213,7 +213,7 @@ def triangulate_face(vertices, *, holes=(), normal=(0.0, 0.0, 1.0)) -> tuple[Tri
     coords = sorted({p.uv[0] for ring in rings for p in ring})
     nonvertical = [(a, b) for ring in rings for a, b in _edges(ring)
                    if a.uv[0] != b.uv[0]]
-    triangles = []
+    cells: list[tuple[_Point, _Point, _Point]] = []
     accounted = Fraction(0)
     for left, right in zip(coords, coords[1:]):
         mid = (left + right) / 2
@@ -238,18 +238,53 @@ def triangulate_face(vertices, *, holes=(), normal=(0.0, 0.0, 1.0)) -> tuple[Tri
                 accounted += twice / 2
                 if n[dominant] < 0:
                     q, r = r, q
-                xyz = tuple(tuple(float(v) + 0.0 for v in pt.xyz) for pt in (p, q, r))
-                u, v, w = xyz
-                av = tuple(v[k] - u[k] for k in range(3))
-                bv = tuple(w[k] - u[k] for k in range(3))
-                cross = (av[1] * bv[2] - av[2] * bv[1],
-                         av[2] * bv[0] - av[0] * bv[2],
-                         av[0] * bv[1] - av[1] * bv[0])
-                _require(sum(cross[k] * n[k] for k in range(3)) > 0,
-                         "triangle collapsed on float conversion")
-                triangles.append(Triangle(xyz, n))
-                _require(len(triangles) <= MAX_TRIANGLES,
+                cells.append((p, q, r))
+                _require(len(cells) <= MAX_TRIANGLES,
                          f"triangle budget exceeds {MAX_TRIANGLES}")
     _require(accounted == expected, "triangulated area does not match outer minus holes")
-    _require(bool(triangles), "no nonzero triangles")
+    _require(bool(cells), "no nonzero triangles")
+
+    # Independent sweep strips can otherwise form T-junctions along the
+    # vertical strip border (notably at a hole's leftmost/rightmost vertex).
+    # Every border is split at *all* vertex heights on that line. Since any
+    # nondegenerate sweep triangle has at most one vertical edge, a simple
+    # fan from its opposite vertex partitions it into conforming subtriangles.
+    border_points: dict[Fraction, dict[Fraction, _Point]] = {}
+    for tri in cells:
+        for p in tri:
+            column = border_points.setdefault(p.uv[0], {})
+            previous = column.setdefault(p.uv[1], p)
+            _require(all(abs(float(previous.xyz[k] - p.xyz[k])) <= PLANE_TOLERANCE
+                         for k in range(3)), "inconsistent coincident vertex")
+
+    conforming = []
+    for tri in cells:
+        for edge in range(3):
+            a, b, opposite = tri[edge], tri[(edge + 1) % 3], tri[(edge + 2) % 3]
+            if a.uv[0] != b.uv[0]:
+                continue
+            lo, hi = sorted((a.uv[1], b.uv[1]))
+            middles = [p for y, p in border_points[a.uv[0]].items() if lo < y < hi]
+            middles.sort(key=lambda p: p.uv[1], reverse=a.uv[1] > b.uv[1])
+            chain = [a, *middles, b]
+            conforming.extend((chain[i], chain[i + 1], opposite)
+                              for i in range(len(chain) - 1))
+            break
+        else:
+            conforming.append(tri)
+        _require(len(conforming) <= MAX_TRIANGLES,
+                 f"conforming triangle budget exceeds {MAX_TRIANGLES}")
+
+    triangles = []
+    for tri in conforming:
+        xyz = tuple(tuple(float(v) + 0.0 for v in pt.xyz) for pt in tri)
+        u, v, w = xyz
+        av = tuple(v[k] - u[k] for k in range(3))
+        bv = tuple(w[k] - u[k] for k in range(3))
+        cross = (av[1] * bv[2] - av[2] * bv[1],
+                 av[2] * bv[0] - av[0] * bv[2],
+                 av[0] * bv[1] - av[1] * bv[0])
+        _require(sum(cross[k] * n[k] for k in range(3)) > 0,
+                 "triangle collapsed on float conversion")
+        triangles.append(Triangle(xyz, n))
     return tuple(triangles)
