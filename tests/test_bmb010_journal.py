@@ -237,6 +237,141 @@ class CorruptionTests(Base):
         self.assertEqual(s.modules(), [])
 
 
+class MetadataTests(Base):
+    """Hash-consistent entries whose recorded request metadata contradicts itself must not load."""
+
+    def rewrite(self, index, edit):
+        """Edit entry `index`, then re-chain every later entry so all hashes are valid."""
+        entries = [json.loads(line) for line in self.path().read_bytes().split(b"\n")[:-1]]
+        edit(entries[index])
+        prev = journal_mod.GENESIS
+        out = []
+        for entry in entries:
+            entry["prev"] = prev
+            entry["hash"] = journal_mod._digest(entry)
+            prev = entry["hash"]
+            out.append(journal_mod._canonical(entry).encode())
+        self.path().write_bytes(b"\n".join(out) + b"\n")
+
+    def assertLoads(self):
+        return JournalStore.open(self.root)
+
+    def assertCorrupt(self):
+        with self.assertRaises(CorruptJournalError):
+            JournalStore.open(self.root)
+
+    def test_untouched_rewrite_still_loads(self):
+        self.fresh().rollback(M, 3, "rb1", 1)
+        self.rewrite(1, lambda e: None)
+        self.assertEqual(self.assertLoads().revision(M), 4)
+
+    def test_malformed_dependency_minimums(self):
+        for bad in ("x", [], None, {"Bad Id": 1}, {K: -1}, {K: True}, {K: "1"}, {"house/a": 1.5}):
+            self.fresh()
+            self.rewrite(2, lambda e, bad=bad: e.update(mins=bad))
+            self.assertCorrupt()
+            self._tmp.cleanup()
+            self.setUp()
+
+    def test_minimums_that_do_not_match_the_recorded_fingerprint(self):
+        self.fresh()
+        self.rewrite(2, lambda e: e.update(mins={K: 1}))
+        self.assertCorrupt()
+
+    def test_valid_minimums_round_trip_with_fingerprint(self):
+        s = self.fresh()
+        s.create_module(K)
+        s.apply(K, 0, "kk", [add("wall-a")])
+        s.apply(M, 3, "dep", [add("wall-d")], {K: 1})
+        r = JournalStore.open(self.root)
+        self.assertEqual(r.apply(M, 3, "dep", [add("wall-d")], {K: 1}).replayed, True)
+        with self.assertRaises(IdempotencyConflictError):
+            r.apply(M, 3, "dep", [add("wall-d")], {K: 0})
+
+    def test_foreign_fingerprint_is_not_trusted(self):
+        self.fresh()
+        self.rewrite(2, lambda e: e.update(fp="0" * 64))
+        self.assertCorrupt()
+
+    def test_rollback_metadata_must_match(self):
+        s = self.fresh()
+        s.rollback(M, 3, "rb1", 1)  # entry index 4
+        fp = lambda to, rev=3: journal_mod._fingerprint(M, rev, [{"op": "rollback", "to": to}], {})
+        # rollbackTo changed but fingerprint left alone
+        self.rewrite(4, lambda e: e.update(rollbackTo=2))
+        self.assertCorrupt()
+        # rollbackTo and fingerprint consistently changed, but the ops still restore revision 1
+        self.rewrite(4, lambda e: e.update(rollbackTo=2, fp=fp(2)))
+        self.assertCorrupt()
+
+    def test_rollback_target_range_and_type(self):
+        for bad in (-1, 3, 4, 9, True, "1", None, 1.0):
+            self.fresh().rollback(M, 3, "rb1", 1)
+            self.rewrite(4, lambda e, bad=bad: e.update(rollbackTo=bad))
+            self.assertCorrupt()
+            self._tmp.cleanup()
+            self.setUp()
+
+    def test_rollback_with_dependency_minimums_is_rejected(self):
+        self.fresh().rollback(M, 3, "rb1", 1)
+        self.rewrite(4, lambda e: e.update(mins={K: 0}))
+        self.assertCorrupt()
+
+    def test_rollback_ops_that_do_not_restore_the_target(self):
+        self.fresh().rollback(M, 3, "rb1", 1)
+        self.rewrite(4, lambda e: e.update(ops=e["ops"][:-1]))   # drops one restoring op
+        self.assertCorrupt()
+
+    def test_corrupt_metadata_leaves_other_modules_loadable(self):
+        s = self.fresh()
+        s.create_module(K)
+        s.apply(K, 0, "kk", [add("wall-a")])
+        self.rewrite(2, lambda e: e.update(fp="1" * 64))
+        self.assertCorrupt()
+        self.assertEqual(JournalStore.open(self.root, modules=[K]).revision(K), 1)
+
+
+class SizeBudgetTests(Base):
+    def test_commits_never_exceed_the_file_budget_open_accepts(self):
+        probe = JournalStore.open(self.root)
+        probe.create_module(M)
+        create_size = self.path().stat().st_size
+        probe.apply(M, 0, "k1", [add("wall-a")])
+        exact = self.path().stat().st_size                   # size after one commit
+        self._tmp.cleanup()
+        self.setUp()
+        with mock.patch.object(journal_mod, "MAX_FILE_BYTES", exact):
+            s = JournalStore.open(self.root)
+            s.create_module(M)
+            self.assertEqual(s.apply(M, 0, "k1", [add("wall-a")]).revision, 1)   # lands exactly on the budget
+            before = self.path().read_bytes()
+            self.assertEqual(len(before), exact)
+            with self.assertRaises(StorageError):
+                s.apply(M, 1, "k2", [add("wall-b")])
+            self.assertEqual((s.revision(M), self.path().read_bytes()), (1, before))
+            with self.assertRaises(StorageError):
+                s.rollback(M, 1, "rb", 0)
+            self.assertEqual(JournalStore.open(self.root).revision(M), 1)         # still opens
+            self.assertGreater(exact, create_size)
+
+    def test_create_over_the_budget_leaves_nothing(self):
+        with mock.patch.object(journal_mod, "MAX_FILE_BYTES", 10):
+            s = JournalStore.open(self.root)
+            with self.assertRaises(StorageError):
+                s.create_module(M)
+        self.assertEqual(s.modules(), [])
+        self.assertFalse(self.path().exists())
+        self.assertEqual(JournalStore.open(self.root).modules(), [])
+
+    def test_failed_budget_check_does_not_consume_the_key(self):
+        s = self.fresh()
+        size = self.path().stat().st_size
+        with mock.patch.object(journal_mod, "MAX_FILE_BYTES", size):
+            with self.assertRaises(StorageError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        self.assertEqual(s.apply(M, 3, "k4", [add("wall-d")]).revision, 4)
+
+
 class RollbackTests(Base):
     def test_rollback_restores_earlier_blocks_and_keeps_history(self):
         s = self.fresh()  # r1 {a:1,b:2}  r2 {a:9,b:2,c}  r3 {a:9,c}

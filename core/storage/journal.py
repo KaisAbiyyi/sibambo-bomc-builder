@@ -25,6 +25,7 @@ JOURNAL = "journal.jsonl"
 MAX_ENTRIES = 10_000          # revisions per module (plus the create entry)
 MAX_LINE_BYTES = 64 * 1024 * 1024
 MAX_FILE_BYTES = 256 * 1024 * 1024
+MAX_ITEMS = 256               # dependency minimums per entry, as in ModuleStore ops per batch
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 FIELDS = {
     "create": {"v", "type", "moduleId", "rev", "prev", "hash"},
@@ -144,13 +145,7 @@ class JournalStore(ModuleStore):
                 if n == 0:
                     ModuleStore.create_module(self, module_id)
                 else:
-                    if not (isinstance(entry["fp"], str) and HEX64.match(entry["fp"])):
-                        raise ValueError("bad fingerprint")
-                    result = ModuleStore.apply(self, module_id, n - 1, entry["key"], entry["ops"])
-                    if result.replayed or result.revision != n:
-                        raise ValueError("duplicate idempotency key")
-                    self._keys[module_id][entry["key"]] = (entry["fp"], n)
-                    self._history[module_id].append(self._check_ops(entry["ops"]))
+                    self._replay_commit(module_id, n, kind, entry)
                 if n == 0:
                     self._history[module_id] = []
                 prev = entry["hash"]
@@ -159,6 +154,34 @@ class JournalStore(ModuleStore):
             raise CorruptJournalError(f"{module_id}: corrupt journal at line {n + 1}: {exc}") from exc
         self._tail[module_id] = (prev, len(data))
 
+    def _replay_commit(self, module_id: str, n: int, kind: str, entry: dict) -> None:
+        """Apply one commit/rollback entry and verify its recorded request metadata."""
+        mins = entry["mins"]
+        if not (isinstance(mins, dict) and len(mins) <= MAX_ITEMS
+                and all(isinstance(k, str) and MODULE_ID_PATTERN.match(k) and type(v) is int and v >= 0
+                        for k, v in mins.items())):
+            raise ValueError("bad dependency minimums")
+        if kind == "rollback":
+            target = entry["rollbackTo"]
+            if type(target) is not int or not 0 <= target < n - 1:
+                raise ValueError("bad rollbackTo")
+            if mins:
+                raise ValueError("rollback records no dependency minimums")
+            expected_fp = _fingerprint(module_id, n - 1, [{"op": "rollback", "to": target}], {})
+            restored = self._blocks_at(module_id, target)
+        checked = self._check_ops(entry["ops"])
+        if kind == "commit":
+            expected_fp = _fingerprint(module_id, n - 1, checked, mins)
+        if entry["fp"] != expected_fp:
+            raise ValueError("recorded fingerprint does not match the recorded request")
+        result = ModuleStore.apply(self, module_id, n - 1, entry["key"], entry["ops"])
+        if result.replayed or result.revision != n:
+            raise ValueError("duplicate idempotency key")
+        if kind == "rollback" and self._blocks[module_id] != restored:
+            raise ValueError(f"rollback ops do not restore revision {target}")
+        self._keys[module_id][entry["key"]] = (expected_fp, n)
+        self._history[module_id].append(checked)
+
     # --- appending ---------------------------------------------------------
     def _append(self, module_id: str, fields: dict, create: bool = False) -> None:
         path = self._path(module_id)
@@ -166,8 +189,8 @@ class JournalStore(ModuleStore):
         entry = {"v": 1, "moduleId": module_id, "prev": prev, **fields}
         entry["hash"] = _digest(entry)
         line = (_canonical(entry) + "\n").encode()
-        if len(line) > MAX_LINE_BYTES or fields["rev"] > MAX_ENTRIES:
-            raise StorageError(f"{module_id}: journal size budget exceeded")
+        if len(line) > MAX_LINE_BYTES or fields["rev"] > MAX_ENTRIES or size + len(line) > MAX_FILE_BYTES:
+            raise StorageError(f"{module_id}: journal size budget exceeded")  # a file open() would reject is never written
         if create:
             path.parent.mkdir(parents=True, exist_ok=True)
         elif path.stat().st_size != size:
