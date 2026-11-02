@@ -182,7 +182,8 @@ class StairsTest(unittest.TestCase):
             stair(origin=[10**400,0,0]), stair(origin=[9999,0,0], direction="+x"),
             stair(opId=".."), stair(materialId="Invalid"),
             stair(width=101), stair(riserHeight=0.9, stepCount=128),
-            stair(treadDepth=9, stepCount=128), stair(extra=1)
+            stair(treadDepth=9, stepCount=128), stair(extra=1),
+            stair(width=1e-6, treadDepth=1e-6)
         ]
         for op in cases:
             with self.subTest(op=str(op)[:100]), self.assertRaises(RoofError):
