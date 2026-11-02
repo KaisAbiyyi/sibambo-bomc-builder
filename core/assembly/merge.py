@@ -126,8 +126,10 @@ def _check_links(mods: dict[str, dict]) -> tuple[dict[str, tuple[float, ...]], t
             raise AssemblyError(str(exc)) from exc
         parent = mods[mid].get("parentId")
         base = resolve(parent, trail + (mid,)) if parent in mods else dag.IDENTITY  # a non-module parent is a group
-        world[mid] = dag.compose(base, local)
-        _need(all(abs(v) <= dag.MAX_ABS_VALUE for v in world[mid]), f"{mid}: world transform out of range")
+        try:  # a chain of individually valid transforms can still compose to a singular or huge one
+            world[mid] = dag.validate_transform(dag.compose(base, local), f"{mid}: composed world transform")
+        except dag.GraphError as exc:
+            raise AssemblyError(str(exc)) from exc
         return world[mid]
 
     for mid in mods:
@@ -167,6 +169,11 @@ def _check_links(mods: dict[str, dict]) -> tuple[dict[str, tuple[float, ...]], t
     return world, tuple(order)
 
 
+def _number(v: object) -> bool:
+    """A real, finite, bounded number; compares before any float() so huge ints cannot overflow."""
+    return type(v) in (int, float) and abs(v) <= dag.MAX_ABS_VALUE
+
+
 def _normalise(v: list[float]) -> tuple[float, float, float]:
     length = math.sqrt(sum(c * c for c in v))
     _need(length > 1e-9, "port normal has zero length")
@@ -177,7 +184,7 @@ def _world_port(mid: str, port: dict, world: tuple[float, ...]) -> dict:
     pid = _sid(port.get("portId"), f"{mid}.port")
     label = f"{mid}.{pid}"
     raw = port.get("normal")
-    _need(isinstance(raw, list) and len(raw) == 3 and all(type(c) in (int, float) and math.isfinite(c) for c in raw),
+    _need(isinstance(raw, list) and len(raw) == 3 and all(_number(c) for c in raw),
           f"{label}: normal must be 3 finite numbers")
     try:
         frame = dag.validate_transform(port.get("localTransform"), f"{label}.localTransform")
@@ -185,10 +192,15 @@ def _world_port(mid: str, port: dict, world: tuple[float, ...]) -> dict:
         raise AssemblyError(str(exc)) from exc
     for key in ("width", "height"):
         v = port.get(key)
-        _need(type(v) in (int, float) and math.isfinite(v) and v > 0, f"{label}: {key} must be positive")
+        _need(_number(v) and v > 0, f"{label}: {key} must be positive")
     inv = dag.invert(world)  # normals transform by the inverse transpose, which also handles mirrors and shear
     n = _normalise([sum(inv[j * 4 + i] * raw[j] for j in range(3)) for i in range(3)])
     placed = dag.compose(world, frame)
+    axes = []
+    for col in (1, 2):  # frame +Y = width direction, +Z = height direction (both tangent to the opening)
+        axes.append(_normalise([placed[col], placed[4 + col], placed[8 + col]]))
+        _need(abs(sum(a * b for a, b in zip(axes[-1], n))) <= NORMAL_TOL,
+              f"{label}: frame {'YZ'[col - 1]} axis is not tangent to the port normal in world space")
     peer = port.get("peer")
     if peer is not None:
         _need(isinstance(peer, dict) and set(peer) == {"moduleId", "portId"}, f"{label}: malformed peer")
@@ -198,25 +210,26 @@ def _world_port(mid: str, port: dict, world: tuple[float, ...]) -> dict:
         _sid(seam, f"{label}.seamId")
     _need((peer is None) == (seam is None), f"{label}: a port needs both peer and seamId, or neither")
     return {"id": (mid, pid), "normal": n, "pos": (placed[3], placed[7], placed[11]),
-            "width": float(port["width"]), "height": float(port["height"]), "peer": peer, "seam": seam}
+            "width_axis": axes[0], "height_axis": axes[1], "width": float(port["width"]), "height": float(port["height"]), "peer": peer, "seam": seam}
 
 
 def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> tuple[Seam, ...]:
     owned: dict[tuple[str, str], dict] = {}
     for mid, module in mods.items():
-        ops = {o.get("opId") for o in _list(module, "operations", mid) if isinstance(o, dict)}
+        ops = {o["opId"] for o in _list(module, "operations", mid)
+               if isinstance(o, dict) and isinstance(o.get("opId"), str)}
         for seam in _list(module, "ownedSeams", mid):
             _need(isinstance(seam, dict), f"{mid}: seam must be an object")
             sid = _sid(seam.get("seamId"), f"{mid}.seam")
             _need((mid, sid) not in owned, f"{mid}: duplicate seam {sid!r}")
             _need(seam.get("ownerModuleId") == mid, f"{mid}.{sid}: declared by {mid} but owned by {seam.get('ownerModuleId')!r}")
             parts = seam.get("participants")
-            _need(isinstance(parts, list) and len(parts) == 2 and len(set(parts)) == 2
-                  and all(isinstance(p, str) for p in parts), f"{mid}.{sid}: participants must be two distinct modules")
+            _need(isinstance(parts, list) and len(parts) == 2 and all(isinstance(p, str) for p in parts)
+                  and parts[0] != parts[1], f"{mid}.{sid}: participants must be two distinct modules")
             _need(mid in parts, f"{mid}.{sid}: owner is not a participant")
             for p in parts:
                 _need(p in mods, f"{mid}.{sid}: participant {p!r} is not in the assembly")
-            _need(seam.get("surfaceOpId") in ops, f"{mid}.{sid}: surfaceOpId {seam.get('surfaceOpId')!r} is not an operation of {mid}")
+            _need(isinstance(seam.get("surfaceOpId"), str) and seam["surfaceOpId"] in ops, f"{mid}.{sid}: surfaceOpId {seam.get('surfaceOpId')!r} is not an operation of {mid}")
             owned[(mid, sid)] = seam
 
     ports: dict[tuple[str, str], dict] = {}
@@ -246,6 +259,9 @@ def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> 
         _need(abs(sum(x * y for x, y in zip(a["normal"], b["normal"])) + 1) <= NORMAL_TOL,
               f"{label}: port normals are not opposite in world space")
         _need(math.dist(a["pos"], b["pos"]) <= POSITION_TOL, f"{label}: peer port frames do not coincide")
+        for axis in ("width_axis", "height_axis"):  # same span lines; the sign of an axis is irrelevant
+            _need(abs(sum(x * y for x, y in zip(a[axis], b[axis]))) >= 1 - NORMAL_TOL,
+                  f"{label}: peer port {axis.split('_')[0]} directions differ")
         _need(abs(a["width"] - b["width"]) <= SPAN_TOL and abs(a["height"] - b["height"]) <= SPAN_TOL,
               f"{label}: peer port spans differ")
         sid, members = a["seam"], (pair[0][0], pair[1][0])

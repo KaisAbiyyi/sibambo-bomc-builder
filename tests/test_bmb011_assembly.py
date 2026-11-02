@@ -14,9 +14,10 @@ from core.graph import dag  # noqa: E402
 LIV, HALL, BATH = "house/floor-1/living", "house/floor-1/hall", "house/floor-1/bath"
 
 
-def port(pid, peer, seam, normal, at, width=0.9, height=2.1):
+def port(pid, peer, seam, normal, at, width=0.9, height=2.1, turn=0):
+    """Port frame convention: +Y is the width direction, +Z the height; both tangent to `normal`."""
     return {"portId": pid, "kind": "doorway", "normal": list(normal),
-            "localTransform": list(dag.translation(*at)), "width": width, "height": height,
+            "localTransform": list(dag.compose(dag.translation(*at), dag.rotation_z(turn))), "width": width, "height": height,
             "peer": {"moduleId": peer[0], "portId": peer[1]} if peer else None, "seamId": seam}
 
 
@@ -35,6 +36,12 @@ def seam(sid, owner, other, op="east-wall"):
     return {"seamId": sid, "ownerModuleId": owner, "participants": [owner, other], "surfaceOpId": op}
 
 
+def _rotation_x(degrees):
+    import math
+    c, s = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    return (1.0, 0.0, 0.0, 0.0, 0.0, c, -s, 0.0, 0.0, s, c, 0.0, 0.0, 0.0, 0.0, 1.0)
+
+
 def pair():
     """living (0..4) owns the east seam shared with hall (4..6)."""
     liv = module(LIV, ports=[port("hall-door", (HALL, "living-door"), "east", (1, 0, 0), (4, 1, 0))],
@@ -46,9 +53,9 @@ def pair():
 
 def chain():
     liv, hall = pair()
-    hall["ports"].append(port("bath-door", (BATH, "hall-door"), "north", (0, 1, 0), (1, 3, 0)))
+    hall["ports"].append(port("bath-door", (BATH, "hall-door"), "north", (0, 1, 0), (1, 3, 0), turn=90))
     hall["ownedSeams"].append(seam("north", HALL, BATH))
-    bath = module(BATH, at=(4, 3, 0), ports=[port("hall-door", (HALL, "bath-door"), "north", (0, -1, 0), (1, 0, 0))],
+    bath = module(BATH, at=(4, 3, 0), ports=[port("hall-door", (HALL, "bath-door"), "north", (0, -1, 0), (1, 0, 0), turn=90)],
                   deps=[(HALL, 0)], revision=0)
     return [bath, hall, liv]
 
@@ -102,23 +109,40 @@ class MergeTests(unittest.TestCase):
     def test_rotated_module_normals_follow_the_frame(self):
         liv, hall = pair()
         hall["localFrame"]["transform"] = list(dag.compose(dag.translation(4, 0, 0), dag.rotation_z(90)))
-        hall["ports"][0]["localTransform"] = list(dag.translation(1, 0, 0))   # world (4, 1, 0)
+        # local port frame: origin (1, 0, 0), +Y (width) along local -x so it is tangent to the local normal +y
+        hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(1, 0, 0), dag.rotation_z(90)))
         hall["ports"][0]["normal"] = [0, 1, 0]                                 # rotates to world -x
         self.assertEqual(len(assemble([liv, hall]).seams), 1)
         hall["ports"][0]["normal"] = [0, -1, 0]
         with self.assertRaises(AssemblyError):
             assemble([liv, hall])
 
-    def test_sheared_module_normals_use_the_inverse_transpose(self):
-        liv, hall = pair()
+    def test_sheared_parent_uses_inverse_transpose_for_normals_and_forward_for_tangents(self):
         k = 0.5
-        hall["localFrame"]["transform"] = list(dag.compose(dag.translation(4, 0, 0), dag.shear_xy(k)))
-        hall["ports"][0]["localTransform"] = list(dag.translation(-k, 1, 0))  # world (4, 1, 0)
-        hall["ports"][0]["normal"] = [-1, -k, 0]                               # (M^-T) n = (-1, 0, 0)
-        self.assertEqual(len(assemble([liv, hall]).seams), 1)
-        hall["ports"][0]["normal"] = [-1, 0, 0]                                # naive: not opposite once sheared
+        group = module("house/floor-1", parent=None, transform=dag.shear_xy(k), ports=[], ops=())
+        liv, hall = pair()
+        a = assemble([group, liv, hall])  # world normals (1,-k,0) and (-1,k,0), tangents (k,1,0): still perpendicular
+        self.assertEqual(len(a.seams), 1)
+        hall["ports"][0]["normal"] = [-1, 0.5, 0]                              # no longer opposite once sheared
         with self.assertRaises(AssemblyError):
-            assemble([liv, hall])
+            assemble([group, liv, hall])
+
+    def test_peer_frame_rotated_about_the_normal_is_rejected(self):
+        liv, hall = pair()
+        hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(0, 1, 0), _rotation_x(90)))
+        # same origin, width, height and normal, but its width/height axes are swapped
+        self.bad(liv, hall)
+        hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(0, 1, 0), _rotation_x(180)))
+        self.assertEqual(len(assemble([liv, hall]).seams), 1)                   # 180 degrees keeps the span lines
+
+    def test_port_frame_axes_must_be_tangent_to_the_normal(self):
+        liv, hall = pair()
+        hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(0, 1, 0), dag.rotation_z(45)))
+        self.bad(liv, hall)
+
+    def bad(self, *mods):
+        with self.assertRaises(AssemblyError):
+            assemble(list(mods))
 
     def test_merge_assemblies_disjoint_union(self):
         left = assemble(list(pair()))
@@ -131,6 +155,66 @@ class MergeTests(unittest.TestCase):
             merge_assemblies(left, left)
         with self.assertRaises(AssemblyError):
             merge_assemblies()
+
+
+class MalformedInputTests(unittest.TestCase):
+    JUNK = ([], {}, None, "x", 1.5, True, [[]], {"a": [1]}, -1, "", [1, 2], 10 ** 400)
+
+    def paths(self, node, trail=()):
+        yield trail
+        if isinstance(node, dict):
+            for k, v in node.items():
+                yield from self.paths(v, trail + (k,))
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                yield from self.paths(v, trail + (i,))
+
+    def test_every_leaf_replaced_by_junk_raises_only_assembly_error(self):
+        base = chain()
+        checked = 0
+        for mi in range(len(base)):
+            for trail in self.paths(base[mi]):
+                if not trail:
+                    continue
+                for junk in self.JUNK:
+                    mods = copy.deepcopy(base)
+                    node = mods[mi]
+                    for key in trail[:-1]:
+                        node = node[key]
+                    node[trail[-1]] = junk
+                    try:
+                        assemble(mods)
+                    except AssemblyError:
+                        pass
+                    checked += 1
+        self.assertGreater(checked, 1000)
+
+    def test_unhashable_nested_values_are_assembly_errors(self):
+        liv, hall = pair()
+        liv["ownedSeams"][0]["participants"] = [[1], [2]]
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])
+        liv, hall = pair()
+        liv["operations"][0]["opId"] = ["east-wall"]
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])
+        liv, hall = pair()
+        liv["ownedSeams"][0]["surfaceOpId"] = ["east-wall"]
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])
+
+    def test_composed_singular_world_transform_is_an_assembly_error(self):
+        thin = dag.scale(1e-4, 1, 1)  # valid alone (det 1e-4), singular once three are composed (1e-12)
+        a = module("g/a", parent=None, transform=thin, ports=[], ops=())
+        b = module("g/b", parent="g/a", transform=thin, ports=[], ops=())
+        c = module("g/c", parent="g/b", transform=thin, ports=[], ops=())
+        assemble([a, b])
+        with self.assertRaises(AssemblyError):
+            assemble([a, b, c])
+        huge = dag.scale(1e5, 1, 1)
+        with self.assertRaises(AssemblyError):
+            assemble([module("g/x", parent=None, transform=huge, ports=[], ops=()),
+                      module("g/y", parent="g/x", transform=huge, ports=[], ops=())])
 
 
 class OwnershipTests(unittest.TestCase):
