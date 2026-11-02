@@ -38,6 +38,17 @@ class StorageError(Exception):
     """Journal I/O failure; the in-memory state is reloaded from disk."""
 
 
+class DurabilityUncertainError(StorageError):
+    """The record was written completely but fsync failed, so it may be lost.
+
+    The module is quarantined: its in-memory state matches the visible file,
+    but writes (and reads-as-dependency) are refused until `recover()` re-writes
+    the journal through a freshly fsynced file. Never retry fsync on the same
+    file and call it durable: after a failed fsync the OS may drop the dirty
+    pages and report a later fsync as successful.
+    """
+
+
 class CorruptJournalError(StorageError):
     """A journal fails integrity checks; it is never partially trusted."""
 
@@ -75,6 +86,7 @@ class JournalStore(ModuleStore):
         self._root = Path(root)
         self._tail: dict[str, tuple[str, int]] = {}      # module -> (last entry hash, file size)
         self._history: dict[str, list[list[dict]]] = {}  # module -> ops of revision 1..n
+        self._uncertain: set[str] = set()                # modules whose newest record may not be durable
 
     # --- open / reload -----------------------------------------------------
     @classmethod
@@ -98,6 +110,7 @@ class JournalStore(ModuleStore):
     def _forget(self, module_id: str) -> None:
         for table in (self._rev, self._blocks, self._keys, self._tail, self._history):
             table.pop(module_id, None)
+        self._uncertain.discard(module_id)
 
     def _reload(self, module_id: str) -> None:
         self._forget(module_id)
@@ -197,16 +210,28 @@ class JournalStore(ModuleStore):
             raise ConcurrentWriteError(f"{module_id}: journal changed on disk; reopen the store")
         flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_BINARY", 0) | (os.O_CREAT | os.O_EXCL if create else 0)
         fd = os.open(path, flags, 0o644)
+        unsynced = None
         try:
-            view = memoryview(line)
-            while view:
-                view = view[os.write(fd, view):]
-            os.fsync(fd)
+            self._write_all(fd, line)
+            try:
+                os.fsync(fd)
+            except OSError as exc:  # the line is fully written; whether it is durable is unknown
+                unsynced = exc
         finally:
             os.close(fd)
+        self._tail[module_id] = (entry["hash"], size + len(line))  # the file now ends with this line
         if create:
             self._sync_dir(path.parent)
-        self._tail[module_id] = (entry["hash"], size + len(line))
+        if unsynced is not None:
+            raise DurabilityUncertainError(
+                f"{module_id}: record written but fsync failed ({unsynced}); durability unknown, "
+                "module quarantined until recover()") from unsynced
+
+    @staticmethod
+    def _write_all(fd: int, data: bytes) -> None:
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
 
     @staticmethod
     def _sync_dir(directory: Path) -> None:
@@ -224,6 +249,10 @@ class JournalStore(ModuleStore):
     def _persist(self, module_id: str, fields: dict, ops: list[dict]) -> None:
         try:
             self._append(module_id, fields)
+        except DurabilityUncertainError:
+            self._uncertain.add(module_id)      # memory matches the visible file; durability is unknown
+            self._history[module_id].append(ops)
+            raise
         except Exception as exc:
             self._reload(module_id)  # disk is the truth; drop the uncommitted in-memory change
             if isinstance(exc, StorageError):
@@ -236,6 +265,10 @@ class JournalStore(ModuleStore):
         super().create_module(module_id)
         try:
             self._append(module_id, {"type": "create", "rev": 0}, create=True)
+        except DurabilityUncertainError:
+            self._uncertain.add(module_id)
+            self._history[module_id] = []
+            raise
         except Exception as exc:
             self._forget(module_id)
             if isinstance(exc, StorageError):
@@ -246,6 +279,7 @@ class JournalStore(ModuleStore):
 
     def apply(self, module_id: str, expected_revision: int, idempotency_key: str,
               ops: list[dict], min_revisions: dict[str, int] | None = None) -> ApplyResult:
+        self._refuse_uncertain(module_id, min_revisions)
         result = super().apply(module_id, expected_revision, idempotency_key, ops, min_revisions)
         if result.replayed:
             return result
@@ -265,6 +299,7 @@ class JournalStore(ModuleStore):
         """
         if module_id not in self._rev:
             raise IdentityError(f"unknown module {module_id!r}")
+        self._refuse_uncertain(module_id, None)
         if type(expected_revision) is not int or expected_revision < 0:
             raise IdentityError("expected_revision must be a non-negative int")
         if type(to_revision) is not int or to_revision < 0:
@@ -304,6 +339,53 @@ class JournalStore(ModuleStore):
                 else:
                     blocks[op["id"]] = op["data"]
         return blocks
+
+    # --- uncertain durability ----------------------------------------------
+    def uncertain_modules(self) -> list[str]:
+        """Modules quarantined after a write whose fsync failed, sorted."""
+        return sorted(self._uncertain)
+
+    def _refuse_uncertain(self, module_id: str, min_revisions: object) -> None:
+        deps = set(min_revisions) if isinstance(min_revisions, dict) else set()
+        blocked = sorted(({module_id} | deps) & self._uncertain)
+        if blocked:  # even an idempotent replay must not report success for a record that may be lost
+            raise DurabilityUncertainError(f"{blocked[0]}: durability of the newest record is unknown; call recover()")
+
+    def recover(self, module_id: str) -> None:
+        """Make a quarantined module durable by re-writing its journal through a new, fsynced file.
+
+        The visible content is copied to `journal.jsonl.recover`, fsynced, atomically renamed
+        over the journal, and the module is reloaded and checked. If any step fails the
+        module stays quarantined and the original file is left in place.
+        """
+        if module_id not in self._rev:
+            raise IdentityError(f"unknown module {module_id!r}")
+        if module_id not in self._uncertain:
+            return
+        path = self._path(module_id)
+        tmp = path.with_name(JOURNAL + ".recover")
+        revision, size = self._rev[module_id], self._tail[module_id][1]
+        try:
+            data = path.read_bytes()
+            if len(data) != size:
+                raise ConcurrentWriteError(f"{module_id}: journal changed on disk; reopen the store")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o644)
+            try:
+                self._write_all(fd, data)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            os.replace(tmp, path)
+        except OSError as exc:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+            raise DurabilityUncertainError(f"{module_id}: recovery failed ({exc}); module stays quarantined") from exc
+        self._sync_dir(path.parent)
+        self._reload(module_id)  # also lifts the quarantine
+        if self._rev.get(module_id) != revision:
+            raise StorageError(f"{module_id}: recovered journal is at revision {self._rev.get(module_id)}, expected {revision}")
 
     def tail_hash(self, module_id: str) -> str:
         """Hash of the newest committed entry: identifies the exact journal state."""

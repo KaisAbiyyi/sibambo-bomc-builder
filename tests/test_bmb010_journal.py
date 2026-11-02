@@ -10,7 +10,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.identity import IdempotencyConflictError, IdentityError, StaleRevisionError  # noqa: E402
 from core.storage import (  # noqa: E402
-    ConcurrentWriteError, CorruptJournalError, JournalStore, StorageError)
+    ConcurrentWriteError, CorruptJournalError, DurabilityUncertainError, JournalStore, StorageError)
 from core.storage import journal as journal_mod  # noqa: E402
 
 M = "house/living"
@@ -235,6 +235,130 @@ class CorruptionTests(Base):
         with self.assertRaises(CorruptJournalError):
             s._load(M)
         self.assertEqual(s.modules(), [])
+
+
+def fsync_fails(times=1):
+    """fsync that raises OSError for the first `times` calls, then behaves normally."""
+    real, state = os.fsync, {"left": times}
+
+    def fsync(fd):
+        if state["left"] > 0:
+            state["left"] -= 1
+            raise OSError("fsync failed")
+        return real(fd)
+    return mock.patch.object(journal_mod.os, "fsync", side_effect=fsync)
+
+
+def fsync_always_fails():
+    return mock.patch.object(journal_mod.os, "fsync", side_effect=OSError("fsync failed"))
+
+
+class UncertainDurabilityTests(Base):
+    """A fully written record whose fsync failed is neither 'failed' nor 'committed'."""
+
+    def test_apply_with_failed_fsync_is_quarantined_not_silently_committed(self):
+        s = self.fresh()
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        self.assertTrue(issubclass(DurabilityUncertainError, StorageError))
+        self.assertEqual(s.uncertain_modules(), [M])
+        self.assertEqual(s.revision(M), 4)                      # memory matches the visible file
+        self.assertEqual(len(self.path().read_bytes().split(b"\n")) - 1, 5)
+        for call in (lambda: s.apply(M, 4, "k5", [add("wall-e")]),
+                     lambda: s.apply(M, 3, "k4", [add("wall-d")]),   # a replay must not report success either
+                     lambda: s.rollback(M, 4, "rb", 1)):
+            with self.assertRaises(DurabilityUncertainError):
+                call()
+        self.assertEqual(s.revision(M), 4)
+
+    def test_recover_rewrites_through_a_fresh_fsynced_file_and_lifts_the_quarantine(self):
+        s = self.fresh()
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        before = self.path().read_bytes()
+        calls = []
+        real_replace = os.replace
+        with mock.patch.object(journal_mod.os, "replace", side_effect=lambda a, b: (calls.append((a, b)), real_replace(a, b))[1]):
+            s.recover(M)
+        self.assertEqual(len(calls), 1)                         # the journal was replaced, not just fsynced again
+        self.assertEqual((s.uncertain_modules(), self.path().read_bytes()), ([], before))
+        self.assertFalse(self.path().with_name("journal.jsonl.recover").exists())
+        retry = s.apply(M, 3, "k4", [add("wall-d")])             # the caller's retry now replays
+        self.assertEqual((retry.revision, retry.replayed), (4, True))
+        self.assertEqual(s.apply(M, 4, "k5", [add("wall-e")]).revision, 5)
+        self.assertEqual(JournalStore.open(self.root).revision(M), 5)
+
+    def test_failed_recovery_keeps_the_quarantine_and_the_original_file(self):
+        s = self.fresh()
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        before = self.path().read_bytes()
+        with fsync_always_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.recover(M)
+        self.assertEqual((s.uncertain_modules(), self.path().read_bytes()), ([M], before))
+        self.assertFalse(self.path().with_name("journal.jsonl.recover").exists())
+        s.recover(M)                                            # works once fsync does
+        self.assertEqual(s.uncertain_modules(), [])
+
+    def test_create_with_failed_fsync_is_quarantined(self):
+        s = JournalStore.open(self.root)
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.create_module(M)
+        self.assertEqual((s.modules(), s.uncertain_modules(), s.revision(M)), ([M], [M], 0))
+        with self.assertRaises(DurabilityUncertainError):
+            s.apply(M, 0, "k1", [add("wall-a")])
+        s.recover(M)
+        self.assertEqual(s.apply(M, 0, "k1", [add("wall-a")]).revision, 1)
+        self.assertEqual(JournalStore.open(self.root).revision(M), 1)
+
+    def test_other_modules_are_unaffected_but_dependents_are_refused(self):
+        s = self.fresh()
+        s.create_module(K)
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(K, 0, "kk", [add("wall-a")])
+        self.assertEqual(s.apply(M, 3, "k4", [add("wall-d")]).revision, 4)   # independent module still writes
+        with self.assertRaises(DurabilityUncertainError):
+            s.apply(M, 4, "k5", [add("wall-e")], {K: 1})                      # must not depend on a maybe-lost revision
+        self.assertEqual(s.revision(M), 4)
+        s.recover(K)
+        self.assertEqual(s.apply(M, 4, "k5", [add("wall-e")], {K: 1}).revision, 5)
+
+    def test_reopen_after_uncertain_write_treats_visible_record_as_committed_and_retry_is_safe(self):
+        s = self.fresh()
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        r = JournalStore.open(self.root)                         # a new process sees the complete line
+        self.assertEqual(r.revision(M), 4)
+        self.assertEqual(r.apply(M, 3, "k4", [add("wall-d")]).replayed, True)
+        # had the record been lost, the same retry would simply commit it (idempotency makes the retry safe)
+        self.path().write_bytes(b"".join(line + b"\n" for line in self.path().read_bytes().split(b"\n")[:-2]))
+        lost = JournalStore.open(self.root)
+        self.assertEqual(lost.revision(M), 3)
+        self.assertEqual(lost.apply(M, 3, "k4", [add("wall-d")]).revision, 4)
+
+    def test_recover_on_healthy_or_unknown_module(self):
+        s = self.fresh()
+        s.recover(M)                                             # nothing to do
+        with self.assertRaises(IdentityError):
+            s.recover("house/none")
+
+    def test_recover_detects_a_changed_file(self):
+        s = self.fresh()
+        with fsync_fails():
+            with self.assertRaises(DurabilityUncertainError):
+                s.apply(M, 3, "k4", [add("wall-d")])
+        with open(self.path(), "ab") as f:
+            f.write(b"x")
+        with self.assertRaises(ConcurrentWriteError):
+            s.recover(M)
+        self.assertEqual(s.uncertain_modules(), [M])
 
 
 class MetadataTests(Base):

@@ -1,2 +1,2 @@
 from .journal import (  # noqa: F401
-    ConcurrentWriteError, CorruptJournalError, JournalStore, StorageError)
+    ConcurrentWriteError, CorruptJournalError, DurabilityUncertainError, JournalStore, StorageError)
