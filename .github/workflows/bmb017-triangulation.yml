@@ -1,0 +1,35 @@
+name: BMB-017 triangulation with holes
+on:
+  pull_request:
+    paths:
+      - 'core/geometry/triangulation.py'
+      - 'core/geometry/floor.py'
+      - 'core/geometry/wall.py'
+      - 'tests/test_bmb017_triangulation.py'
+      - '.github/workflows/bmb017-triangulation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/geometry/triangulation.py'
+      - 'tests/test_bmb017_triangulation.py'
+      - '.github/workflows/bmb017-triangulation.yml'
+permissions:
+  contents: read
+jobs:
+  polygon-holes:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing regression dependency
+        run: python -m pip install 'jsonschema==4.23.0'
+      - name: Focused BMB-017 triangulation tests
+        run: python -m unittest discover -s tests -p test_bmb017_triangulation.py -v
+      - name: Existing builder regression suite
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
