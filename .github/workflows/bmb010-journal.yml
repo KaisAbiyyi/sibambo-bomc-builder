@@ -1,0 +1,28 @@
+name: BMB-010 module journal
+on:
+  push:
+    paths:
+      - "core/**"
+      - "tests/test_bmb010_journal.py"
+      - ".github/workflows/bmb010-journal.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "tests/test_bmb010_journal.py"
+      - ".github/workflows/bmb010-journal.yml"
+  workflow_dispatch:
+
+jobs:
+  journal:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Journal persistence, recovery and rollback tests
+        run: python -m unittest discover -s tests -p test_bmb010_journal.py -v
