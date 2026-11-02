@@ -1,0 +1,25 @@
+# BMB-011 — Assembly merge and shared-wall seam ownership
+
+Implementation: [`core/assembly/merge.py`](../core/assembly/merge.py). Tests: [`tests/test_bmb011_assembly.py`](../tests/test_bmb011_assembly.py). Lock: `core/assembly`. Input is [Module IR](MODULE-IR-V1.md) modules; transforms use the [BMB-009](BMB-009-DEFINITION-INSTANCE-GRAPH.md) helpers.
+
+## API
+
+- `assemble(modules) -> Assembly`: merges a list of module objects into one graph or raises `AssemblyError`. Nothing is returned on error and inputs are never mutated (modules are deep-copied as plain JSON).
+- `merge_assemblies(*assemblies)`: union of assemblies with disjoint module ids, re-validated as a whole.
+- `Assembly`: `modules` (sorted), `order` (dependencies first), `world_transforms`, `seams`, plus `neighbours()`, `seams_of()`, `owned_by()`. The result is identical for any input order.
+
+## What the merge checks (fail closed)
+
+- **Identity:** schemaVersion `1.0.0`, unique valid module ids, integer revisions, bounded counts.
+- **Links:** `parentId` chains are acyclic and at most 32 deep; a parent that is not itself a module is treated as a group (identity transform), a parent that is a module composes its transform. Dependencies must exist, may not be self, duplicate or cyclic, and `minRevision` must be satisfied by the module's revision.
+- **Ports:** each port with a peer needs a `seamId` (and the reverse); the peer must exist in another module and point back; both name the same seam.
+- **Shared wall agreement in world space:** port normals (transformed by the inverse transpose, so mirrors, rotations and shear are handled) must be opposite within 1e-6; port frames must coincide within 1 mm; width and height must match within 1 mm.
+- **Seam ownership:** every reciprocal port pair must be covered by exactly one `ownedSeams` entry declared by one of its two modules. Both claiming it raises `DuplicateOwnershipError`; neither claiming it, an owner that is not a participant or not the declarer, participants that differ from the connected modules, a `surfaceOpId` that is not an operation of the owner, a duplicate seam id, and a seam no port pair references are all rejected.
+
+## Test evidence
+
+`python -m unittest discover -s tests -p test_bmb011_assembly.py -v` (Ubuntu + Windows CI, `.github/workflows/bmb011-assembly.yml`): the IR example, a three-module chain, order independence, nested parents, mirrored / rotated / sheared frames, disjoint union, and rejection cases for ownership, ports, dependencies and parents. Mutation checks: removing the duplicate-owner check or using the wrong normal transform makes the matching tests fail.
+
+## Not covered (NOT_RUN)
+
+Geometry validity, bounds overlap and collisions, opening-versus-wall fit and typed diagnostics (BMB-012); compiling the assembly to BOMC (BMB-020); replacing a module with a newer revision inside an existing assembly (rebuild with `assemble`); persistence (BMB-010); Module IR JSON Schema validation (use the BMB-006 schema separately).
