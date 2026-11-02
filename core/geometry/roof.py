@@ -223,10 +223,13 @@ def build_stair_flight(op):
             xa, xb = x, x + width
         _require(all(abs(v) <= _LIMIT for v in (xa, xb, ya, yb, z + (i+1)*riser)),
                  "stair coordinates outside supported range")
-        slab = build_floor_slab({"kind": "floor-slab", "opId": f"step-{i+1}",
-                                 "footprint": [[xa, ya], [xb, ya], [xb, yb], [xa, yb]],
-                                 "thickness": (i+1)*riser, "elevation": z,
-                                 "role": "structural", "materialId": material})
+        try:
+            slab = build_floor_slab({"kind": "floor-slab", "opId": f"step-{i+1}",
+                                     "footprint": [[xa, ya], [xb, ya], [xb, yb], [xa, yb]],
+                                     "thickness": (i+1)*riser, "elevation": z,
+                                     "role": "structural", "materialId": material})
+        except FloorError as exc:
+            raise RoofError(f"invalid stair step {i+1}: {exc}") from exc
         parts.append({"step": i+1, "topElevation": z+(i+1)*riser,
                       "bounds": {"min": list(slab.bounds[0]), "max": list(slab.bounds[1])},
                       "faces": [{"role": face.name,
