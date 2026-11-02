@@ -1,0 +1,30 @@
+name: BMB-011 assembly merge
+on:
+  push:
+    paths:
+      - "core/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb011_assembly.py"
+      - ".github/workflows/bmb011-assembly.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb011_assembly.py"
+      - ".github/workflows/bmb011-assembly.yml"
+  workflow_dispatch:
+
+jobs:
+  assembly:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Assembly merge and seam ownership tests
+        run: python -m unittest discover -s tests -p test_bmb011_assembly.py -v
