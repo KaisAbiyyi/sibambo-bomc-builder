@@ -34,6 +34,22 @@ def centroids(triangles):
             for tri in triangles]
 
 
+def no_t_junctions(triangles):
+    """Every vertex lying on an existing XY edge must be an endpoint."""
+    points = {tuple(p[:2]) for tri in triangles for p in tri.vertices}
+    for tri in triangles:
+        verts = [tuple(p[:2]) for p in tri.vertices]
+        for a, b in zip(verts, verts[1:] + verts[:1]):
+            for p in points:
+                if p == a or p == b:
+                    continue
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                cross = dx * (p[1] - a[1]) - dy * (p[0] - a[0])
+                if cross == 0 and min(a[0], b[0]) <= p[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= p[1] <= max(a[1], b[1]):
+                    return False
+    return True
+
+
 class AcceptedTests(unittest.TestCase):
     def test_rectangle_no_holes_and_upward_winding(self):
         ts = triangulate_face(square(z=2.5))
@@ -56,6 +72,7 @@ class AcceptedTests(unittest.TestCase):
         hole = square(2, 2, 4, 4)
         ts = triangulate_face(square(), holes=[hole])
         self.assertAlmostEqual(area(ts), 32)
+        self.assertTrue(no_t_junctions(ts), 'hole boundary creates a nonconforming seam')
         self.assertTrue(all(not (2 < x < 4 and 2 < y < 4)
                             for x, y, _ in centroids(ts)))
         self.assertTrue(all(t.normal[2] == 1 for t in ts))
@@ -66,6 +83,7 @@ class AcceptedTests(unittest.TestCase):
         b = square(6, 4, 8, 6)
         ts = triangulate_face(outer, holes=(a, b))
         self.assertAlmostEqual(area(ts), 72)
+        self.assertTrue(no_t_junctions(ts))
         for x, y, _ in centroids(ts):
             self.assertFalse(1 < x < 3 and 1 < y < 3)
             self.assertFalse(6 < x < 8 and 4 < y < 6)
@@ -91,6 +109,7 @@ class AcceptedTests(unittest.TestCase):
         right_hole = square(5.5, 3, 7.5, 5)
         ts = triangulate_face(outer, holes=[left_hole, right_hole])
         self.assertAlmostEqual(area(ts), 44)
+        self.assertTrue(no_t_junctions(ts))
         self.assertTrue(all(not (3 < x < 5 and y > 2)
                             for x, y, _ in centroids(ts)))
 
