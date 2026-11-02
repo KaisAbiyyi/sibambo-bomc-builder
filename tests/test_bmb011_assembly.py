@@ -127,6 +127,48 @@ class MergeTests(unittest.TestCase):
         with self.assertRaises(AssemblyError):
             assemble([group, liv, hall])
 
+    def test_world_space_span_includes_scale_of_module_frames(self):
+        liv, hall = pair()
+        liv["localFrame"]["transform"] = list(dag.scale(1, 2, 1))              # living's 0.9 m opening is 1.8 m in the assembly
+        hall["localFrame"]["transform"] = list(dag.translation(4, 1, 0))      # frames still coincide at (4, 2, 0)
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])                                              # 1.8 m against 0.9 m
+        hall["ports"][0]["width"] = 1.8
+        self.assertEqual(len(assemble([liv, hall]).seams), 1)
+        hall["ports"][0]["width"] = 1.8005                                     # inside the 1 mm tolerance
+        self.assertEqual(len(assemble([liv, hall]).seams), 1)
+        hall["ports"][0]["width"] = 1.802
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])
+
+    def test_nonuniform_scaled_group_keeps_spans_consistent(self):
+        group = module("house/floor-1", parent=None, transform=dag.scale(1, 2, 3), ports=[], ops=())
+        liv, hall = pair()
+        a = assemble([group, liv, hall])                                       # both spans scale by the same factors
+        self.assertEqual(len(a.seams), 1)
+        hall["ports"][0]["height"] = 2.0                                       # 2.0 vs 2.1 local height
+        with self.assertRaises(AssemblyError):
+            assemble([group, liv, hall])
+
+    def test_span_mismatch_under_shear(self):
+        k = 0.5
+        group = module("house/floor-1", parent=None, transform=dag.shear_xy(k), ports=[], ops=())
+        liv, hall = pair()
+        hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(0, 1, 0), dag.scale(1, 1.5, 1)))
+        with self.assertRaises(AssemblyError):
+            assemble([group, liv, hall])                                       # hall's frame stretches its width by 1.5
+        hall["ports"][0]["width"] = 0.6                                        # 0.6 * 1.5 = 0.9
+        self.assertEqual(len(assemble([group, liv, hall]).seams), 1)
+
+    def test_operation_count_matches_the_schema_limit(self):
+        liv, hall = pair()
+        liv["operations"] = [{"kind": "wall-run", "opId": "east-wall"}] + \
+            [{"kind": "wall-run", "opId": f"op-{i}"} for i in range(9999)]
+        self.assertEqual(len(assemble([liv, hall]).seams), 1)                  # 10 000 operations
+        liv["operations"].append({"kind": "wall-run", "opId": "op-extra"})
+        with self.assertRaises(AssemblyError):
+            assemble([liv, hall])                                              # 10 001
+
     def test_peer_frame_rotated_about_the_normal_is_rejected(self):
         liv, hall = pair()
         hall["ports"][0]["localTransform"] = list(dag.compose(dag.translation(0, 1, 0), _rotation_x(90)))

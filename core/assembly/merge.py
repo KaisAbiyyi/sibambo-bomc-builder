@@ -21,7 +21,8 @@ SCHEMA_VERSION = "1.0.0"
 MODULE_ID = re.compile(r"[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+\Z")
 SMALL_ID = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
 MAX_MODULES = 1024
-MAX_ITEMS = 256               # ports, seams, dependencies, operations per module
+MAX_ITEMS = 256               # ports, seams, dependencies per module (schema maxItems)
+MAX_OPERATIONS = 10_000       # operations per module (schema maxItems)
 MAX_PARENT_DEPTH = dag.MAX_DEPTH
 NORMAL_TOL = 1e-6
 POSITION_TOL = 1e-3           # metres
@@ -52,9 +53,9 @@ def _mid(value: object, label: str) -> str:
     return value
 
 
-def _list(module: dict, key: str, mid: str) -> list:
+def _list(module: dict, key: str, mid: str, limit: int = MAX_ITEMS) -> list:
     value = module.get(key)
-    _need(isinstance(value, list) and len(value) <= MAX_ITEMS, f"{mid}: {key} must be a list of at most {MAX_ITEMS}")
+    _need(isinstance(value, list) and len(value) <= limit, f"{mid}: {key} must be a list of at most {limit}")
     return value
 
 
@@ -196,11 +197,13 @@ def _world_port(mid: str, port: dict, world: tuple[float, ...]) -> dict:
     inv = dag.invert(world)  # normals transform by the inverse transpose, which also handles mirrors and shear
     n = _normalise([sum(inv[j * 4 + i] * raw[j] for j in range(3)) for i in range(3)])
     placed = dag.compose(world, frame)
-    axes = []
-    for col in (1, 2):  # frame +Y = width direction, +Z = height direction (both tangent to the opening)
-        axes.append(_normalise([placed[col], placed[4 + col], placed[8 + col]]))
+    axes, spans = [], []
+    for col, key in ((1, "width"), (2, "height")):  # frame +Y = width direction, +Z = height direction
+        vector = [placed[col], placed[4 + col], placed[8 + col]]  # frame axis as placed in the assembly (scale and shear kept)
+        axes.append(_normalise(vector))
         _need(abs(sum(a * b for a, b in zip(axes[-1], n))) <= NORMAL_TOL,
               f"{label}: frame {'YZ'[col - 1]} axis is not tangent to the port normal in world space")
+        spans.append(float(port[key]) * math.sqrt(sum(c * c for c in vector)))  # world-space opening extent
     peer = port.get("peer")
     if peer is not None:
         _need(isinstance(peer, dict) and set(peer) == {"moduleId", "portId"}, f"{label}: malformed peer")
@@ -210,13 +213,13 @@ def _world_port(mid: str, port: dict, world: tuple[float, ...]) -> dict:
         _sid(seam, f"{label}.seamId")
     _need((peer is None) == (seam is None), f"{label}: a port needs both peer and seamId, or neither")
     return {"id": (mid, pid), "normal": n, "pos": (placed[3], placed[7], placed[11]),
-            "width_axis": axes[0], "height_axis": axes[1], "width": float(port["width"]), "height": float(port["height"]), "peer": peer, "seam": seam}
+            "width_axis": axes[0], "height_axis": axes[1], "width": spans[0], "height": spans[1], "peer": peer, "seam": seam}
 
 
 def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> tuple[Seam, ...]:
     owned: dict[tuple[str, str], dict] = {}
     for mid, module in mods.items():
-        ops = {o["opId"] for o in _list(module, "operations", mid)
+        ops = {o["opId"] for o in _list(module, "operations", mid, MAX_OPERATIONS)
                if isinstance(o, dict) and isinstance(o.get("opId"), str)}
         for seam in _list(module, "ownedSeams", mid):
             _need(isinstance(seam, dict), f"{mid}: seam must be an object")
