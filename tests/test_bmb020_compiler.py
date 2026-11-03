@@ -109,7 +109,7 @@ class CompilerTests(unittest.TestCase):
             inspect_container(payload)
             self.assertEqual(receipt["coverage"], [0] * 6)
 
-    def test_reject_geometry_and_material_loss_explicitly(self):
+    def test_reject_malformed_semantics_and_source_features_explicitly(self):
         for key in ("operations", "materials", "ports", "ownedSeams", "faceAnnotations"):
             with self.subTest(key=key):
                 item = module()
