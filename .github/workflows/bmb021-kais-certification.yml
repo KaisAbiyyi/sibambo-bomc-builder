@@ -1,0 +1,65 @@
+name: BMB-021 Kais independent semantic certification
+on:
+  push:
+    branches:
+      - work/bmb-021/kais-interop-20261103
+    paths:
+      - "tests/interop/kais_*.py"
+      - "tests/test_bmb021_kais.py"
+      - ".github/workflows/bmb021-kais-certification.yml"
+      - "docs/BMB-021-KAIS-CERTIFICATION.md"
+      - "compatibility/bmb021-kais-candidate.json"
+  pull_request:
+    paths:
+      - "tests/interop/kais_*.py"
+      - "tests/test_bmb021_kais.py"
+      - ".github/workflows/bmb021-kais-certification.yml"
+      - "docs/BMB-021-KAIS-CERTIFICATION.md"
+      - "compatibility/bmb021-kais-candidate.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bmb021-kais-${{ github.ref }
+  cancel-in-progress: false
+jobs:
+  kais-interop:
+    name: Kais synthetic semantics / ${{ matrix.os }
+    runs-on: ${{ matrix.os }
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }
+          persist-credentials: false
+      - name: Exact SHA
+        run: git rev-parse HEAD
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install approved exact validator version
+        run: python -m pip install jsonschema==4.23.0
+      - name: Two fresh cold processes per synthetic fixture and SHA256 manifest
+        run: python tests/interop/kais_receipt.py --out bmb021-kais-evidence
+      - name: Independent semantic readback, mutation and determinism certification
+        run: python -m unittest discover -s tests -p test_bmb021_kais.py -v
+      - name: Existing BMB-020 semantic and compiler regression
+        run: python -m unittest discover -s tests -p test_bmb020_semantic.py -v
+      - run: python -m unittest discover -s tests -p test_bmb020_compiler.py -v
+      - name: BMB-019 and BMB-011/009 contract regressions
+        run: python -m unittest discover -s tests -p test_bmb019_writer.py -v
+      - run: python -m unittest discover -s tests -p test_bmb011_assembly.py -v
+      - run: python -m unittest discover -s tests -p test_bmb009_graph.py -v
+      - name: Existing container-only structural goldens
+        run: python tools/bomc_fixture_harness.py --selftest
+      - name: Upload Kais candidate binaries and exact SHA receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bmb021-kais-${{ matrix.os }-${{ github.sha }
+          path: bmb021-kais-evidence/
+          retention-days: 21
+          if-no-files-found: warn
