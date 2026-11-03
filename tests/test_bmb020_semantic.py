@@ -251,9 +251,16 @@ def independent_read(payload):
     assert coverage == (fcount, fcount, 0, 0, 0, 0)
     assert len(faces) == fcount and total_triangles > 0
     assert len(set(m["definition"] for m in mesh_bounds)) == mcount
+    transforms = sections[13][1]
+    assert transforms[:4] == bytes((1,1,0,0))
+    tcount, tlength = struct.unpack_from("<II", transforms, 4)
+    assert tcount == counts[6] and tlength == 96*tcount
+    matrices = [struct.unpack_from("<12d", transforms, 12+96*i)
+                for i in range(tcount)]
     return {"counts":counts, "coverage":coverage, "bounds":bounds,
             "strings":strings, "faces":faces, "mesh":mesh_bounds,
-            "colors":colors, "triangles":total_triangles, "sections":tuple(sorted(sections))}
+            "colors":colors, "transforms":matrices,
+            "triangles":total_triangles, "sections":tuple(sorted(sections))}
 
 
 class GeometryReadback(unittest.TestCase):
@@ -329,6 +336,38 @@ class GeometryReadback(unittest.TestCase):
             self.assertEqual(parsed["counts"][2:4],(2,12))
             self.assertEqual(parsed["coverage"],(12,12,0,0,0,0))
             self.assertEqual(parsed["triangles"],24)
+
+    def test_nested_mirror_shear_and_operation_permutation(self):
+        from core.assembly import assemble
+        from bomc.compiler.graph_to_bomc import compile_assembly
+        parent = module("house/floor", parent=None, transform=dag.mirror("x"))
+        parent["bounds"] = {"min": [0,0,0], "max": [0,0,0]}
+        child = floor(transform=dag.compose(dag.translation(3,0,0), dag.shear_xy(0.25)))
+        child["parentId"] = parent["moduleId"]
+        doc = {"schemaVersion":"1.0.0", "modules":[parent, child]}
+        compiled = compile_document(doc)
+        readback = independent_read(compiled.payload)
+        self.assertEqual(readback["bounds"], (-5.25,0.0,0.0,-3.0,1.0,0.2))
+        self.assertIn((-1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0),
+                      readback["transforms"])
+        self.assertIn((1.0,0.0,0.0,0.25,1.0,0.0,0.0,0.0,1.0,3.0,0.0,0.0),
+                      readback["transforms"])
+        assembly = assemble(doc["modules"])
+        assembly.world_transforms[child["moduleId"]] = tuple(dag.IDENTITY)
+        with self.assertRaisesRegex(CompileError, "assembly proof"):
+            compile_assembly(assembly)
+
+        cut = wall_with_door()
+        first = compile_document({"schemaVersion":"1.0.0","modules":[cut]})
+        cut["operations"].reverse()
+        second = compile_document({"schemaVersion":"1.0.0","modules":[cut]})
+        self.assertEqual(first.payload,second.payload)
+
+    def test_large_json_budget_prevents_allocating_full_binary(self):
+        big = floor()
+        big["provenance"]["note"] = "x" * (1_000_000 + 1)
+        with self.assertRaisesRegex(CompileError, "byte budget"):
+            compile_document({"schemaVersion":"1.0.0","modules":[big]})
 
     def test_reject_lossy_missing_refs_bad_geometry_and_keep_previous(self):
         base=floor()
