@@ -1,6 +1,10 @@
 # sibambo-bomc-builder
 
-Headless, agent-operable modular building construction into a deterministic compiled BOMC 3D document. **Planning phase**; no CLI/MCP or executable geometry builder has shipped yet.
+Headless, agent-operable modular building construction into a deterministic compiled BOMC 3D document. **Incremental implementation:** a bounded Python journal/assembly CLI is available (BMB-022); MCP, full geometric construction and compiler/consumer proof are separately gated.
+
+## Available headless CLI
+
+The cloud-tested command-line interface uses the existing journal and assembly core to create, inspect, edit, roll back and validate synthetic projects. See [BMB-022 CLI contract](docs/BMB-022-HEADLESS-CLI.md). It does not compile final BOMC files or validate geometric collisions.
 
 ## Project planning
 - [Technical BOMC research](docs/BOMC-RESEARCH.md)
