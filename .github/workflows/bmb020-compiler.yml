@@ -1,0 +1,36 @@
+name: BMB-020 deterministic compiler
+on:
+  push:
+    paths:
+      - "bomc/compiler/**"
+      - "tests/test_bmb020_compiler.py"
+      - ".github/workflows/bmb020-compiler.yml"
+  pull_request:
+    paths:
+      - "bomc/compiler/**"
+      - "tests/test_bmb020_compiler.py"
+      - ".github/workflows/bmb020-compiler.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compiler:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compiler + cold-process SHA check
+        run: python -m unittest discover -s tests -p test_bmb020_compiler.py -v
+      - name: BMB-019 metadata writer regression
+        run: python -m unittest discover -s tests -p test_bmb019_writer.py -v
+      - name: BMB-011 assembly and BMB-009 DAG regressions
+        run: python -m unittest discover -s tests -p test_bmb011_assembly.py -v
+      - run: python -m unittest discover -s tests -p test_bmb009_graph.py -v
+      - name: Independent container harness
+        run: python tools/bomc_fixture_harness.py --selftest
