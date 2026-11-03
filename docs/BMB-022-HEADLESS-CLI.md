@@ -22,7 +22,7 @@ Use an absolute Windows project path in place of /tmp/demo when running on Windo
 - inspect: loads only the chosen journal via JournalStore.open(modules=[id]); returns revision, journal hash, block count and IDs. Add --blocks for a full bounded payload.
 - edit: reads a single JSON object from stdin. Required key ops is a list of {op,id,data} changes; optional minRevisions maps dependency module IDs to required revisions. Only the existing JournalStore.apply mutates state, with CAS, atomic batch and idempotency.
 - rollback: invokes JournalStore.rollback with the target historical revision; commits a compensating new revision and preserves history.
-- validate: defaults to loading all journals, with --module-id optionally scoping validation to a single journal. With --assembly-stdin and no root it validates an envelope containing exactly {"modules":[...]} via core.assembly.assemble, returning module IDs, topological order and seam ownership.
+- validate: defaults to loading all journals, with --module-id optionally scoping validation to a single journal. With --assembly-stdin and no root it validates an envelope containing {"modules":[...]} plus optional {"schemaVersion":"1.0.0"} (the published BMB-006 example uses the versioned form) via core.assembly.assemble, returning module IDs, topological order and seam ownership.
 - All commands have stable JSON error codes. Input/output limits are 1 MiB; invalid UTF-8, duplicate JSON fields and non-finite constants are rejected.
 
 ## Stable error codes
