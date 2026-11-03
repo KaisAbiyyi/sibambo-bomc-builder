@@ -9,7 +9,8 @@ on:
   pull_request:
     paths:
       - "bomc/compiler/**"
-      - "tests/test_bmb020_compiler.py"
+      - "tests/test_bmb020_*.py"
+      - "examples/bmb020-semantic-floor.json"
       - ".github/workflows/bmb020-compiler.yml"
   workflow_dispatch:
 permissions:
@@ -23,6 +24,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact checked-out source SHA
+        run: git rev-parse HEAD
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -41,3 +46,15 @@ jobs:
         run: python -m unittest discover -s tests -p test_bmb01*.py -v
       - name: Independent container harness
         run: python tools/bomc_fixture_harness.py --selftest
+      - name: Compile public fixtures for downstream BMB-021 readback
+        run: |
+          python -c "from pathlib import Path; Path('bmb020-evidence').mkdir(exist_ok=True)"
+          python -m bomc.compiler.graph_to_bomc --input examples/bmb020-semantic-floor.json --output bmb020-evidence/floor.bomc
+          python -m bomc.compiler.graph_to_bomc --input examples/module-ir-two-rooms.json --output bmb020-evidence/two-rooms.bomc
+      - name: Upload exact candidate's synthetic semantic BOMC files
+        uses: actions/upload-artifact@v4
+        with:
+          name: bmb020-semantic-${{ matrix.os }}
+          path: bmb020-evidence/*.bomc
+          if-no-files-found: error
+          retention-days: 14
