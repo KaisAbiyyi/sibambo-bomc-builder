@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "candidate": "KaisAbiyyi",
+  "resourceLock": "tests/interop:kais",
+  "startingBaseline": "cc01e0a02aafe519d2fe3d3136d2f28fb6b0011e",
+  "branch": "work/bmb-021/kais-interop-20261103",
+  "evidenceSource": "tests/interop/kais_receipt.py; binary/SHA manifests are generated only by exact-head cloud CI",
+  "internalIndependentDecoder": {
+    "status": "NOT_RUN",
+    "reason": "Pending exact-HEAD hosted Linux/Windows acceptance; no local-only PASS claimed"
+  },
+  "pairings": [
+    {
+      "source": "Builder BOMC 1.2",
+      "consumer": "Original Editor E4",
+      "status": "NOT_RUN",
+      "reason": "No actual original E4 viewer readback of independent Builder binary"
+    },
+    {
+      "source": "Builder BOMC 1.2",
+      "consumer": "Original Model-Eval",
+      "status": "NOT_RUN",
+      "reason": "No actual original Model-Eval semantic readback of Builder binary"
+    },
+    {
+      "source": "Original Ruby producer",
+      "consumer": "Original Editor E4",
+      "status": "NOT_RUN",
+      "reason": "No original synthetic Ruby binary followed by real E4 viewer readback"
+    },
+    {
+      "source": "Original Ruby producer",
+      "consumer": "Original Model-Eval",
+      "status": "NOT_RUN",
+      "reason": "No original synthetic Ruby binary followed by real Model-Eval readback"
+    },
+    {
+      "source": "Original Editor writer",
+      "consumer": "Original Model-Eval",
+      "status": "NOT_RUN",
+      "reason": "No actual Editor-writer binary read through real Model-Eval loader"
+    }
+  ],
+  "adversarial": [
+    {
+      "consumer": "Independent Kais Builder decoder",
+      "status": "NOT_RUN",
+      "reason": "Pending exact-head Linux and Windows corruption matrix CI"
+    },
+    {
+      "consumer": "Original Editor E4 and strict web authoring",
+      "status": "NOT_RUN",
+      "reason": "No real consumer run on corrupted/241 files"
+    },
+    {
+      "consumer": "Original Model-Eval",
+      "status": "NOT_RUN",
+      "reason": "No real consumer run on corrupted/241 files"
+    }
+  ],
+  "capabilityExceptions": [
+    {
+      "feature": "Concave polygon without holes",
+      "status": "NOT_RUN",
+      "reason": "Pending independent binary CI"
+    },
+    {
+      "feature": "Polygon with inner holes",
+      "status": "NOT_RUN",
+      "reason": "BMB-006 Module IR cannot author holes; require separate legal producer/Editor fixture and real consumer CI"
+    },
+    {
+      "feature": "Nested/mirrored/sheared/nonuniform Module IR transforms",
+      "status": "NOT_RUN",
+      "reason": "Pending independent binary CI"
+    },
+    {
+      "feature": "Shared reusable mesh definition across instances",
+      "status": "NOT_RUN",
+      "reason": "BMB-020 creates per-module mesh definitions; BMB-009 only supports empty reusable groups"
+    },
+    {
+      "feature": "Strict Editor editability including section 241",
+      "status": "NOT_RUN",
+      "reason": "Builder does not author BWEB 241; generic semantic load is a distinct gate"
+    }
+  ],
+  "ownerMergePolicy": "Merge PROHIBITED until same-scope independent comparison with Nazar candidate and approval"
+}
