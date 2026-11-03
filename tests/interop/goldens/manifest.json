@@ -1,0 +1,937 @@
+{
+  "compilerSources": {
+    "bomc/adapter/writer_v12.py": "5306686f57c84d7109d1e01684b7a2fc1b744bd8660cd300aec8942b54e2abe0",
+    "bomc/compiler/graph_to_bomc.py": "61ad0ff53efc2a754f0e5e0fdd80de9c4f5ec7778083fef1cf81fe3202df1b24",
+    "bomc/compiler/semantic_v12.py": "37c700de869696642b46e03d7beb17c670cf87fd586ac40ae742848eba3a152e"
+  },
+  "consumerStatus": {
+    "originalEditorE4": "NOT_RUN",
+    "originalModelEval": "NOT_RUN",
+    "section241": "NOT_RUN"
+  },
+  "fixtures": [
+    {
+      "byteSize": 2332,
+      "file": "concave-l-floor.bomc",
+      "intent": "concave L-shaped slab face, triangulated",
+      "name": "concave-l-floor",
+      "reader": {
+        "bounds": [
+          0.0,
+          0.0,
+          0.0,
+          4.0,
+          3.0,
+          0.2
+        ],
+        "counts": {
+          "definitions": 3,
+          "faces": 8,
+          "instances": 3,
+          "materials": 2,
+          "meshes": 1,
+          "transforms": 3
+        },
+        "coverage": [
+          8,
+          8,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "ecc50979398df40e4f95172e7385a56ceaa23c9fbb1c460c3c66ed47259fffb8",
+        "faceLabels": [
+          "Floor top: independent front/back",
+          "house/level/l/slab/bottom",
+          "house/level/l/slab/side-0",
+          "house/level/l/slab/side-1",
+          "house/level/l/slab/side-2",
+          "house/level/l/slab/side-3",
+          "house/level/l/slab/side-4",
+          "house/level/l/slab/side-5"
+        ],
+        "faceSurfaceCounts": {
+          "2": 8
+        },
+        "frontBackDistinctFaces": 1,
+        "geometryDigest": "62d9e14042f3ba753fa82f9fb1a4100be3383d9713660a0e8da925c33e7115d0",
+        "materialColors": [
+          [
+            140,
+            135,
+            130,
+            255
+          ],
+          [
+            200,
+            50,
+            35,
+            240
+          ]
+        ],
+        "materialOpacity": [
+          65535,
+          52428
+        ],
+        "meshDefinitions": [
+          2
+        ],
+        "meshVertices": [
+          14
+        ],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/level",
+          "house/level/l"
+        ],
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 13,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 22
+      },
+      "sha256": "8ca1c7aa803b08a091d4b35b5b121e725cbf27433affde435d1987a5c61ade63"
+    },
+    {
+      "byteSize": 2060,
+      "file": "floor-front-back.bomc",
+      "intent": "flat slab with independent front/back solid materials",
+      "name": "floor-front-back",
+      "reader": {
+        "bounds": [
+          0.0,
+          0.0,
+          0.0,
+          2.0,
+          1.0,
+          0.2
+        ],
+        "counts": {
+          "definitions": 3,
+          "faces": 6,
+          "instances": 3,
+          "materials": 2,
+          "meshes": 1,
+          "transforms": 3
+        },
+        "coverage": [
+          6,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "9aad1e161188ba8570e845bffa3ef04cafcc2bf52c4897d0f8ff64a1a337003c",
+        "faceLabels": [
+          "Study floor top",
+          "house/floor-1/study/slab/bottom",
+          "house/floor-1/study/slab/side-0",
+          "house/floor-1/study/slab/side-1",
+          "house/floor-1/study/slab/side-2",
+          "house/floor-1/study/slab/side-3"
+        ],
+        "faceSurfaceCounts": {
+          "2": 6
+        },
+        "frontBackDistinctFaces": 1,
+        "geometryDigest": "9a8847d93c52d6a7fdb01e0c33950f7b23c63b0bd564a49f55566573224387c9",
+        "materialColors": [
+          [
+            145,
+            145,
+            145,
+            255
+          ],
+          [
+            190,
+            120,
+            80,
+            245
+          ]
+        ],
+        "materialOpacity": [
+          65535,
+          58982
+        ],
+        "meshDefinitions": [
+          2
+        ],
+        "meshVertices": [
+          8
+        ],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/floor-1",
+          "house/floor-1/study"
+        ],
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 11,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 12
+      },
+      "sha256": "6d652bbd941059750dd2e26464d9c8104a1a8e827ef6f8e3328208a782f7ab8e"
+    },
+    {
+      "byteSize": 852,
+      "file": "minimal-root.bomc",
+      "intent": "one empty module under the root: no geometry sections",
+      "name": "minimal-root",
+      "reader": {
+        "bounds": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "counts": {
+          "definitions": 3,
+          "faces": 0,
+          "instances": 3,
+          "materials": 0,
+          "meshes": 0,
+          "transforms": 3
+        },
+        "coverage": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "faceLabels": [],
+        "faceSurfaceCounts": {},
+        "frontBackDistinctFaces": 0,
+        "geometryDigest": null,
+        "materialColors": [],
+        "materialOpacity": [],
+        "meshDefinitions": [],
+        "meshVertices": [],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/level",
+          "house/level/a"
+        ],
+        "sections": [
+          1,
+          2,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 3,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 0
+      },
+      "sha256": "f414a9260bb45fc93b36681e04a62e649ec875a9feabf0a7a6b82e22000437d2"
+    },
+    {
+      "byteSize": 2020,
+      "file": "mirrored-sheared-floors.bomc",
+      "intent": "mirror parent and sheared child transforms",
+      "name": "mirrored-sheared-floors",
+      "reader": {
+        "bounds": [
+          -5.25,
+          0.0,
+          0.0,
+          -3.0,
+          1.0,
+          0.2
+        ],
+        "counts": {
+          "definitions": 3,
+          "faces": 6,
+          "instances": 3,
+          "materials": 2,
+          "meshes": 1,
+          "transforms": 3
+        },
+        "coverage": [
+          6,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "d90e6764a37331a00436384dbcbf374e270359e23e1620d0a8077aeb83636064",
+        "faceLabels": [
+          "Floor top: independent front/back",
+          "house/level/a/slab/bottom",
+          "house/level/a/slab/side-0",
+          "house/level/a/slab/side-1",
+          "house/level/a/slab/side-2",
+          "house/level/a/slab/side-3"
+        ],
+        "faceSurfaceCounts": {
+          "2": 6
+        },
+        "frontBackDistinctFaces": 1,
+        "geometryDigest": "9a8847d93c52d6a7fdb01e0c33950f7b23c63b0bd564a49f55566573224387c9",
+        "materialColors": [
+          [
+            140,
+            135,
+            130,
+            255
+          ],
+          [
+            200,
+            50,
+            35,
+            240
+          ]
+        ],
+        "materialOpacity": [
+          65535,
+          52428
+        ],
+        "meshDefinitions": [
+          1
+        ],
+        "meshVertices": [
+          8
+        ],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/level/a",
+          "house/level"
+        ],
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 11,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.25,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 12
+      },
+      "sha256": "f026b5a76258a3b6e6fb61e6687850e81c73fdc64a244d937ada22a14e97f5ab"
+    },
+    {
+      "byteSize": 1372,
+      "file": "nested-shared-definitions.bomc",
+      "intent": "nested shared empty-group definitions with mirror and shear",
+      "name": "nested-shared-definitions",
+      "reader": {
+        "bounds": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "counts": {
+          "definitions": 8,
+          "faces": 0,
+          "instances": 8,
+          "materials": 0,
+          "meshes": 0,
+          "transforms": 8
+        },
+        "coverage": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "faceLabels": [],
+        "faceSurfaceCounts": {},
+        "frontBackDistinctFaces": 0,
+        "geometryDigest": null,
+        "materialColors": [],
+        "materialOpacity": [],
+        "meshDefinitions": [],
+        "meshVertices": [],
+        "nodes": [
+          "BOMC Builder assembly",
+          "wing",
+          "room",
+          "wing",
+          "room",
+          "room",
+          "room",
+          "room"
+        ],
+        "sections": [
+          1,
+          2,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 3,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.25,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            6.0,
+            0.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -6.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            4.0,
+            0.0
+          ],
+          [
+            -1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            3.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            4.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            -4.0,
+            0.0
+          ]
+        ],
+        "triangles": 0
+      },
+      "sha256": "6e481586741aa95f921d9b679c634c8636ff643417cef22bf713a40bb0da3408"
+    },
+    {
+      "byteSize": 8364,
+      "file": "two-room-door-seam.bomc",
+      "intent": "two rooms, real door cutout, single-owned shared seam",
+      "name": "two-room-door-seam",
+      "reader": {
+        "bounds": [
+          0.0,
+          0.0,
+          0.0,
+          6.0,
+          3.0,
+          2.8
+        ],
+        "counts": {
+          "definitions": 4,
+          "faces": 58,
+          "instances": 4,
+          "materials": 3,
+          "meshes": 2,
+          "transforms": 4
+        },
+        "coverage": [
+          58,
+          58,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "b9420b6c98c19639cf4658b394257a1764c6da6feafbaf76a0d6fb5cc32fafd0",
+        "faceLabels": [
+          "house/floor-1/hall/floor-1/bottom",
+          "house/floor-1/hall/floor-1/side-0",
+          "house/floor-1/hall/floor-1/side-1",
+          "house/floor-1/hall/floor-1/side-2",
+          "house/floor-1/hall/floor-1/side-3",
+          "house/floor-1/hall/floor-1/top",
+          "house/floor-1/living/east-wall/cut-0",
+          "house/floor-1/living/east-wall/cut-1",
+          "house/floor-1/living/east-wall/cut-10",
+          "house/floor-1/living/east-wall/cut-11",
+          "house/floor-1/living/east-wall/cut-12",
+          "house/floor-1/living/east-wall/cut-13",
+          "house/floor-1/living/east-wall/cut-14",
+          "house/floor-1/living/east-wall/cut-15",
+          "house/floor-1/living/east-wall/cut-16",
+          "house/floor-1/living/east-wall/cut-17",
+          "house/floor-1/living/east-wall/cut-18",
+          "house/floor-1/living/east-wall/cut-19",
+          "house/floor-1/living/east-wall/cut-2",
+          "house/floor-1/living/east-wall/cut-20",
+          "house/floor-1/living/east-wall/cut-21",
+          "house/floor-1/living/east-wall/cut-3",
+          "house/floor-1/living/east-wall/cut-4",
+          "house/floor-1/living/east-wall/cut-5",
+          "house/floor-1/living/east-wall/cut-6",
+          "house/floor-1/living/east-wall/cut-7",
+          "house/floor-1/living/east-wall/cut-8",
+          "house/floor-1/living/east-wall/cut-9",
+          "house/floor-1/living/east-wall/insert-door-1-0-0",
+          "house/floor-1/living/east-wall/insert-door-1-0-1",
+          "house/floor-1/living/east-wall/insert-door-1-0-2",
+          "house/floor-1/living/east-wall/insert-door-1-0-3",
+          "house/floor-1/living/east-wall/insert-door-1-0-4",
+          "house/floor-1/living/east-wall/insert-door-1-0-5",
+          "house/floor-1/living/east-wall/insert-door-1-1-0",
+          "house/floor-1/living/east-wall/insert-door-1-1-1",
+          "house/floor-1/living/east-wall/insert-door-1-1-2",
+          "house/floor-1/living/east-wall/insert-door-1-1-3",
+          "house/floor-1/living/east-wall/insert-door-1-1-4",
+          "house/floor-1/living/east-wall/insert-door-1-1-5",
+          "house/floor-1/living/east-wall/insert-door-1-2-0",
+          "house/floor-1/living/east-wall/insert-door-1-2-1",
+          "house/floor-1/living/east-wall/insert-door-1-2-2",
+          "house/floor-1/living/east-wall/insert-door-1-2-3",
+          "house/floor-1/living/east-wall/insert-door-1-2-4",
+          "house/floor-1/living/east-wall/insert-door-1-2-5",
+          "house/floor-1/living/east-wall/insert-door-1-3-0",
+          "house/floor-1/living/east-wall/insert-door-1-3-1",
+          "house/floor-1/living/east-wall/insert-door-1-3-2",
+          "house/floor-1/living/east-wall/insert-door-1-3-3",
+          "house/floor-1/living/east-wall/insert-door-1-3-4",
+          "house/floor-1/living/east-wall/insert-door-1-3-5",
+          "house/floor-1/living/floor-1/bottom",
+          "house/floor-1/living/floor-1/side-0",
+          "house/floor-1/living/floor-1/side-1",
+          "house/floor-1/living/floor-1/side-2",
+          "house/floor-1/living/floor-1/side-3",
+          "house/floor-1/living/floor-1/top"
+        ],
+        "faceSurfaceCounts": {
+          "1": 22,
+          "2": 12,
+          "9": 24
+        },
+        "frontBackDistinctFaces": 0,
+        "geometryDigest": "69915fd235d794c095c82a2385d31dd84b857645eb836ede2cfa88fb5a96182e",
+        "materialColors": [
+          [
+            220,
+            220,
+            214,
+            255
+          ],
+          [
+            180,
+            180,
+            180,
+            255
+          ],
+          [
+            245,
+            244,
+            242,
+            255
+          ]
+        ],
+        "materialOpacity": [
+          65535,
+          65535,
+          65535
+        ],
+        "meshDefinitions": [
+          3,
+          2
+        ],
+        "meshVertices": [
+          8,
+          52
+        ],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/floor-1",
+          "house/floor-1/living",
+          "house/floor-1/hall"
+        ],
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 65,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            4.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 116
+      },
+      "sha256": "a21109c137b943e5afc4a50776dcbf2eb3def36b93eaa63e951a9311ee46f632"
+    }
+  ],
+  "schemaVersion": 1,
+  "scope": "Builder-side certification only: bytes compiled by this repository and read by its own strict reader",
+  "unsupportedByBuilderSource": [
+    {
+      "name": "holed-face",
+      "reason": "Module IR v1 has no hole-authoring field"
+    },
+    {
+      "name": "roof-operation",
+      "reason": "roof operations are not in the Module IR v1 schema"
+    },
+    {
+      "name": "textured-material",
+      "reason": "textures and UVs are not part of the profile"
+    }
+  ]
+}

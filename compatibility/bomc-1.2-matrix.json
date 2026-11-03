@@ -208,7 +208,7 @@
       "writer": "builderWriter12",
       "reader": "editorE4Viewer",
       "status": "NOT_RUN",
-      "claim": "BMB-019 writer does not exist at this stage; no valid binary parity claim"
+      "claim": "Builder BOMC 1.2 compiler (BMB-019/020) exists and its output passes the Builder's own strict reader (see builderSideCertification); no original Editor E4 or Model-Eval run, so no consumer pairing is claimed"
     }
   ],
   "negatives": [
@@ -283,5 +283,66 @@
       "skipped": 2,
       "capability": "Real BOMC 1.2 semantic loader works on native synthetic models. Six BMB-007 containers structurally parse but semantic load correctly rejects; external pairing NOT_RUN."
     }
-  ]
+  ],
+  "builderSideCertification": {
+    "status": "PASS_BUILDER_SIDE_ONLY",
+    "scope": "Bytes produced by this repository's compiler, decoded by this repository's own strict reader (tests/interop/reader.py). This is NOT an original-consumer result and promotes no writer/reader pairing in `cases`.",
+    "task": "BMB-021",
+    "manifest": "tests/interop/goldens/manifest.json",
+    "fixtures": [
+      {
+        "name": "concave-l-floor",
+        "sha256": "8ca1c7aa803b08a091d4b35b5b121e725cbf27433affde435d1987a5c61ade63",
+        "byteSize": 2332
+      },
+      {
+        "name": "floor-front-back",
+        "sha256": "6d652bbd941059750dd2e26464d9c8104a1a8e827ef6f8e3328208a782f7ab8e",
+        "byteSize": 2060
+      },
+      {
+        "name": "minimal-root",
+        "sha256": "f414a9260bb45fc93b36681e04a62e649ec875a9feabf0a7a6b82e22000437d2",
+        "byteSize": 852
+      },
+      {
+        "name": "mirrored-sheared-floors",
+        "sha256": "f026b5a76258a3b6e6fb61e6687850e81c73fdc64a244d937ada22a14e97f5ab",
+        "byteSize": 2020
+      },
+      {
+        "name": "nested-shared-definitions",
+        "sha256": "6e481586741aa95f921d9b679c634c8636ff643417cef22bf713a40bb0da3408",
+        "byteSize": 1372
+      },
+      {
+        "name": "two-room-door-seam",
+        "sha256": "a21109c137b943e5afc4a50776dcbf2eb3def36b93eaa63e951a9311ee46f632",
+        "byteSize": 8364
+      }
+    ],
+    "unsupportedByBuilderSource": [
+      {
+        "name": "holed-face",
+        "reason": "Module IR v1 has no hole-authoring field"
+      },
+      {
+        "name": "roof-operation",
+        "reason": "roof operations are not in the Module IR v1 schema"
+      },
+      {
+        "name": "textured-material",
+        "reason": "textures and UVs are not part of the profile"
+      }
+    ],
+    "consumerPairings": {
+      "Builder -> original Editor E4 viewer": "NOT_RUN",
+      "Builder -> original Model-Eval viewer": "NOT_RUN",
+      "Builder -> strict Editor editable reader (needs section 241)": "NOT_RUN",
+      "Ruby producer -> Editor E4 / Model-Eval": "NOT_RUN",
+      "Editor writer -> Model-Eval": "NOT_RUN",
+      "malformed section 241 at original consumers": "NOT_RUN"
+    },
+    "reason": "Editor and Model-Eval are private repositories that the Builder session and Actions token cannot check out"
+  }
 }

@@ -1,0 +1,39 @@
+name: BMB-021 Builder-side interop certification
+on:
+  push:
+    paths:
+      - "core/**"
+      - "examples/**"
+      - "bomc/**"
+      - "compatibility/**"
+      - "tests/interop/**"
+      - "tests/test_bmb021_interop.py"
+      - ".github/workflows/bmb021-interop.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "examples/**"
+      - "bomc/**"
+      - "compatibility/**"
+      - "tests/interop/**"
+      - "tests/test_bmb021_interop.py"
+      - ".github/workflows/bmb021-interop.yml"
+  workflow_dispatch:
+
+jobs:
+  interop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Semantic goldens, strict reader and corruption matrix
+        run: |
+          python -m pip install jsonschema==4.23.0
+          python -m tests.interop.goldens --check tests/interop/goldens
+          python -m unittest discover -s tests -p test_bmb021_interop.py -v
