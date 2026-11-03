@@ -79,14 +79,15 @@ REFERENCE = {
         "materialCount": 2, "bounds": [0, 0, 0, 2, 1, 0.2],
     },
     "concave-solid": {
-        "meshCount": 1, "faceCount": 8,
+        "meshCount": 1, "faceCount": 8, "triangleCount": 22,
         "materialCount": 2, "bounds": [0, 0, 0, 3, 3, 0.2],
     },
     "door-and-two-room": {
         "meshCount": 2, "faceCount": 58, "triangleCount": 116,
         "materialCount": 3,
     },
-    "window-cutout": {"meshCount": 1, "materialCount": 2},
+    "window-cutout": {"meshCount": 1, "faceCount": 68, "triangleCount": 136,
+                      "materialCount": 2},
     "nested-mirror-shear-nonuniform": {
         "meshCount": 1, "faceCount": 6, "triangleCount": 12,
         "materialCount": 2, "bounds": [-5.25, 2, 0, -3, 3.5, 0.15],
