@@ -111,8 +111,10 @@ def _run(args: argparse.Namespace, stream) -> dict:
         if args.root is not None or args.module_id is not None:
             raise CLIError("assembly validation cannot combine --root or --module-id")
         payload = _input_json(stream)
-        if set(payload) != {"modules"}:
-            raise CLIError("assembly JSON must contain only 'modules'")
+        if set(payload) not in ({"modules"}, {"schemaVersion", "modules"}):
+            raise CLIError("assembly JSON requires 'modules' and optional 'schemaVersion' only")
+        if "schemaVersion" in payload and payload["schemaVersion"] != "1.0.0":
+            raise CLIError("assembly schemaVersion must be 1.0.0")
         graph = assemble(payload["modules"])
         return {
             "mode": "assembly",
