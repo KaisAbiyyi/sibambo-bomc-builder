@@ -323,10 +323,10 @@ def encode_semantic(assembly, nodes):
     base_strings = _strings(base[2][0])
     module_faces = {}
     for mid, module in sorted(assembly.modules.items()):
-        module_faces = _shape_faces(mid, module)
-        if module_faces:
-            module_faces.sort(key=lambda f: (f["opid"], f["key"]))
-            module_faces[mid] = module_faces
+        faces_for_module = _shape_faces(mid, module)
+        if faces_for_module:
+            faces_for_module.sort(key=lambda f: (f["opid"], f["key"]))
+            module_faces[mid] = faces_for_module
         elif any(module.get(k) for k in ("operations", "faceAnnotations")):
             raise GeometryEncodingError("source geometry produced no faces")
     _require(module_faces, "semantic compile requires at least one face")
