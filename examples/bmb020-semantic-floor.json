@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "1.0.0",
+  "modules": [
+    {
+      "schemaVersion": "1.0.0",
+      "moduleId": "house/floor-1/study",
+      "parentId": "house/floor-1",
+      "revision": 1,
+      "localFrame": {
+        "unit": "m",
+        "handedness": "right",
+        "upAxis": "+Z",
+        "forwardAxis": "+Y",
+        "transform": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          2,
+          1,
+          0.2
+        ]
+      },
+      "operations": [
+        {
+          "kind": "floor-slab",
+          "opId": "slab",
+          "role": "floor",
+          "materialId": "concrete",
+          "footprint": [
+            [
+              0,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "thickness": 0.2,
+          "elevation": 0
+        }
+      ],
+      "materials": [
+        {
+          "materialId": "concrete",
+          "rgba": [
+            145,
+            145,
+            145,
+            255
+          ],
+          "opacity": 1,
+          "semanticRole": "floor"
+        },
+        {
+          "materialId": "finish",
+          "rgba": [
+            190,
+            120,
+            80,
+            245
+          ],
+          "opacity": 0.9,
+          "semanticRole": "floor"
+        }
+      ],
+      "faceAnnotations": [
+        {
+          "opId": "slab",
+          "faceKey": "top",
+          "role": "floor",
+          "frontMaterialId": "finish",
+          "backMaterialId": "concrete",
+          "label": "Study floor top"
+        }
+      ],
+      "ports": [],
+      "ownedSeams": [],
+      "dependencies": [],
+      "provenance": {
+        "origin": "synthetic",
+        "generator": "bmb020-cleanroom-example",
+        "note": "Entirely invented room"
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+name: BMB-020 deterministic compiler
+on:
+  push:
+    paths:
+      - "bomc/compiler/**"
+      - "tests/test_bmb020_*.py"
+      - "examples/bmb020-semantic-floor.json"
+      - ".github/workflows/bmb020-compiler.yml"
+  pull_request:
+    paths:
+      - "bomc/compiler/**"
+      - "tests/test_bmb020_*.py"
+      - "examples/bmb020-semantic-floor.json"
+      - ".github/workflows/bmb020-compiler.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compiler:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact checked-out source SHA
+        run: git rev-parse HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install already-pinned Module IR semantic schema validator
+        run: python -m pip install jsonschema==4.23.0
+      - name: Compiler + cold-process SHA check
+        run: python -m unittest discover -s tests -p test_bmb020_compiler.py -v
+      - name: Real geometry, semantic binary readback and nonempty cold-process SHA
+        run: python -m unittest discover -s tests -p test_bmb020_semantic.py -v
+      - name: BMB-019 metadata writer regression
+        run: python -m unittest discover -s tests -p test_bmb019_writer.py -v
+      - name: BMB-011 assembly and BMB-009 DAG regressions
+        run: python -m unittest discover -s tests -p test_bmb011_assembly.py -v
+      - run: python -m unittest discover -s tests -p test_bmb009_graph.py -v
+      - name: Geometry primitive and semantic regression
+        run: python -m unittest discover -s tests -p test_bmb01*.py -v
+      - name: Independent container harness
+        run: python tools/bomc_fixture_harness.py --selftest
+      - name: Compile public fixtures for downstream BMB-021 readback
+        run: |
+          python -c "from pathlib import Path; Path('bmb020-evidence').mkdir(exist_ok=True)"
+          python -m bomc.compiler.graph_to_bomc --input examples/bmb020-semantic-floor.json --output bmb020-evidence/floor.bomc
+          python -m bomc.compiler.graph_to_bomc --input examples/module-ir-two-rooms.json --output bmb020-evidence/two-rooms.bomc
+      - name: Upload exact candidate's synthetic semantic BOMC files
+        uses: actions/upload-artifact@v4
+        with:
+          name: bmb020-semantic-${{ matrix.os }}
+          path: bmb020-evidence/*.bomc
+          if-no-files-found: error
+          retention-days: 14
