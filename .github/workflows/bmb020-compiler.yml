@@ -4,6 +4,7 @@ on:
     paths:
       - "bomc/compiler/**"
       - "tests/test_bmb020_*.py"
+      - "examples/bmb020-semantic-floor.json"
       - ".github/workflows/bmb020-compiler.yml"
   pull_request:
     paths:
