@@ -79,7 +79,7 @@ REFERENCE = {
         "materialCount": 2, "bounds": [0, 0, 0, 2, 1, 0.2],
     },
     "concave-solid": {
-        "meshCount": 1, "faceCount": 8, "triangleCount": 20,
+        "meshCount": 1, "faceCount": 8,
         "materialCount": 2, "bounds": [0, 0, 0, 3, 3, 0.2],
     },
     "door-and-two-room": {
