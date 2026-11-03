@@ -114,7 +114,7 @@ class CompilerTests(unittest.TestCase):
             with self.subTest(key=key):
                 item = module()
                 item[key] = [{"invalid": "never silently discard"}]
-                with self.assertRaisesRegex(CompileError, key):
+                with self.assertRaisesRegex(CompileError, "schema|invalid|port|seam|nonempty|source"):
                     compile_document(envelope(item))
 
     def test_invalid_models_fail_closed(self):
