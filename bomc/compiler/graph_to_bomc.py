@@ -20,6 +20,7 @@ from bomc.adapter.writer_v12 import (
 from core.assembly.merge import Assembly, AssemblyError, assemble
 from bomc.compiler.semantic_v12 import encode_semantic, GeometryEncodingError
 from core.graph import dag
+from core.geometry.semantics import validate_module_faces, SemanticFaceError
 
 MODULE_FIELDS = {
     "schemaVersion", "moduleId", "parentId", "revision", "localFrame",
@@ -113,6 +114,10 @@ def compile_assembly(assembly: Assembly) -> Compiled:
     _need(0 < len(assembly.modules) < MAX_NODES, "assembly exceeds writer budget")
     for mid, module in assembly.modules.items():
         doc = _object(module, REQUIRED, MODULE_FIELDS, mid)
+        try:
+            validate_module_faces(doc)
+        except SemanticFaceError as exc:
+            raise CompileError(f"{mid}: Module IR schema / semantic rejection: {exc}") from exc
         frame = _object(doc["localFrame"], FRAME_FIELDS, FRAME_FIELDS, mid + ".localFrame")
         _need(frame["unit"] == "m" and frame["handedness"] == "right" and
               frame["upAxis"] == "+Z" and frame["forwardAxis"] == "+Y",
