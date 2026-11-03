@@ -233,8 +233,15 @@ def semantic_read(blob):
     parent = index_list(ins_raw, 12 + 2 * ic, ic, ic, nullable=True)
     idef = index_list(ins_raw, 12 + 3 * ic, ic, dc)
     itrans = index_list(ins_raw, 12 + 4 * ic, ic, mc[6])
-    require(parent[0] == 255 and all(0 <= parent[i] < i for i in range(1, ic)),
-            "cycle or invalid parent tree")
+    require(parent[0] == 255 and all(0 <= parent[i] < ic and parent[i] != i
+                                     for i in range(1, ic)), "invalid parent reference")
+    for instance_id in range(ic):
+        seen = set()
+        cursor = instance_id
+        while cursor != 255:
+            require(cursor not in seen and len(seen) < ic, "instance hierarchy cycle/depth")
+            seen.add(cursor)
+            cursor = parent[cursor]
     require(ikind[0] == 1 and all(k == 3 for k in ikind[1:]) and
             all(idef[i] == i for i in range(ic)), "invalid instance to definition relationship")
     xf_raw, tc = sections[13][1], sections[13][0]
