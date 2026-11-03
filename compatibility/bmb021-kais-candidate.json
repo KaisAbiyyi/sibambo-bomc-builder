@@ -6,8 +6,17 @@
   "branch": "work/bmb-021/kais-interop-20261103",
   "evidenceSource": "tests/interop/kais_receipt.py; binary/SHA manifests are generated only by exact-head cloud CI",
   "internalIndependentDecoder": {
-    "status": "NOT_RUN",
-    "reason": "Pending exact-HEAD hosted Linux/Windows acceptance; no local-only PASS claimed"
+    "status": "PASS",
+    "evidence": {
+      "commit": "f97027217848b90818c72aaa5dfa82ac4a70ebeb",
+      "run": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41632404663",
+      "platforms": [
+        "ubuntu-latest",
+        "windows-latest"
+      ],
+      "unittestInvocationsPerOS": 75,
+      "notes": "Exact semantic cold-process full-binary hashes identical on Ubuntu/Windows; this is internal independent decoding, not original consumer readback"
+    }
   },
   "pairings": [
     {
@@ -44,8 +53,18 @@
   "adversarial": [
     {
       "consumer": "Independent Kais Builder decoder",
-      "status": "NOT_RUN",
-      "reason": "Pending exact-head Linux and Windows corruption matrix CI"
+      "status": "PASS",
+      "evidence": {
+        "commit": "f97027217848b90818c72aaa5dfa82ac4a70ebeb",
+        "run": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41632404663",
+        "platforms": [
+          "ubuntu-latest",
+          "windows-latest"
+        ],
+        "unittestInvocationsPerOS": 75,
+        "notes": "Exact semantic cold-process full-binary hashes identical on Ubuntu/Windows; this is internal independent decoding, not original consumer readback"
+      },
+      "scope": "Strict Builder reader version/header/CRC/directory/topology/transform/material/winding/241 rejection; real zlib positive and expansion rejection. Original consumers NOT_RUN."
     },
     {
       "consumer": "Original Editor E4 and strict web authoring",
@@ -61,8 +80,18 @@
   "capabilityExceptions": [
     {
       "feature": "Concave polygon without holes",
-      "status": "NOT_RUN",
-      "reason": "Pending independent binary CI"
+      "status": "PASS",
+      "reason": "Pending independent binary CI",
+      "evidence": {
+        "commit": "f97027217848b90818c72aaa5dfa82ac4a70ebeb",
+        "run": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41632404663",
+        "platforms": [
+          "ubuntu-latest",
+          "windows-latest"
+        ],
+        "unittestInvocationsPerOS": 75,
+        "notes": "Exact semantic cold-process full-binary hashes identical on Ubuntu/Windows; this is internal independent decoding, not original consumer readback"
+      }
     },
     {
       "feature": "Polygon with inner holes",
@@ -71,8 +100,18 @@
     },
     {
       "feature": "Nested/mirrored/sheared/nonuniform Module IR transforms",
-      "status": "NOT_RUN",
-      "reason": "Pending independent binary CI"
+      "status": "PASS",
+      "reason": "Pending independent binary CI",
+      "evidence": {
+        "commit": "f97027217848b90818c72aaa5dfa82ac4a70ebeb",
+        "run": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41632404663",
+        "platforms": [
+          "ubuntu-latest",
+          "windows-latest"
+        ],
+        "unittestInvocationsPerOS": 75,
+        "notes": "Exact semantic cold-process full-binary hashes identical on Ubuntu/Windows; this is internal independent decoding, not original consumer readback"
+      }
     },
     {
       "feature": "Shared reusable mesh definition across instances",
@@ -85,5 +124,42 @@
       "reason": "Builder does not author BWEB 241; generic semantic load is a distinct gate"
     }
   ],
-  "ownerMergePolicy": "Merge PROHIBITED until same-scope independent comparison with Nazar candidate and approval"
+  "ownerMergePolicy": "Merge PROHIBITED until same-scope independent comparison with Nazar candidate and approval",
+  "fixtureGoldens": [
+    {
+      "fixture": "minimal-solid",
+      "binarySHA256": "6d652bbd941059750dd2e26464d9c8104a1a8e827ef6f8e3328208a782f7ab8e",
+      "faceCount": 6,
+      "triangleCount": 12,
+      "otherCounters": "See exact-head uploaded kais-manifest.json and tests/interop/kais_cases.py"
+    },
+    {
+      "fixture": "concave-solid",
+      "binarySHA256": "0dea9d9a7f3b71ee3e106ed9e34646f7c518d00589cd1c13ec355b34640d9529",
+      "faceCount": 8,
+      "triangleCount": 22,
+      "otherCounters": "See exact-head uploaded kais-manifest.json and tests/interop/kais_cases.py"
+    },
+    {
+      "fixture": "door-and-two-room",
+      "binarySHA256": "a21109c137b943e5afc4a50776dcbf2eb3def36b93eaa63e951a9311ee46f632",
+      "faceCount": 58,
+      "triangleCount": 116,
+      "otherCounters": "See exact-head uploaded kais-manifest.json and tests/interop/kais_cases.py"
+    },
+    {
+      "fixture": "window-cutout",
+      "binarySHA256": "0401f37d0a6ff036b285ebc948e75dae7dfdf1416783b51fe4e987e9723d7710",
+      "faceCount": 68,
+      "triangleCount": 136,
+      "otherCounters": "See exact-head uploaded kais-manifest.json and tests/interop/kais_cases.py"
+    },
+    {
+      "fixture": "nested-mirror-shear-nonuniform",
+      "binarySHA256": "2a112b564030ef1ca4098549fbf78d66e0be14fc4cce2f2491d423feb0aa453c",
+      "faceCount": 6,
+      "triangleCount": 12,
+      "otherCounters": "See exact-head uploaded kais-manifest.json and tests/interop/kais_cases.py"
+    }
+  ]
 }
