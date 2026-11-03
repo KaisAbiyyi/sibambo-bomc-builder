@@ -20,12 +20,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: bmb021-kais-${{ github.ref }
+  group: bmb021-kais-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   kais-interop:
-    name: Kais synthetic semantics / ${{ matrix.os }
-    runs-on: ${{ matrix.os }
+    name: Kais synthetic semantics / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Exact SHA
         run: git rev-parse HEAD
@@ -59,7 +59,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: bmb021-kais-${{ matrix.os }-${{ github.sha }
+          name: bmb021-kais-${{ matrix.os }}-${{ github.sha }}
           path: bmb021-kais-evidence/
           retention-days: 21
           if-no-files-found: warn
