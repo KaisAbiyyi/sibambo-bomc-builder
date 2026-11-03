@@ -71,6 +71,27 @@ def changed_binary(binary, at, data):
     return bytes(value)
 
 
+def compressed_section(binary, section_id, declared=None, trim=0):
+    """Independently repack one compressed section with fresh stored CRC."""
+    sections = source_sections(binary)
+    position = (H.size + E.size*len(sections) + 7) & ~7
+    descriptors, pieces = bytearray(), []
+    for sid, (original, count) in sorted(sections.items()):
+        pack = zlib.compress(original, level=9) if sid == section_id else original
+        if sid == section_id and trim:
+            pack = pack[:-trim]
+        raw_size = (len(original) if declared is None else declared) if sid == section_id else len(original)
+        descriptors += E.pack(sid, 1 if sid == section_id else 0, 0, position,
+                              len(pack), raw_size, count, zlib.crc32(pack) & 0xffffffff)
+        pieces.append(pack)
+        position = (position + len(pack) + 7) & ~7
+    out = bytearray(H.pack(b"BOMC\r\n\x1a\n", 1, 2, 0x01020304, 0x11,
+                           len(sections), 32)) + descriptors
+    for part in pieces:
+        out += bytes((-len(out)) % 8) + part
+    return bytes(out)
+
+
 class KaisSemantic(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -227,6 +248,39 @@ class KaisSemantic(unittest.TestCase):
             with self.subTest(vector=key):
                 with self.assertRaises(Reject):
                     semantic_read(bad)
+
+    def test_zlib_real_stream_bounded_decode_and_expansion_bomb(self):
+        base = self.outputs["minimal-solid"]
+        # Known legal compressed section is parsed semantically, not rejected
+        # just because the writer normally chooses STORE.
+        compressed = compressed_section(base, 2)
+        normal, comp = semantic_read(base), semantic_read(compressed)
+        for field in ("faceCount", "triangleCount", "vertexCount", "coverage",
+                      "bounds", "materials", "faces", "instances"):
+            self.assertEqual(normal[field], comp[field])
+        # Valid compressed bytes, false small declared output: strict cap and
+        # size mismatch must reject even with a recalculated stored CRC.
+        with self.assertRaises(Reject):
+            semantic_read(compressed_section(base, 2, declared=1))
+        with self.assertRaises(Reject):
+            semantic_read(compressed_section(base, 2, declared=2_000_001))
+        with self.assertRaises(Reject):
+            semantic_read(compressed_section(base, 2, trim=1))
+
+    def test_crc_valid_winding_and_material_reference_mutations(self):
+        base = self.outputs["minimal-solid"]
+        face_count = semantic_read(base)["faceCount"]
+        def invert_normal(raw):
+            first = struct.unpack_from("<3d", raw, 12)
+            struct.pack_into("<3d", raw, 12, *(-v for v in first))
+        def bogus_material(raw):
+            raw[24 + 3*face_count] = 254
+        for kind, broken in {
+            "reversed_normal": changed_section(base, 9, invert_normal),
+            "bad_material_index": changed_section(base, 6, bogus_material),
+        }.items():
+            with self.subTest(kind=kind), self.assertRaises(Reject):
+                semantic_read(broken)
 
     def test_section_241_unknown_and_budget_gate_reject_not_editor_claim(self):
         base = self.outputs["minimal-solid"]
