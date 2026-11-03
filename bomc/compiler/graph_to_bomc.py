@@ -1,6 +1,6 @@
 """BMB-020: deterministic graph to BOMC 1.2 metadata compiler.
 
-Strictly fail closed on geometry until the real semantic writer is certified.
+Geometry-bearing Module IR is supported through a bounded real semantic writer.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from bomc.adapter.writer_v12 import (
     UnsupportedFeature, encode_graph,
 )
 from core.assembly.merge import Assembly, AssemblyError, assemble
+from bomc.compiler.semantic_v12 import encode_semantic, GeometryEncodingError
 from core.graph import dag
 
 MODULE_FIELDS = {
@@ -27,7 +28,6 @@ MODULE_FIELDS = {
 }
 REQUIRED = MODULE_FIELDS - {"faceAnnotations"}
 FRAME_FIELDS = {"unit", "handedness", "upAxis", "forwardAxis", "transform"}
-UNSUPPORTED = ("operations", "materials", "ports", "ownedSeams", "faceAnnotations")
 ROOT_NAME = "BOMC Builder assembly"
 
 
@@ -43,17 +43,20 @@ class Compiled:
     string_count: int
     section_ids: tuple[int, ...]
     coverage: tuple[int, ...]
+    geometry_info: dict | None = None
 
     def receipt(self) -> dict:
         return {
-            "profile": "bomc-1.2-metadata-only",
+            "profile": "bomc-1.2-semantic-solid-subset" if self.geometry_info else "bomc-1.2-metadata-only",
             "sha256": self.sha256,
             "sizeBytes": len(self.payload),
             "nodeCount": self.node_count,
             "stringCount": self.string_count,
             "sections": list(self.section_ids),
             "coverage": list(self.coverage),
-            "geometrySemanticsValid": False,
+            "geometrySemanticsValid": bool(self.geometry_info),
+            **({k: v for k, v in self.geometry_info.items() if k not in ("coverage", "sectionIds")}
+               if self.geometry_info else {}),
         }
 
 
@@ -110,10 +113,6 @@ def compile_assembly(assembly: Assembly) -> Compiled:
     _need(0 < len(assembly.modules) < MAX_NODES, "assembly exceeds writer budget")
     for mid, module in assembly.modules.items():
         doc = _object(module, REQUIRED, MODULE_FIELDS, mid)
-        for key in UNSUPPORTED:
-            values = doc.get(key, [])
-            _need(isinstance(values, list) and not values,
-                  f"{mid}: {key} requires real semantic BOMC writer; lossy compile rejected")
         frame = _object(doc["localFrame"], FRAME_FIELDS, FRAME_FIELDS, mid + ".localFrame")
         _need(frame["unit"] == "m" and frame["handedness"] == "right" and
               frame["upAxis"] == "+Z" and frame["forwardAxis"] == "+Y",
@@ -124,8 +123,11 @@ def compile_assembly(assembly: Assembly) -> Compiled:
             vec = bounds[part]
             _need(isinstance(vec, list) and len(vec) == 3, f"{mid}: malformed bounds")
             for v in vec:
-                _need(type(v) in (int, float) and v == 0,
-                      f"{mid}: nonzero bounds are not geometry-free")
+                _need(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 1e6,
+                      f"{mid}: invalid bounds")
+        if not doc["operations"]:
+            _need(all(v == 0 for part in ("min", "max") for v in bounds[part]),
+                  f"{mid}: nonzero bounds with no geometry")
         provenance = _object(doc["provenance"], {"origin", "generator"},
                              {"origin", "generator", "note"}, mid + ".provenance")
         _need(provenance["origin"] in ("synthetic", "user-authored") and
@@ -153,21 +155,36 @@ def compile_assembly(assembly: Assembly) -> Compiled:
         nodes.append({"id": module_ids[mid], "kind": "group", "name": mid,
                       "parentId": parent_id,
                       "transform": _to_wire_matrix(module["localFrame"]["transform"])})
+    if any(module["operations"] for module in assembly.modules.values()):
+        try:
+            binary, info = encode_semantic(assembly, nodes)
+        except (GeometryEncodingError, ValueError, TypeError, KeyError,
+                OverflowError, RecursionError) as exc:
+            raise CompileError("semantic geometry rejected: " + str(exc)) from exc
+        return Compiled(binary, hashlib.sha256(binary).hexdigest(), len(nodes),
+                        _string_count(binary), info["sectionIds"], info["coverage"], info)
+    _need(not any(module["materials"] or module["ports"] or module["ownedSeams"] or
+                  module.get("faceAnnotations") for module in assembly.modules.values()),
+          "nonempty semantic metadata without geometry cannot be dropped")
     return _emit(nodes)
 
 
+def _string_count(binary: bytes) -> int:
+    for i in range(HEADER.unpack_from(binary)[5]):
+        row = ENTRY.unpack_from(binary, HEADER.size + i * ENTRY.size)
+        if row[0] == 2:
+            return row[6]
+    raise CompileError("missing strings section")
+
+
 def compile_document(value: object) -> Compiled:
-    """BMB-006 envelope -> BMB-011 assembly -> qualified BMB-019 writer."""
+    """BMB-006 envelope -> BMB-011 assembly -> real BOMC 1.2 solid subset."""
     doc = _object(value, {"schemaVersion", "modules"},
                   {"schemaVersion", "modules"}, "document")
     _need(doc["schemaVersion"] == "1.0.0", "unsupported document schemaVersion")
     _need(isinstance(doc["modules"], list), "modules must be a list")
     for index, module in enumerate(doc["modules"]):
         _need(isinstance(module, dict), f"modules[{index}]: expected object")
-        for key in UNSUPPORTED:
-            if key in module:
-                _need(isinstance(module[key], list) and not module[key],
-                      f"modules[{index}]: {key} nonempty; geometry writer not implemented")
     try:
         return compile_assembly(assemble(doc["modules"]))
     except AssemblyError as exc:
