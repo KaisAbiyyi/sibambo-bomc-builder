@@ -298,9 +298,12 @@ def validate_assembly(source: Assembly | list[dict] | tuple[dict, ...],
         assembly = assemble(modules)
     except AssemblyError as exc:
         message = str(exc)
-        mid = next((m.get("moduleId") for m in modules if isinstance(m, dict)
-                    and isinstance(m.get("moduleId"), str) and m["moduleId"] in message),
-                   None) if isinstance(modules, (list, tuple)) else None
+        ids = sorted({m["moduleId"] for m in modules if isinstance(m, dict)
+                      and isinstance(m.get("moduleId"), str)},
+                     key=lambda name: (-len(name), name)) if isinstance(modules, (list, tuple)) else []
+        mid = next((name for name in ids if message.startswith((name + ":", name + ".", name + " "))), None)
+        if mid is None:
+            mid = next((name for name in ids if name in message), None)
         _add(out, "ASSEMBLY_INVALID", mid, "assembly", message)
         return _report(out, tol)
     boxes: dict[str, tuple] = {}

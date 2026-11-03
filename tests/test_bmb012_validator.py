@@ -103,6 +103,13 @@ class ValidationTests(unittest.TestCase):
         find(mods, LIV)["ports"][0]["localTransform"][7] = 9
         self.assertIn("PORT_OUT_OF_BOUNDS", self.codes(validate_assembly(mods)))
 
+    def test_invalid_report_order_independent(self):
+        mods = example()
+        find(mods, HALL)["ports"][0]["peer"]["portId"] = "missing"
+        first = validate_assembly(mods).to_dict()
+        second = validate_assembly(list(reversed(mods))).to_dict()
+        self.assertEqual(first, second)
+
     def test_unresolved_port_reciprocity(self):
         mods = example()
         find(mods, HALL)["ports"][0]["peer"]["portId"] = "missing"
