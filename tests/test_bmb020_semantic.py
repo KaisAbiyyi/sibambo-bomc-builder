@@ -282,6 +282,15 @@ class GeometryReadback(unittest.TestCase):
         self.assertEqual(binary.receipt()["materialCount"], 2)
         self.assertIn(9, parsed["sections"])
 
+    def test_committed_public_semantic_fixture(self):
+        fixture = json.loads((ROOT/"examples/bmb020-semantic-floor.json").read_text(encoding="utf8"))
+        result = compile_document(fixture)
+        original = independent_read(result.payload)
+        self.assertEqual(original["counts"][:4], (2, 0, 1, 6))
+        self.assertEqual(original["coverage"], (6, 6, 0, 0, 0, 0))
+        self.assertTrue(any(f["label"] == "Study floor top"
+                            and f["front"] != f["back"] for f in original["faces"]))
+
     def test_wall_real_cutout_and_shared_wall_example(self):
         wall = wall_with_door()
         result = independent_read(compile_document({
@@ -336,6 +345,10 @@ class GeometryReadback(unittest.TestCase):
             self.assertEqual(parsed["counts"][2:4],(2,12))
             self.assertEqual(parsed["coverage"],(12,12,0,0,0,0))
             self.assertEqual(parsed["triangles"],24)
+            print("BMB020_COLD_GEOMETRY_SHA256=" + receipts[0]["sha256"] +
+                  " sections=" + str(receipts[0]["sections"]) +
+                  " coverage=" + str(receipts[0]["coverage"]) +
+                  " faces=" + str(receipts[0]["faceCount"]))
 
     def test_nested_mirror_shear_and_operation_permutation(self):
         from core.assembly import assemble
