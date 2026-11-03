@@ -179,6 +179,16 @@ class CLITests(unittest.TestCase):
         rc, r = self.cmd("validate", "--assembly-stdin", payload={"modules": []})
         self.assertEqual((rc, r["error"]["code"]), (2, "INVALID_ARGUMENT"))
 
+    def test_error_payload_is_bounded_even_for_oversized_flags(self):
+        rc, value = self.cmd("create", "--module-id", "X" * 10000)
+        self.assertEqual((rc, value["error"]["code"]), (2, "INVALID_OPERATION"))
+        self.assertLessEqual(len(value["error"]["message"]), 512)
+
+    def test_assembly_version_is_pinned(self):
+        rc, value = self.cmd("validate", "--assembly-stdin",
+                             payload={"schemaVersion": "9.0.0", "modules": []}, include_root=False)
+        self.assertEqual((rc, value["error"]["code"]), (2, "INVALID_ARGUMENT"))
+
     def test_root_and_parser_errors(self):
         rc, r = self.cmd("create", "--module-id", "../unsafe")
         self.assertEqual((rc, r["error"]["code"]), (2, "INVALID_OPERATION"))
