@@ -111,6 +111,16 @@ def _emit(nodes: list[dict]) -> Compiled:
 def compile_assembly(assembly: Assembly) -> Compiled:
     """Compile verified BMB-011 assembly preserving local placement transforms."""
     _need(isinstance(assembly, Assembly), "BMB-011 Assembly required")
+    # Revalidate because Assembly's nested dictionaries can be mutated after construction.
+    try:
+        verified = assemble(list(assembly.modules.values()))
+    except (AssemblyError, TypeError, ValueError) as exc:
+        raise CompileError("invalid assembly: " + str(exc)) from exc
+    _need(verified.order == assembly.order and
+          verified.world_transforms == assembly.world_transforms and
+          verified.seams == assembly.seams,
+          "assembly proof does not match current source modules")
+    assembly = verified
     _need(0 < len(assembly.modules) < MAX_NODES, "assembly exceeds writer budget")
     for mid, module in assembly.modules.items():
         doc = _object(module, REQUIRED, MODULE_FIELDS, mid)
@@ -188,6 +198,12 @@ def compile_document(value: object) -> Compiled:
                   {"schemaVersion", "modules"}, "document")
     _need(doc["schemaVersion"] == "1.0.0", "unsupported document schemaVersion")
     _need(isinstance(doc["modules"], list), "modules must be a list")
+    try:
+        size = len(json.dumps(doc, sort_keys=True, ensure_ascii=False,
+                              separators=(",", ":"), allow_nan=False).encode("utf-8"))
+    except (TypeError, ValueError, UnicodeError, RecursionError, OverflowError) as exc:
+        raise CompileError("document contains invalid or nonfinite JSON data") from exc
+    _need(size <= MAX_INPUT_BYTES, "document JSON byte budget exceeded")
     for index, module in enumerate(doc["modules"]):
         _need(isinstance(module, dict), f"modules[{index}]: expected object")
     try:
@@ -234,9 +250,11 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict:
 
 def load_document(path: Path) -> object:
     try:
-        _need(path.stat().st_size <= MAX_INPUT_BYTES, "JSON input budget exceeded")
+        with path.open("rb") as stream:
+            data = stream.read(MAX_INPUT_BYTES + 1)
+        _need(len(data) <= MAX_INPUT_BYTES, "JSON input byte budget exceeded")
         return json.loads(
-            path.read_text(encoding="utf-8"), object_pairs_hook=_unique_pairs,
+            data.decode("utf-8"), object_pairs_hook=_unique_pairs,
             parse_constant=lambda c: (_ for _ in ()).throw(CompileError("invalid number " + c)))
     except (OSError, UnicodeError, json.JSONDecodeError, RecursionError) as exc:
         raise CompileError(f"invalid input JSON: {exc}") from exc
