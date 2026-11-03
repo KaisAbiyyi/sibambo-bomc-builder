@@ -210,7 +210,7 @@ def main(argv: list[str] | None = None, stream=None) -> int:
     except (CLIError, IdentityError, StorageError, AssemblyError, OSError) as exc:
         code, exit_code = _error(exc)
         print(json.dumps({"ok": False, "command": command,
-                          "error": {"code": code, "message": str(exc)}}, sort_keys=True))
+                          "error": {"code": code, "message": str(exc)[:512]}}, sort_keys=True))
         return exit_code
     except Exception:
         # Never expose a traceback or internal path in the machine-readable interface.
