@@ -418,7 +418,8 @@ def encode_semantic(assembly, nodes):
     matsec.extend(bytes(count * 2))  # material type=0; semantic colorize=0.
     matsec.extend(bytes(count * 24))  # three colorize Float64 deltas = zero.
     matsec.extend(bytes(count * 32))  # no semantic colorize SHA.
-    sections[3] = (bytes(matsec), count)
+    if count:
+        sections[3] = (bytes(matsec), count)
 
     nmeshes = len(meshes)
     meshes_sec = bytearray(struct.pack("<4BI", 1, 1, 0, 0, nmeshes))
