@@ -109,6 +109,19 @@ class MCPTests(unittest.TestCase):
         self.assertEqual(out["result"]["structuredContent"]["error"]["code"], "IDEMPOTENCY_CONFLICT")
         self.assertEqual(original, (self.root / "modules" / "house__living" / "journal.jsonl").read_bytes())
 
+    def test_read_only_empty_project_queries_do_not_create_state(self):
+        out = self.valid(
+            request("tools/call", {"name": "bmb_validate_journals"}),
+            tool("bmb_inspect_module", {"moduleId": MID}, 2),
+            tool("bmb_validate_journals", {"moduleId": MID}, 3),
+            writes=False,
+        )
+        self.assertEqual(out[0]["result"]["structuredContent"]["data"]["revisions"], {})
+        for row in out[1:]:
+            self.assertTrue(row["result"]["isError"])
+            self.assertEqual(row["result"]["structuredContent"]["error"]["code"], "STORAGE_ERROR")
+        self.assertFalse((self.root / "modules").exists())
+
     def test_optional_arguments_accepts_zero_argument_tool(self):
         out = self.valid(
             request("tools/call", {"name": "bmb_validate_journals"}),

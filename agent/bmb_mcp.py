@@ -271,8 +271,18 @@ def _worker(conn, root, name, args):
             cap = 512 * 1024 * 1024
             resource.setrlimit(resource.RLIMIT_AS, (min(soft, cap) if soft > 0 else cap, hard))
         _guard_root(Path(root))
-        command, payload = _command(name, args, root)
-        result = cli_run(command, io.BytesIO(payload))
+        # JournalStore.open() creates modules/ even on reads. Preserve the
+        # shared core while keeping empty-project queries strictly non-mutating.
+        # Static root/link validation above remains mandatory on every call.
+        if name in ("bmb_validate_journals", "bmb_inspect_module") and not (Path(root) / "modules").exists():
+            if name == "bmb_validate_journals" and "moduleId" not in args:
+                result = {"mode": "journal", "moduleCount": 0,
+                          "moduleIds": [], "revisions": {}}
+            else:
+                raise ToolFailure("STORAGE_ERROR", "Requested journal does not exist")
+        else:
+            command, payload = _command(name, args, root)
+            result = cli_run(command, io.BytesIO(payload))
         _guard_root(Path(root))
         response = {"ok": True, "data": result}
         if len(json.dumps(response, allow_nan=False).encode("utf-8")) > MAX_RESPONSE // 2:

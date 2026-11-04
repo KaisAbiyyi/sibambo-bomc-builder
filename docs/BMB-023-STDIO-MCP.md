@@ -60,6 +60,10 @@ Tool schemas are advertised as JSON Schema with `additionalProperties: false`, a
 
 These caps can be *lowered* in later hardening; do not assume all production resource controls are satisfied. The adapter uses Python `spawn` workers, not `shell=True` or arbitrary command spawn. It applies a POSIX umask of `077`; Windows host must independently provide restricted ACL/DACL and Job Object memory/CPU quotas. Caller self-reported `clientInfo` is not authentication. The launcher and its OS identity are the trusted principal. The project root must be owned by that principal and inaccessible to hostile co-tenants.
 
+## Read-only empty-project behavior
+
+The shared `JournalStore.open()` initializes `modules/` even on an empty-project read. The MCP adapter short-circuits **only** empty-project journal validation to the exact empty summary, and returns `STORAGE_ERROR` for scoped lookups when no journal directory exists. This prevents unintended directory creation in read-only mode without modifying the shared core. Static root checks and the exclusive process lock still apply. Existing nonempty journals continue through the original CLI/shared core.
+
 ## Error and failure semantics
 
 Typed tool execution errors include `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `PATH_OUTSIDE_ROOT`, `LIMIT_EXCEEDED`, `DEPTH_LIMIT`, `REVISION_CONFLICT`, `IDEMPOTENCY_CONFLICT`, `CORRUPT_INPUT`, `STORAGE_ERROR`, `BUSY`, `TIMEOUT`, `DURABILITY_UNCERTAIN`, `INTERNAL_ERROR`. Exception traces, environment variables and absolute host paths are not sent through MCP. The deadline can terminate a worker during a journal write: `TIMEOUT` means **commit status unknown**, not an automatic rollback guarantee. The existing journal handles torn tails on next open, but owner-level power-loss validation is separate. Retry with the same durable idempotency key only after inspecting project state.
