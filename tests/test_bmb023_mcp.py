@@ -172,7 +172,7 @@ class MCPTests(unittest.TestCase):
             ptr["a"] = {}
             ptr = ptr["a"]
         out = self.valid(tool("bmb_validate_assembly", {"document": nested}))[0]
-        self.assertEqual(out["result"]["structuredContent"]["error"]["code"], "DEPTH_LIMIT")
+        # Frame depth is rejected before JSON-RPC tool dispatch.\n        self.assertEqual(out["error"]["code"], -32600)
 
     def test_symlink_module_denied(self):
         self.valid(tool("bmb_create_module", {"moduleId": MID}))
@@ -221,6 +221,42 @@ class MCPTests(unittest.TestCase):
     def test_empty_stream_exits_without_stdout(self):
         rc, out, err = self.talk(raw=b"")
         self.assertEqual((rc, out, err), (0, [], b""))
+
+
+    def test_rate_limit_is_bounded_on_single_process(self):
+        out = self.valid(*(tool("unknown", {}, i) for i in range(1, 62)))
+        self.assertEqual(out[0]["result"]["structuredContent"]["error"]["code"], "UNKNOWN_TOOL")
+        self.assertEqual(out[-1]["result"]["structuredContent"]["error"]["code"], "LIMIT_EXCEEDED")
+
+    def test_large_inspection_never_returns_truncated_json(self):
+        self.valid(tool("bmb_create_module", {"moduleId": MID}))
+        ops = [{"op": "add", "id": f"block-{i}", "data": {"label": "x" * 54_000}}
+               for i in range(4)]
+        out = self.valid(tool("bmb_edit_module", {"moduleId": MID, "expectedRevision": 0,
+                         "idempotencyKey": "large", "ops": ops}),
+                         tool("bmb_inspect_module", {"moduleId": MID, "includeBlocks": True}, 2))
+        self.assertTrue(out[0]["result"]["structuredContent"]["ok"])
+        self.assertEqual(out[1]["result"]["structuredContent"]["error"]["code"], "LIMIT_EXCEEDED")
+        self.assertEqual(self.valid(tool("bmb_inspect_module", {"moduleId": MID}))[0]
+                         ["result"]["structuredContent"]["data"]["blockCount"], 4)
+
+    def test_exclusive_root_lock_blocks_second_server(self):
+        argv = [sys.executable, "-m", "agent.bmb_mcp", "--root", str(self.root)]
+        first = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            first.stdin.write(json.dumps(request("server/discover")).encode() + b"\\n")
+            first.stdin.flush()
+            ready = json.loads(first.stdout.readline())
+            self.assertEqual(ready["id"], 1)
+            second = subprocess.run(argv, cwd=ROOT, input=b"", stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, timeout=20)
+            self.assertEqual(second.returncode, 2)
+            self.assertFalse(second.stdout)
+        finally:
+            first.stdin.close()
+            first.wait(timeout=10)
+
 
 
 if __name__ == "__main__":
