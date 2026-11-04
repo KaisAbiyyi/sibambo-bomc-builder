@@ -59,14 +59,16 @@ jobs:
       - name: Record platform and test validator version
         shell: bash
         run: |
-          python -m pip install --disable-pip-version-check jsonschema==4.23.0
-          python -c 'import platform, importlib.metadata as m; print("OS:", platform.platform()); print("Python:", platform.python_version()); print("jsonschema:", m.version("jsonschema"))'
+          python -m pip install --disable-pip-version-check jsonschema==4.23.0 mcp==2.3.0
+          python -c 'import platform, importlib.metadata as m; print("OS:", platform.platform()); print("Python:", platform.python_version()); print("jsonschema:", m.version("jsonschema")); print("mcp:", m.version("mcp"))'
           echo "OS: $RUNNER_OS" >> "$GITHUB_STEP_SUMMARY"
           python -c 'import platform; print("Python:", platform.python_version())'
       - name: MCP adversarial stdio integration
         run: python -m unittest discover -s tests -p test_bmb023_mcp.py -v
       - name: Published MCP 2026-07-28 schema validation (pinned)
         run: python -m unittest discover -s tests -p test_bmb023_mcp_schema.py -v
+      - name: Real MCP Python SDK v2.3.0 stdio interoperability
+        run: python -m unittest discover -s tests -p test_bmb023_mcp_sdk.py -v
       - name: CLI subprocess regression
         run: python -m unittest discover -s tests -p test_bmb022_cli.py -v
       - name: Journal regression
