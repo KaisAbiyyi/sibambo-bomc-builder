@@ -51,16 +51,25 @@ def _align8(n: int) -> int:
 
 
 def _varuint(blob: bytes, cursor: int) -> tuple[int, int]:
+    """Unsigned LEB128, canonical only: at most 5 bytes, value < 2**32, no redundant trailing zero group.
+
+    The repository's contract documents name the codec ("delta-varint") but do not state whether
+    non-minimal encodings are permitted, so this is a Builder-profile policy: the Builder writers
+    only ever emit minimal forms, and this reader refuses anything else rather than guessing.
+    What other consumers do with non-minimal forms is NOT_RUN.
+    """
     value = shift = 0
-    for _ in range(5):
+    for index in range(5):
         need(cursor < len(blob), "varuint truncated")
         byte = blob[cursor]
         cursor += 1
         value |= (byte & 127) << shift
         if byte < 128:
+            need(not (index and byte == 0), "non-canonical (overlong) varuint")
+            need(value <= 0xFFFFFFFF, "varuint overflows 32 bits")
             return value, cursor
         shift += 7
-    raise Rejected("varuint too long")
+    raise Rejected("varuint unterminated or longer than 5 bytes")
 
 
 def _column(blob: bytes, count: int) -> list[int]:
@@ -298,7 +307,7 @@ def _geometry(sections, summary, strings, materials, meshes, faces):
             need(math.isclose(tri_area, area, rel_tol=1e-7, abs_tol=1e-7), "triangles do not tile the face loop")
             summary["faces"].append({"surface": surfaces[f], "role": roles[f], "front": fronts[f], "back": backs[f],
                                      "label": strings[labels[f]] if labels[f] is not None else None,
-                                     "normal": tuple(normal), "loop": len(ring), "triangles": len(idx) // 3,
+                                     "normal": tuple(normal), "loop": len(ring), "triangles": len(idx) // 3, "area": area,
                                      "mesh": mi})
         need(at_l == len(loops) and at_t == len(tris), "unconsumed topology")
     need(covered == fcount, "meshes do not cover every face")

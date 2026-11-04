@@ -319,6 +319,11 @@
         "name": "two-room-door-seam",
         "sha256": "a21109c137b943e5afc4a50776dcbf2eb3def36b93eaa63e951a9311ee46f632",
         "byteSize": 8364
+      },
+      {
+        "name": "wall-window-cutout",
+        "sha256": "68a4acd2c4a7f6e9d4b3cb18808a1d8e4bde8d5fcb6cefcd7c84051922b7eaeb",
+        "byteSize": 7636
       }
     ],
     "unsupportedByBuilderSource": [
@@ -343,6 +348,19 @@
       "Editor writer -> Model-Eval": "NOT_RUN",
       "malformed section 241 at original consumers": "NOT_RUN"
     },
-    "reason": "Editor and Model-Eval are private repositories that the Builder session and Actions token cannot check out"
+    "reason": "Editor and Model-Eval are private repositories that the Builder session and Actions token cannot check out",
+    "sharedMeshGeometry": "NOT_DEMONSTRATED: Module IR v1 has no shared geometry-definition reference; nested-shared-definitions is an empty-group hierarchy only",
+    "varuintPolicy": "Builder-profile policy: canonical (minimal, 32-bit) varuints only; the repository contract documents do not state the rule for the wire format, and original-consumer behavior is NOT_RUN",
+    "hostedCiEvidence": {
+      "note": "Run URLs for the final head are recorded in PR #57 and Issue #21; a commit cannot contain its own run URL.",
+      "previousHead": {
+        "sha": "2ce575c39531834e2b27c744ad5b9b7db9e6c93f",
+        "runs": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41629550190",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41629550106"
+        ],
+        "result": "SUCCESS (Ubuntu + Windows)"
+      }
+    }
   }
 }

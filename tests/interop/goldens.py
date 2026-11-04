@@ -62,6 +62,7 @@ def manifest(blobs: dict[str, bytes]) -> dict:
     return {
         "schemaVersion": 1,
         "scope": "Builder-side certification only: bytes compiled by this repository and read by its own strict reader",
+        "sharedMeshGeometry": "NOT_DEMONSTRATED: Module IR v1 has no shared geometry-definition reference; nested-shared-definitions is an empty-group hierarchy only",
         "consumerStatus": {"originalEditorE4": "NOT_RUN", "originalModelEval": "NOT_RUN", "section241": "NOT_RUN"},
         "compilerSources": {p: sha256((ROOT / p).read_bytes()) for p in COMPILER_SOURCES},
         "fixtures": [

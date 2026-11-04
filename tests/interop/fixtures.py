@@ -66,6 +66,29 @@ def two_room_door_seam():
     return compile_document(_example("module-ir-two-rooms.json"))
 
 
+def wall_module(mid="house/level/w", window=True):
+    """Straight 4 m wall; optionally a real window cutout (positive sill) with frame and glazing inserts."""
+    m = module(mid, bounds=((0, -0.1, 0), (4, 0.1, 2.8)))
+    m["operations"] = [{"kind": "wall-run", "opId": "wall", "role": "wall", "materialId": "plaster",
+                        "path": [[0, 0], [4, 0]], "thickness": 0.2, "height": 2.8, "baseElevation": 0}]
+    m["materials"] = [{"materialId": "plaster", "rgba": [245, 244, 242, 255], "opacity": 1, "semanticRole": "wall"}]
+    if window:
+        m["operations"].append({"kind": "opening-cut", "opId": "window-1", "role": "opening", "targetWallOpId": "wall",
+                                "offset": 1.2, "width": 1.2, "height": 1.2, "sillHeight": 0.9, "openingType": "window",
+                                "materialId": "glass"})
+        m["materials"].append({"materialId": "glass", "rgba": [150, 200, 230, 120], "opacity": 0.47,
+                               "semanticRole": "window"})
+    return m
+
+
+def wall_window_cutout():
+    return compile_document(envelope(wall_module()))
+
+
+def wall_without_window():
+    return compile_document(envelope(wall_module(window=False)))
+
+
 def nested_shared_definitions():
     graph = dag.DefinitionGraph()
     for name in ("house", "wing", "room"):
@@ -85,7 +108,8 @@ FIXTURES = {
     "concave-l-floor": (concave_l_floor, "concave L-shaped slab face, triangulated"),
     "mirrored-sheared-floors": (mirrored_sheared_floors, "mirror parent and sheared child transforms"),
     "two-room-door-seam": (two_room_door_seam, "two rooms, real door cutout, single-owned shared seam"),
-    "nested-shared-definitions": (nested_shared_definitions, "nested shared empty-group definitions with mirror and shear"),
+    "wall-window-cutout": (wall_window_cutout, "straight wall with a real window cutout, sill and head, frame and translucent glazing inserts"),
+    "nested-shared-definitions": (nested_shared_definitions, "nested empty-group hierarchy with mirror and shear (no reusable shared mesh geometry)"),
 }
 
 

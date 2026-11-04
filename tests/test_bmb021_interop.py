@@ -30,6 +30,7 @@ PINNED = {
     "mirrored-sheared-floors": "f026b5a76258",
     "nested-shared-definitions": "6e481586741a",
     "two-room-door-seam": "a21109c137b9",
+    "wall-window-cutout": "68a4acd2c4a7",
 }
 
 
@@ -112,6 +113,40 @@ class GoldenSuiteTests(unittest.TestCase):
         ir["modules"][1]["ownedSeams"].append(dict(ir["modules"][0]["ownedSeams"][0], ownerModuleId=ir["modules"][1]["moduleId"]))
         with self.assertRaises(CompileError):
             compile_document(ir)                                            # a second owner of the same wall never compiles
+
+    def test_window_cutout_is_real_geometry_with_reveals_inserts_and_materials(self):
+        cut, whole = read(golden("wall-window-cutout")), read(fixtures.wall_without_window().payload)
+        self.assertEqual((cut["counts"]["faces"], cut["triangles"], cut["counts"]["materials"]), (62, 124, 2))
+        self.assertEqual((whole["counts"]["faces"], whole["triangles"]), (6, 12))
+        self.assertEqual(cut["bounds"], (0.0, -0.1, 0.0, 4.0, 0.1, 2.8))
+
+        def area(summary, axis, surface):
+            return sum(f["area"] for f in summary["faces"] if f["surface"] == surface and abs(f["normal"][axis]) > 0.99)
+
+        window, thick = 1.2 * 1.2, 0.2 * 1.2
+        # the 1.2 m x 1.2 m void is removed from both wall faces ...
+        self.assertAlmostEqual(area(whole, 1, 1) - area(cut, 1, 1), 2 * window, places=9)
+        # ... and replaced by two jamb reveals and a sill plus a head (0.2 m thick wall, 1.2 m opening)
+        self.assertAlmostEqual(area(cut, 0, 1) - area(whole, 0, 1), 2 * thick, places=9)
+        self.assertAlmostEqual(area(cut, 2, 1) - area(whole, 2, 1), 2 * thick, places=9)
+        # distinct window insert solids (surface 8): frame and glazing, all bound to the translucent glass material
+        inserts = [f for f in cut["faces"] if f["surface"] == 8]
+        self.assertEqual(len(inserts), 30)
+        self.assertEqual({(f["front"], f["back"]) for f in inserts}, {(0, None)})
+        self.assertEqual(cut["colors"], [(150, 200, 230, 120), (245, 244, 242, 255)])    # glass, plaster
+        self.assertEqual(cut["opacity"], [30801, 65535])                                  # 0.47 and 1.0 as uint16
+        walls = [f for f in cut["faces"] if f["surface"] == 1]
+        self.assertEqual({(f["front"], f["back"]) for f in walls}, {(1, None)})
+        self.assertTrue(all(f["triangles"] >= 2 for f in cut["faces"]))
+
+    def test_shared_mesh_geometry_reuse_is_not_claimed(self):
+        manifest = json.loads((GOLDENS / "manifest.json").read_text())
+        self.assertTrue(manifest["sharedMeshGeometry"].startswith("NOT_DEMONSTRATED"))
+        nested = read(golden("nested-shared-definitions"))
+        self.assertEqual(nested["counts"]["meshes"], 0)        # shared definitions here carry no geometry at all
+        for name in PINNED:                                    # and no fixture instances one mesh more than once
+            s = read(golden(name))
+            self.assertEqual(len(set(s.get("meshDefinitions", []))), s["counts"]["meshes"], name)
 
     def test_unsupported_sources_fail_closed(self):
         for name, (doc, reason) in fixtures.unsupported_sources().items():
@@ -260,6 +295,97 @@ class ContainerCorruptionTests(unittest.TestCase):
         rejected(self, self.base + b"\0" * (MAX_BYTES + 1 - len(self.base)), "input over the byte budget", "budget")
         rejected(self, b"", "empty input")
         rejected(self, MAGIC, "magic only")
+
+
+class CanonicalVarintTests(unittest.TestCase):
+    """The Builder profile accepts only minimal varuints; crafted, CRC-repaired files prove each column is checked."""
+
+    def decode(self, data):
+        from tests.interop import reader
+        return reader._varuint(bytes(data), 0)
+
+    def test_varuint_unit_cases(self):
+        for data, value in [(b"\x00", 0), (b"\x7f", 127), (b"\x80\x01", 128), (b"\xff\x7f", 16383),
+                            (b"\xff\xff\xff\xff\x0f", 0xFFFFFFFF)]:
+            self.assertEqual(self.decode(data), (value, len(data)))
+        for label, data in [("overlong zero", b"\x80\x00"), ("overlong one", b"\x81\x00"), ("overlong 127", b"\xff\x00"),
+                            ("overlong 3 bytes", b"\x81\x80\x00"), ("overflow 2**32", b"\x80\x80\x80\x80\x10"),
+                            ("overflow 35 bits", b"\xff\xff\xff\xff\x7f"), ("unterminated", b"\x80" * 5),
+                            ("six bytes", b"\x80\x80\x80\x80\x80\x01"), ("truncated", b"\x80"), ("empty", b"")]:
+            with self.subTest(label):
+                with self.assertRaises(Rejected):
+                    self.decode(data)
+
+    @staticmethod
+    def lengthen(extra):
+        """Same value, `extra` redundant continuation groups appended: a non-minimal encoding of the original."""
+        return lambda orig: bytes(orig[:-1]) + bytes([orig[-1] | 0x80]) + b"\x80" * (extra - 1) + b"\x00"
+
+    def widen(self, base, topology=None, faces=None):
+        """Swap one varuint for `replacement` and keep every length field consistent, CRCs recomputed."""
+        def edit(model):
+            sections = {e["id"]: e for e in model["entries"]}
+            if topology:
+                where, replacement = topology
+                d = bytearray(sections[8]["data"])
+                lcount, tcount, ll, tlb = struct.unpack_from("<4I", d, 4)
+                start = 20 if where == "loop" else 20 + ll
+                end = start + next(i for i in range(1, 6) if d[start + i - 1] < 128)
+                replacement = replacement(bytes(d[start:end])) if callable(replacement) else replacement
+                d[start:end] = replacement
+                grow = len(replacement) - (end - start)
+                ll, tlb = (ll + grow, tlb) if where == "loop" else (ll, tlb + grow)
+                struct.pack_into("<4I", d, 4, lcount, tcount, ll, tlb)
+                sections[8]["data"] = bytes(d)
+                m = bytearray(sections[5]["data"])
+                struct.pack_into("<I", m, 9 + 4 * 8, struct.unpack_from("<I", m, 9 + 4 * 8)[0] + grow)
+                sections[5]["data"] = bytes(m)
+            if faces:
+                column, replacement = faces
+                d = bytearray(sections[6]["data"])
+                fcount, loops, a, b, c = struct.unpack_from("<5I", d, 4)
+                start = 24 + 7 * fcount + {"loops": 0, "triangles": a, "lengths": a + b}[column]
+                end = start + next(i for i in range(1, 6) if d[start + i - 1] < 128)
+                replacement = replacement(bytes(d[start:end])) if callable(replacement) else replacement
+                d[start:end] = replacement
+                grow = len(replacement) - (end - start)
+                sizes = {"loops": (a + grow, b, c), "triangles": (a, b + grow, c), "lengths": (a, b, c + grow)}[column]
+                struct.pack_into("<3I", d, 12, *sizes)
+                sections[6]["data"] = bytes(d)
+        return mutate.rebuild(base, edit)
+
+    def test_overlong_encodings_in_topology_and_face_columns_are_rejected(self):
+        base = golden("floor-front-back")
+        keep = lambda orig: orig
+        for kwargs in (dict(topology=("loop", keep)), dict(topology=("triangle", keep)), dict(faces=("lengths", keep))):
+            self.assertEqual(self.widen(base, **kwargs), base)      # control: rewriting with the original bytes is a no-op
+        lengthen = self.lengthen
+        cases = [("loop delta widened by one byte", dict(topology=("loop", lengthen(1)))),
+                 ("loop delta widened by two bytes", dict(topology=("loop", lengthen(2)))),
+                 ("triangle delta widened", dict(topology=("triangle", lengthen(1)))),
+                 ("face loop-count column widened", dict(faces=("loops", lengthen(1)))),
+                 ("face triangle-count column widened", dict(faces=("triangles", lengthen(1)))),
+                 ("face loop-length column widened", dict(faces=("lengths", lengthen(1))))]
+        for label, kwargs in cases:
+            with self.subTest(label):
+                payload = self.widen(base, **kwargs)
+                self.assertNotEqual(payload, base)
+                with self.assertRaises(Rejected) as ctx:
+                    read(payload)
+                self.assertIn("overlong", str(ctx.exception))
+
+    def test_overflowing_and_unterminated_encodings_are_rejected(self):
+        base = golden("floor-front-back")
+        for label, kwargs, needle in [
+            ("loop delta 2**32", dict(topology=("loop", b"\x80\x80\x80\x80\x10")), "overflow"),
+            ("loop delta unterminated", dict(topology=("loop", b"\x80" * 5)), "unterminated"),
+            ("face column 35-bit value", dict(faces=("lengths", b"\xff\xff\xff\xff\x7f")), "overflow"),
+            ("face column six bytes", dict(faces=("triangles", b"\x80\x80\x80\x80\x80\x01")), "unterminated"),
+        ]:
+            with self.subTest(label):
+                with self.assertRaises(Rejected) as ctx:
+                    read(self.widen(base, **kwargs))
+                self.assertIn(needle, str(ctx.exception))
 
 
 def floats(*values):

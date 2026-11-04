@@ -40,7 +40,7 @@
           0,
           0
         ],
-        "faceDigest": "ecc50979398df40e4f95172e7385a56ceaa23c9fbb1c460c3c66ed47259fffb8",
+        "faceDigest": "055a040739732663cb563af4b4ef5acff0cf5ebe497d048e78dd53a657e1cb50",
         "faceLabels": [
           "Floor top: independent front/back",
           "house/level/l/slab/bottom",
@@ -179,7 +179,7 @@
           0,
           0
         ],
-        "faceDigest": "9aad1e161188ba8570e845bffa3ef04cafcc2bf52c4897d0f8ff64a1a337003c",
+        "faceDigest": "a778c1906d4f5139285be137fed035c3be2a0fea8fa086734820b7d08e503f87",
         "faceLabels": [
           "Study floor top",
           "house/floor-1/study/slab/bottom",
@@ -418,7 +418,7 @@
           0,
           0
         ],
-        "faceDigest": "d90e6764a37331a00436384dbcbf374e270359e23e1620d0a8077aeb83636064",
+        "faceDigest": "071632a576d307c65da685ad97133c2c6930936ec0aeb0f2cbbd6dd1f3b025a0",
         "faceLabels": [
           "Floor top: independent front/back",
           "house/level/a/slab/bottom",
@@ -528,7 +528,7 @@
     {
       "byteSize": 1372,
       "file": "nested-shared-definitions.bomc",
-      "intent": "nested shared empty-group definitions with mirror and shear",
+      "intent": "nested empty-group hierarchy with mirror and shear (no reusable shared mesh geometry)",
       "name": "nested-shared-definitions",
       "reader": {
         "bounds": [
@@ -732,7 +732,7 @@
           0,
           0
         ],
-        "faceDigest": "b9420b6c98c19639cf4658b394257a1764c6da6feafbaf76a0d6fb5cc32fafd0",
+        "faceDigest": "2aea2ee90a900cb384a3366c66d4a9a80378f057634285a744f71fa8192c7bbc",
         "faceLabels": [
           "house/floor-1/hall/floor-1/bottom",
           "house/floor-1/hall/floor-1/side-0",
@@ -916,10 +916,205 @@
         "triangles": 116
       },
       "sha256": "a21109c137b943e5afc4a50776dcbf2eb3def36b93eaa63e951a9311ee46f632"
+    },
+    {
+      "byteSize": 7636,
+      "file": "wall-window-cutout.bomc",
+      "intent": "straight wall with a real window cutout, sill and head, frame and translucent glazing inserts",
+      "name": "wall-window-cutout",
+      "reader": {
+        "bounds": [
+          0.0,
+          -0.1,
+          0.0,
+          4.0,
+          0.1,
+          2.8
+        ],
+        "counts": {
+          "definitions": 3,
+          "faces": 62,
+          "instances": 3,
+          "materials": 2,
+          "meshes": 1,
+          "transforms": 3
+        },
+        "coverage": [
+          62,
+          62,
+          0,
+          0,
+          0,
+          0
+        ],
+        "faceDigest": "1235d4057bc87f3ac3bc2a2fa927363e6d87703350af459be2a7e8da2370162d",
+        "faceLabels": [
+          "house/level/w/wall/cut-0",
+          "house/level/w/wall/cut-1",
+          "house/level/w/wall/cut-10",
+          "house/level/w/wall/cut-11",
+          "house/level/w/wall/cut-12",
+          "house/level/w/wall/cut-13",
+          "house/level/w/wall/cut-14",
+          "house/level/w/wall/cut-15",
+          "house/level/w/wall/cut-16",
+          "house/level/w/wall/cut-17",
+          "house/level/w/wall/cut-18",
+          "house/level/w/wall/cut-19",
+          "house/level/w/wall/cut-2",
+          "house/level/w/wall/cut-20",
+          "house/level/w/wall/cut-21",
+          "house/level/w/wall/cut-22",
+          "house/level/w/wall/cut-23",
+          "house/level/w/wall/cut-24",
+          "house/level/w/wall/cut-25",
+          "house/level/w/wall/cut-26",
+          "house/level/w/wall/cut-27",
+          "house/level/w/wall/cut-28",
+          "house/level/w/wall/cut-29",
+          "house/level/w/wall/cut-3",
+          "house/level/w/wall/cut-30",
+          "house/level/w/wall/cut-31",
+          "house/level/w/wall/cut-4",
+          "house/level/w/wall/cut-5",
+          "house/level/w/wall/cut-6",
+          "house/level/w/wall/cut-7",
+          "house/level/w/wall/cut-8",
+          "house/level/w/wall/cut-9",
+          "house/level/w/wall/insert-window-1-0-0",
+          "house/level/w/wall/insert-window-1-0-1",
+          "house/level/w/wall/insert-window-1-0-2",
+          "house/level/w/wall/insert-window-1-0-3",
+          "house/level/w/wall/insert-window-1-0-4",
+          "house/level/w/wall/insert-window-1-0-5",
+          "house/level/w/wall/insert-window-1-1-0",
+          "house/level/w/wall/insert-window-1-1-1",
+          "house/level/w/wall/insert-window-1-1-2",
+          "house/level/w/wall/insert-window-1-1-3",
+          "house/level/w/wall/insert-window-1-1-4",
+          "house/level/w/wall/insert-window-1-1-5",
+          "house/level/w/wall/insert-window-1-2-0",
+          "house/level/w/wall/insert-window-1-2-1",
+          "house/level/w/wall/insert-window-1-2-2",
+          "house/level/w/wall/insert-window-1-2-3",
+          "house/level/w/wall/insert-window-1-2-4",
+          "house/level/w/wall/insert-window-1-2-5",
+          "house/level/w/wall/insert-window-1-3-0",
+          "house/level/w/wall/insert-window-1-3-1",
+          "house/level/w/wall/insert-window-1-3-2",
+          "house/level/w/wall/insert-window-1-3-3",
+          "house/level/w/wall/insert-window-1-3-4",
+          "house/level/w/wall/insert-window-1-3-5",
+          "house/level/w/wall/insert-window-1-4-0",
+          "house/level/w/wall/insert-window-1-4-1",
+          "house/level/w/wall/insert-window-1-4-2",
+          "house/level/w/wall/insert-window-1-4-3",
+          "house/level/w/wall/insert-window-1-4-4",
+          "house/level/w/wall/insert-window-1-4-5"
+        ],
+        "faceSurfaceCounts": {
+          "1": 32,
+          "8": 30
+        },
+        "frontBackDistinctFaces": 0,
+        "geometryDigest": "9c312ec01ae72ad280a2df352a1ee0c36acf5bb8250f470af71dcc40dd4d8e1f",
+        "materialColors": [
+          [
+            150,
+            200,
+            230,
+            120
+          ],
+          [
+            245,
+            244,
+            242,
+            255
+          ]
+        ],
+        "materialOpacity": [
+          30801,
+          65535
+        ],
+        "meshDefinitions": [
+          2
+        ],
+        "meshVertices": [
+          56
+        ],
+        "nodes": [
+          "BOMC Builder assembly",
+          "house/level",
+          "house/level/w"
+        ],
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "stringCount": 67,
+        "transforms": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        "triangles": 124
+      },
+      "sha256": "68a4acd2c4a7f6e9d4b3cb18808a1d8e4bde8d5fcb6cefcd7c84051922b7eaeb"
     }
   ],
   "schemaVersion": 1,
   "scope": "Builder-side certification only: bytes compiled by this repository and read by its own strict reader",
+  "sharedMeshGeometry": "NOT_DEMONSTRATED: Module IR v1 has no shared geometry-definition reference; nested-shared-definitions is an empty-group hierarchy only",
   "unsupportedByBuilderSource": [
     {
       "name": "holed-face",
