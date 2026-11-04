@@ -245,7 +245,7 @@ class MCPTests(unittest.TestCase):
         first = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            first.stdin.write(json.dumps(request("server/discover")).encode() + b"\\n")
+            first.stdin.write(json.dumps(request("server/discover")).encode() + b"\n")
             first.stdin.flush()
             ready = json.loads(first.stdout.readline())
             self.assertEqual(ready["id"], 1)
