@@ -1,0 +1,468 @@
+"""BMB-024 scoped context retrieval, token budgets, checkpoints, resume and replay: synthetic data only."""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from agentctx import (  # noqa: E402
+    ContextError, ContextProvider, ReplayDivergence, SessionBudgetExceeded, SessionError, SessionStore,
+    estimate_tokens)
+from agentctx import evidence, retrieval, session as session_mod  # noqa: E402
+from agentctx.evidence import BATH, HALL, LIV  # noqa: E402
+from core.storage.journal import JournalStore  # noqa: E402
+
+
+def block(n):
+    return {"op": "add", "id": f"b-{n:03d}", "data": {"n": n}}
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name) / "proj"
+
+    def scene(self, filler=0, overlap=False):
+        store, assembly = evidence.build_scene(self.root, filler=filler, overlap=overlap)
+        return store, assembly, ContextProvider(store, assembly)
+
+
+class ManifestTests(Base):
+    def test_pages_cover_every_module_once_and_in_order(self):
+        store, _, p = self.scene(filler=117)
+        ids, cursor, seen = store.modules(), None, []
+        while True:
+            page = p.manifest(cursor=cursor, page_size=50)
+            seen += [m["id"] for m in page["modules"]]
+            self.assertLessEqual(page["budget"]["usedTokens"], page["budget"]["maxTokens"])
+            self.assertEqual(page["totals"]["modules"], 120)
+            cursor = page["page"]["next"]
+            if cursor is None:
+                break
+        self.assertEqual(seen, ids)
+
+    def test_manifest_rows_never_carry_block_contents(self):
+        _, _, p = self.scene()
+        row = p.manifest()["modules"][0]
+        self.assertEqual(set(row), {"id", "rev", "blocks", "hash"})
+        self.assertNotIn('"height"', json.dumps(p.manifest()))
+
+    def test_tight_budget_cuts_rows_and_continues_without_gaps(self):
+        store, _, p = self.scene(filler=40)
+        ids, cursor, seen, pages = store.modules(), None, [], 0
+        while True:
+            page = p.manifest(cursor=cursor, page_size=50, max_tokens=250)
+            self.assertLessEqual(estimate_tokens(page), 250)
+            self.assertEqual(len(page["modules"]) + page["page"]["omitted"], len(ids) - len(seen))
+            seen += [m["id"] for m in page["modules"]]
+            pages += 1
+            cursor = page["page"]["next"]
+            if cursor is None:
+                break
+        self.assertEqual(seen, ids)
+        self.assertGreater(pages, 3)
+
+    def test_project_digest_tracks_state_not_history_of_calls(self):
+        store, _, p = self.scene()
+        first = p.project_digest()
+        p.manifest(), p.module(HALL)
+        self.assertEqual(p.project_digest(), first)
+        store.apply(LIV, 1, "k2", [block(1)])
+        self.assertNotEqual(p.project_digest(), first)
+
+    def test_rejects_bad_requests(self):
+        _, _, p = self.scene()
+        for kwargs in ({"cursor": "../x"}, {"cursor": 5}, {"page_size": 0}, {"page_size": 51}, {"page_size": True},
+                       {"max_tokens": 10}, {"max_tokens": 10 ** 9}, {"max_tokens": True}, {"max_tokens": "1500"}):
+            with self.subTest(kwargs):
+                with self.assertRaises(ContextError):
+                    p.manifest(**kwargs)
+
+
+class ModuleContextTests(Base):
+    def test_focus_neighbours_dependencies_and_bounds(self):
+        _, _, p = self.scene(filler=20)
+        ctx = p.module(HALL)
+        self.assertEqual((ctx["focus"]["id"], ctx["focus"]["rev"], ctx["focus"]["blockCount"]), (HALL, 1, 6))
+        self.assertEqual([n["id"] for n in ctx["neighbors"]], [BATH, LIV])
+        living = next(n for n in ctx["neighbors"] if n["id"] == LIV)
+        self.assertEqual(living["bounds"], [[0.0, 0.0, 0.0], [4.0, 3.0, 2.8]])      # world AABB of the neighbour
+        self.assertEqual(living["seams"][0]["id"], "east")
+        self.assertEqual(living["seams"][0]["owner"], LIV)
+        self.assertEqual([(d["id"], d["minRevision"], d["satisfied"]) for d in ctx["dependencies"]],
+                         [(LIV, 1, True)])
+        self.assertEqual([d["id"] for d in ctx["dependents"]], [BATH])
+        self.assertTrue(all(not n["id"].startswith("site/") for n in ctx["neighbors"]))   # unrelated modules never appear
+        self.assertEqual(ctx["diagnostics"], [])
+        self.assertTrue(all(v == 0 for v in ctx["omitted"].values()))
+
+    def test_depth_controls_how_far_the_context_reaches(self):
+        _, _, p = self.scene()
+        self.assertEqual(p.module(LIV, depth=0)["neighbors"], [])
+        self.assertEqual([(n["id"], n["distance"]) for n in p.module(LIV, depth=1)["neighbors"]], [(HALL, 1)])
+        self.assertEqual([(n["id"], n["distance"]) for n in p.module(LIV, depth=2)["neighbors"]], [(HALL, 1), (BATH, 2)])
+        for depth in (-1, 3, True, "1"):
+            with self.assertRaises(ContextError):
+                p.module(LIV, depth=depth)
+
+    def test_unsatisfied_dependency_is_visible(self):
+        store, assembly, p = self.scene()
+        assembly.modules[HALL]["dependencies"][0]["minRevision"] = 5
+        self.assertFalse(p.module(HALL)["dependencies"][0]["satisfied"])
+
+    def test_diagnostics_are_scoped_to_the_implicated_modules(self):
+        _, _, p = self.scene(overlap=True)
+        living, bath = p.module(LIV), p.module(BATH)
+        self.assertTrue(living["diagnostics"])
+        self.assertTrue(any("house/f1/closet" in (d["moduleId"], d["relatedModuleId"]) for d in living["diagnostics"]))
+        self.assertEqual(bath["diagnostics"], [])
+        self.assertEqual(p.module("house/f1/closet")["diagnostics"][0]["code"], living["diagnostics"][0]["code"])
+
+    def test_block_data_is_only_returned_when_asked_and_is_bounded(self):
+        store, assembly, p = self.scene()
+        store.apply(HALL, 1, "big", [{"op": "add", "id": "huge", "data": {"text": "x" * 5000}}])
+        ctx = p.module(HALL, blocks=["wall-1", "huge", "ghost"])
+        data = {b["id"]: b for b in ctx["blockData"]}
+        self.assertEqual(data["wall-1"]["data"]["k"], 1)
+        self.assertTrue(data["huge"]["truncated"] and "data" not in data["huge"])
+        self.assertTrue(data["ghost"]["missing"])
+        self.assertEqual(len(ctx["blockIndex"]), 7)
+        self.assertEqual(p.module(HALL)["blockData"], [])
+        for bad in ("wall-1", [1], ["b"] * 17):
+            with self.assertRaises(ContextError):
+                p.module(HALL, blocks=bad)
+
+    def test_without_an_assembly_only_journal_facts_are_returned(self):
+        store, _, _ = self.scene()
+        ctx = ContextProvider(store).module(HALL)
+        self.assertEqual((ctx["neighbors"], ctx["dependencies"], ctx["diagnostics"]), ([], [], []))
+        self.assertIn("not supplied", ctx["assembly"])
+        self.assertEqual(ctx["focus"]["blockCount"], 6)
+
+    def test_every_budget_is_respected_and_cuts_by_priority(self):
+        store, _, p = self.scene()
+        full = p.module(HALL, blocks=["wall-1", "wall-2"], max_tokens=8000)
+        self.assertTrue(all(v == 0 for v in full["omitted"].values()))
+        order = list(retrieval.ContextProvider.PRIORITY)       # least important first
+        cut_sections = set()
+        for limit in range(8000, 199, -37):
+            ctx = p.module(HALL, blocks=["wall-1", "wall-2"], max_tokens=limit)
+            self.assertLessEqual(estimate_tokens(ctx), limit)
+            self.assertEqual(ctx["budget"]["usedTokens"], estimate_tokens(ctx))
+            for key in order:
+                self.assertEqual(len(ctx[key]) + ctx["omitted"][key], len(full[key]), (limit, key))
+                self.assertEqual(ctx[key], full[key][:len(ctx[key])], (limit, key))        # a prefix: order is preserved
+            cut_sections |= {k for k in order if ctx["omitted"][k]}
+            if limit >= 600:                                    # small, high-priority facts survive moderate budgets
+                self.assertEqual((len(ctx["dependencies"]), len(ctx["dependents"])), (1, 1), limit)
+        self.assertTrue({"blockData", "blockIndex", "neighbors"} <= cut_sections)          # tight budgets cut real content
+        # as the budget shrinks, the first thing to go is the least important section
+        first = next(limit for limit in range(8000, 199, -1)
+                     if any(p.module(HALL, blocks=["wall-1", "wall-2"], max_tokens=limit)["omitted"].values()))
+        cut = p.module(HALL, blocks=["wall-1", "wall-2"], max_tokens=first)["omitted"]
+        self.assertEqual([k for k in order if cut[k]], ["blockData"])
+
+    def test_budget_too_small_is_an_error_not_a_silent_overrun(self):
+        _, _, p = self.scene()
+        with mock.patch.object(retrieval, "MIN_TOKENS", 1):
+            for call in (lambda: p.module(HALL, max_tokens=5), lambda: p.manifest(max_tokens=5)):
+                with self.assertRaises(ContextError) as ctx:
+                    call()
+                self.assertEqual(ctx.exception.code, "BUDGET_TOO_SMALL")
+
+    def test_bad_ids_and_unknown_modules(self):
+        _, _, p = self.scene()
+        for module in ("../etc/passwd", "house", "House/F1", "", None, 5, "house/f1/none"):
+            with self.subTest(module):
+                with self.assertRaises(ContextError):
+                    p.module(module)
+
+    def test_reads_never_change_the_journal(self):
+        store, _, p = self.scene(filler=5)
+        before = {m: (Path(store._root) / "modules" / m.replace("/", "__") / "journal.jsonl").read_bytes() for m in store.modules()}
+        p.manifest(), p.module(LIV, depth=2, blocks=["wall-0"]), p.full_scene_tokens(), p.project_digest()
+        after = {m: (Path(store._root) / "modules" / m.replace("/", "__") / "journal.jsonl").read_bytes() for m in store.modules()}
+        self.assertEqual(before, after)
+
+    def test_output_is_deterministic(self):
+        _, _, p = self.scene(filler=10)
+        self.assertEqual(json.dumps(p.module(HALL, depth=2), sort_keys=True), json.dumps(p.module(HALL, depth=2), sort_keys=True))
+
+
+class TokenEvidenceTests(unittest.TestCase):
+    def test_scoped_context_does_not_grow_with_the_scene_but_a_dump_does(self):
+        rows = evidence.measure((3, 30, 120))
+        self.assertEqual(len({r["moduleContextTokens"] for r in rows}), 1)                # constant in scene size
+        self.assertLessEqual(rows[-1]["manifestPageTokens"], 600)                          # one page, whatever the size
+        self.assertGreater(rows[1]["fullSceneTokens"], 5 * rows[0]["fullSceneTokens"])
+        self.assertGreater(rows[2]["fullSceneTokens"], 3 * rows[1]["fullSceneTokens"])
+        self.assertGreater(rows[2]["reduction"], 50)                                       # 120 modules: >50x cheaper
+        self.assertTrue(all(r["moduleContextTokens"] <= retrieval.DEFAULT_TOKENS for r in rows))
+
+
+class SessionBase(Base):
+    def open_session(self, name="agent-1", **kw):
+        store, assembly, provider = self.scene()
+        sessions = SessionStore(self.root)
+        return store, assembly, provider, sessions, sessions.create(name, **kw)
+
+
+class SessionFileTests(SessionBase):
+    def test_create_open_and_reject_bad_ids(self):
+        _, _, _, sessions, s = self.open_session()
+        self.assertTrue(sessions.path("agent-1").is_file())
+        self.assertEqual(sessions.sessions(), ["agent-1"])
+        with self.assertRaises(SessionError):
+            sessions.create("agent-1")
+        for bad in ("../x", "A", "", "a/b", "a" * 65, None):
+            with self.subTest(bad):
+                with self.assertRaises(SessionError):
+                    sessions.create(bad)
+        with self.assertRaises(SessionError):
+            sessions.open("missing")
+        self.assertEqual(sessions.open("agent-1").token_cap, session_mod.DEFAULT_TOKEN_CAP)
+
+    def test_session_files_live_outside_the_module_tree(self):
+        store, _, _, sessions, s = self.open_session()
+        self.assertEqual(JournalStore.open(self.root).modules(), store.modules())     # sessions/ is not a module
+
+    def test_reopen_restores_steps_tokens_and_checkpoint(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.manifest(provider)
+        s.module(provider, HALL)
+        s.apply(store, LIV, 1, "k2", [block(1)])
+        cp = s.checkpoint(provider, "after-living")
+        again = sessions.open("agent-1")
+        self.assertEqual((again.tokens_used, len(again.steps()), again.last_checkpoint()["seq"]), (s.tokens_used, 3, cp["seq"]))
+        self.assertEqual(again.last_checkpoint()["label"], "after-living")
+
+    def test_corruption_is_detected(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.manifest(provider)
+        s.checkpoint(provider)
+        path = sessions.path("agent-1")
+        good = path.read_bytes()
+        lines = good.split(b"\n")[:-1]
+        cases = {
+            "flipped byte": good.replace(b'"tokens"', b'"tokenz"', 1),
+            "dropped line": b"\n".join(lines[:1] + lines[2:]) + b"\n",
+            "reordered": b"\n".join([lines[0], lines[2], lines[1]]) + b"\n",
+            "garbage line": good + b"not json\n",
+            "duplicate keys": good + b'{"seq":3,"seq":3}\n',
+            "NaN": good.replace(b'"tokenCap":50000', b'"tokenCap":NaN', 1),
+            "empty": b"",
+        }
+        for label, data in cases.items():
+            with self.subTest(label):
+                path.write_bytes(data)
+                with self.assertRaises(SessionError):
+                    sessions.open("agent-1")
+        path.write_bytes(good)
+        self.assertEqual(len(sessions.open("agent-1").steps()), 1)
+
+    def test_torn_tail_is_dropped_on_open(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.manifest(provider)
+        good = sessions.path("agent-1").read_bytes()
+        s.checkpoint(provider)
+        full = sessions.path("agent-1").read_bytes()
+        sessions.path("agent-1").write_bytes(full[:len(good) + 40])
+        again = sessions.open("agent-1")
+        self.assertEqual((again.last_checkpoint(), sessions.path("agent-1").read_bytes()), (None, good))
+
+    def test_second_writer_and_failed_write_break_the_session(self):
+        store, _, provider, sessions, s = self.open_session()
+        other = sessions.open("agent-1")
+        s.manifest(provider)
+        with self.assertRaises(SessionError):
+            other.checkpoint(provider)                       # the file moved on under it
+        with self.assertRaises(SessionError):
+            other.manifest(provider)                         # and it stays refused
+        s2 = sessions.open("agent-1")
+        with mock.patch.object(session_mod.os, "fsync", side_effect=OSError("disk")):
+            with self.assertRaises(SessionError):
+                s2.checkpoint(provider)
+        with self.assertRaises(SessionError):
+            s2.checkpoint(provider)                          # outcome unknown: refuse until reopened
+        sessions.open("agent-1").checkpoint(provider)
+
+
+class SessionBudgetTests(SessionBase):
+    def test_cumulative_cap_is_enforced_before_a_response_is_delivered(self):
+        store, _, provider, sessions, s = self.open_session(token_cap=1000)
+        used = []
+        with self.assertRaises(SessionBudgetExceeded):
+            for _ in range(20):
+                response = s.module(provider, HALL)
+                used.append(response["budget"]["usedTokens"])
+                self.assertLessEqual(s.tokens_used, 1000)
+        self.assertGreaterEqual(len(used), 2)
+        self.assertLessEqual(s.tokens_used, 1000)
+        self.assertEqual(sessions.open("agent-1").tokens_used, s.tokens_used)
+
+    def test_late_requests_are_shrunk_to_what_is_left(self):
+        store, _, provider, sessions, s = self.open_session(token_cap=900)
+        first = s.module(provider, HALL, max_tokens=600)
+        left = s.remaining_tokens()
+        second = s.module(provider, HALL, max_tokens=2000)
+        self.assertLessEqual(second["budget"]["usedTokens"], left)
+        self.assertEqual(second["budget"]["maxTokens"], left)
+        self.assertLessEqual(first["budget"]["usedTokens"], 600)
+
+    def test_cap_must_be_sane(self):
+        _, _, _, sessions, _ = self.open_session()
+        for cap in (10, 10 ** 9, True, "5000"):
+            with self.assertRaises(SessionError):
+                sessions.create("other", token_cap=cap)
+
+
+class CheckpointResumeTests(SessionBase):
+    def test_unchanged_project_resumes_in_constant_cost(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.checkpoint(provider)
+        report = s.resume(provider)
+        self.assertEqual((report["status"], report["changed"]), ("current", []))
+        self.assertLess(estimate_tokens(report), estimate_tokens(provider.manifest()))
+        with self.assertRaises(SessionError):
+            sessions.create("fresh").resume(provider)       # no checkpoint yet
+
+    def test_only_changed_modules_are_reported(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.checkpoint(provider)
+        store.apply(HALL, 1, "k2", [block(1)])
+        store.apply(HALL, 2, "k3", [block(2)])
+        store.rollback(BATH, 1, "undo", 0)
+        store.create_module("house/f1/new")
+        report = sessions.open("agent-1").resume(provider)
+        self.assertEqual(report["status"], "advanced")
+        self.assertEqual(report["advanced"], [{"id": BATH, "from": 1, "to": 2}, {"id": HALL, "from": 1, "to": 3}])
+        self.assertEqual((report["unchanged"], report["new"], report["diverged"], report["missing"]), (1, ["house/f1/new"], [], []))
+        self.assertEqual(report["changed"], sorted([BATH, HALL, "house/f1/new"]))
+
+    def test_diverged_and_missing_modules(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.checkpoint(provider)
+        other = JournalStore.open(Path(self._tmp.name) / "elsewhere")
+        for mid in (LIV, HALL):                              # same ids and revision numbers, different living history
+            other.create_module(mid)
+            data = {"height": 3.4} if mid == LIV else {"height": 2.8, "thickness": 0.15, "k": 0}
+            other.apply(mid, 0, "seed-1", [{"op": "add", "id": "wall-0", "data": data}])
+        report = s.resume(ContextProvider(other))
+        self.assertEqual(report["status"], "diverged")
+        self.assertEqual(report["diverged"], [HALL, LIV])    # hall differs too: it never had wall-1..5
+        self.assertEqual(report["missing"], [BATH])
+        self.assertEqual(report["unchanged"], 0)
+
+    def test_a_longer_but_different_history_is_diverged_not_advanced(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.checkpoint(provider)                                       # living is at revision 1 here
+        other = JournalStore.open(Path(self._tmp.name) / "elsewhere")
+        other.create_module(LIV)
+        other.apply(LIV, 0, "seed-1", [{"op": "add", "id": "wall-0", "data": {"height": 3.4}}])
+        other.apply(LIV, 1, "more", [block(1)])                     # revision 2, so newer, but its revision 1 differs
+        report = s.resume(ContextProvider(other))
+        self.assertEqual((report["diverged"], report["advanced"]), ([LIV], []))
+        store.apply(LIV, 1, "more", [block(1)])                     # a true continuation of the checkpointed history
+        self.assertEqual(s.resume(provider)["advanced"], [{"id": LIV, "from": 1, "to": 2}])
+
+    def test_resume_needs_far_fewer_tokens_than_rereading_the_scene(self):
+        store, _, provider, sessions, s = self.open_session()
+        for i in range(60):
+            store.create_module(f"site/b-{i:03d}")
+        provider = ContextProvider(store, provider.assembly)
+        s.checkpoint(provider)
+        store.apply(HALL, 1, "k2", [block(1)])
+        report = s.resume(provider)
+        self.assertEqual(report["changed"], [HALL])
+        self.assertLess(estimate_tokens(report) * 10, provider.full_scene_tokens())
+
+    def test_resume_works_in_a_cold_process(self):
+        store, _, provider, sessions, s = self.open_session()
+        s.checkpoint(provider)
+        store.apply(HALL, 1, "k2", [block(1)])
+        code = ("import json,sys; sys.path.insert(0,%r); from agentctx import ContextProvider, SessionStore; "
+                "from core.storage.journal import JournalStore; s=SessionStore(%r).open('agent-1'); "
+                "print(json.dumps(s.resume(ContextProvider(JournalStore.open(%r))), sort_keys=True))"
+                % (str(ROOT), str(self.root), str(self.root)))
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, check=True)
+        self.assertEqual(json.loads(out.stdout), json.loads(json.dumps(sessions.open("agent-1").resume(ContextProvider(store)), sort_keys=True)))
+
+
+class RecordedWriteAndReplayTests(Base):
+    def record(self, root):
+        store = JournalStore.open(root)
+        sessions = SessionStore(root)
+        s = sessions.create("agent-1")
+        for m in ("house/f1/a", "house/f1/b"):
+            s.create_module(store, m)
+        s.apply(store, "house/f1/a", 0, "a1", [block(1), block(2)])
+        s.apply(store, "house/f1/b", 0, "b1", [block(1)], None)
+        s.apply(store, "house/f1/b", 1, "b2", [block(2)], {"house/f1/a": 1})
+        s.rollback(store, "house/f1/a", 1, "a-undo", 0)
+        return store, sessions, s
+
+    def test_only_effective_writes_are_logged(self):
+        store, sessions, s = self.record(self.root)
+        count = len(s.steps())
+        self.assertEqual(count, 6)
+        from core.identity import StaleRevisionError
+        with self.assertRaises(StaleRevisionError):
+            s.apply(store, "house/f1/a", 0, "stale", [block(3)])
+        again = s.apply(store, "house/f1/b", 0, "b1", [block(1)])              # idempotent retry
+        self.assertTrue(again.replayed)
+        self.assertEqual(len(s.steps()), count)
+
+    def test_replay_into_an_empty_store_is_byte_identical(self):
+        store, sessions, s = self.record(self.root)
+        target = JournalStore.open(Path(self._tmp.name) / "replayed")
+        report = sessions.open("agent-1").replay_into(target)
+        self.assertEqual(report["replayedWrites"], 6)
+        for m in store.modules():
+            self.assertEqual(target.tail_hash(m), store.tail_hash(m))
+            self.assertEqual(target.snapshot(m), store.snapshot(m))
+        for m in store.modules():
+            name = m.replace("/", "__")
+            self.assertEqual((Path(self._tmp.name) / "replayed" / "modules" / name / "journal.jsonl").read_bytes(),
+                             (self.root / "modules" / name / "journal.jsonl").read_bytes())
+
+    def test_replay_into_the_original_is_a_no_op(self):
+        store, sessions, s = self.record(self.root)
+        before = {m: store.tail_hash(m) for m in store.modules()}
+        report = sessions.open("agent-1").replay_into(store)
+        self.assertEqual(report["replayedWrites"], 6)
+        self.assertEqual({m: store.tail_hash(m) for m in store.modules()}, before)
+
+    def test_tampered_recording_is_caught_as_a_divergence(self):
+        store, sessions, s = self.record(self.root)
+        path = sessions.path("agent-1")
+        entries = [json.loads(line) for line in path.read_bytes().split(b"\n")[:-1]]
+        target_step = next(e for e in entries if e.get("tool") == "apply")
+        target_step["request"]["ops"][0]["data"] = {"n": 999}           # a forged edit, with every hash re-chained
+        prev, out = session_mod.GENESIS, []
+        for e in entries:
+            e["prev"] = prev
+            e["hash"] = session_mod._entry_hash(e)
+            prev = e["hash"]
+            out.append(session_mod.canonical(e).encode())
+        path.write_bytes(b"\n".join(out) + b"\n")
+        with self.assertRaises(ReplayDivergence):
+            sessions.open("agent-1").replay_into(JournalStore.open(Path(self._tmp.name) / "forged"))
+
+    def test_oversized_request_is_refused_before_the_journal_changes(self):
+        store, sessions, s = self.record(self.root)
+        before = store.tail_hash("house/f1/a")
+        ops = [{"op": "add", "id": f"huge-{i}", "data": {"x": "y" * 30000}} for i in range(4)]
+        with self.assertRaises(SessionError):
+            s.apply(store, "house/f1/a", 2, "too-big", ops)
+        self.assertEqual(store.tail_hash("house/f1/a"), before)
+
+
+if __name__ == "__main__":
+    unittest.main()
