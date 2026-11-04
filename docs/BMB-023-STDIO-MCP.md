@@ -4,7 +4,7 @@
 
 ## Launch
 
-A trusted host creates a private single-project directory and applies low-privilege OS process/ACL or sandbox boundaries. Only launch the server for a directory entirely controlled by that principal; MCP code cannot replace filesystem isolation.
+A trusted host creates an owner-only single-project directory (POSIX mode 0700, owned by the launcher identity) and applies low-privilege OS process/ACL or sandbox boundaries. The server rejects a POSIX project root accessible to group/other and rejects filesystem roots, symlinks and junctions. Windows root DACL inspection remains a distinct owner/OS gate. Only launch the server for a directory entirely controlled by that principal; MCP code cannot replace filesystem isolation.
 
 ```sh
 python -m agent.bmb_mcp --root /absolute/private/project
