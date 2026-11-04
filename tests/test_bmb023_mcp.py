@@ -280,9 +280,17 @@ class MCPTests(unittest.TestCase):
 
 
     def test_rate_limit_is_bounded_on_single_process(self):
-        out = self.valid(*(tool("unknown", {}, i) for i in range(1, 62)))
+        out = self.valid(
+            *(tool("unknown", {}, i) for i in range(1, 60)),
+            tool("bmb_validate_journals", {}, 60),
+            tool("bmb_validate_journals", {}, 61),
+            tool("unknown", {}, 62),
+        )
         self.assertEqual(out[0]["error"]["code"], -32602)
-        self.assertEqual(out[-1]["result"]["structuredContent"]["error"]["code"], "LIMIT_EXCEEDED")
+        self.assertTrue(out[-3]["result"]["structuredContent"]["ok"])
+        self.assertEqual(out[-2]["result"]["structuredContent"]["error"]["code"], "LIMIT_EXCEEDED")
+        self.assertEqual(out[-1]["error"]["code"], -32602)
+        self.assertNotIn("result", out[-1])
 
     def test_large_inspection_never_returns_truncated_json(self):
         self.valid(tool("bmb_create_module", {"moduleId": MID}))

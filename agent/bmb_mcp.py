@@ -422,6 +422,9 @@ class Server:
                 raise ToolFailure("PERMISSION_DENIED", "Mutating tool not granted by launcher")
             result = _perform(self.root, name, args)
         except ToolFailure as exc:
+            if name not in SCHEMAS:
+                # Even after rate exhaustion, unknown names remain protocol errors.
+                return _rpc_error(ident, -32602, "Unknown tool")
             result = {"ok": False, "error": {"code": exc.code, "message": str(exc)[:128]}}
         output = _success(ident, _tool_response(result))
         if len(json.dumps(output, separators=(",", ":"), allow_nan=False).encode("utf-8")) > MAX_RESPONSE:
