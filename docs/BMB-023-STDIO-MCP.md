@@ -25,7 +25,7 @@ Every JSON-RPC request must include the following in `params._meta`:
 }
 ```
 
-Discovery is `server/discover` (required); tools use `tools/list` and `tools/call`. The server deliberately does not negotiate `initialize`/legacy MCP 2025 sessions. Unknown versions return JSON-RPC `-32022` with `supported: ["2026-07-28"]`; absent required metadata returns `-32602`. Business and security errors from valid tools return `resultType: "complete"`, `isError: true`, with stable `structuredContent.error.code`. MCP transport/method parsing problems are JSON-RPC errors. Server capability is `tools`; no resources, subscriptions, prompts or HTTP transport.
+Discovery is `server/discover` (required); tools use `tools/list` and `tools/call`. The server deliberately does not negotiate `initialize`/legacy MCP 2025 sessions. Unknown versions return JSON-RPC `-32022` with `supported: ["2026-07-28"]`; absent required metadata returns `-32602`. Discovery and listing return mandatory `ttlMs: 0` and `cacheScope: "private"` so authorization-scoped tool listings cannot be reused across principals. `tools/call` may omit `arguments`, which is treated as `{}`; required input validation is unchanged. Unknown tool names and malformed calls return protocol-level JSON-RPC `-32602`, as required by the MCP tool-error specification. Valid tool execution failures, including permission and business/core errors, return `resultType: "complete"`, `isError: true`, with stable `structuredContent.error.code`. Other transport/method parsing problems are JSON-RPC errors. Server capability is `tools`; no resources, subscriptions, prompts or HTTP transport.
 
 ## Typed allowlisted tools
 
@@ -62,13 +62,13 @@ These caps can be *lowered* in later hardening; do not assume all production res
 
 ## Error and failure semantics
 
-Typed errors include `INVALID_ARGUMENT`, `UNKNOWN_TOOL`, `PERMISSION_DENIED`, `PATH_OUTSIDE_ROOT`, `LIMIT_EXCEEDED`, `DEPTH_LIMIT`, `REVISION_CONFLICT`, `IDEMPOTENCY_CONFLICT`, `CORRUPT_INPUT`, `STORAGE_ERROR`, `BUSY`, `TIMEOUT`, `DURABILITY_UNCERTAIN`, `INTERNAL_ERROR`. Exception traces, environment variables and absolute host paths are not sent through MCP. The deadline can terminate a worker during a journal write: `TIMEOUT` means **commit status unknown**, not an automatic rollback guarantee. The existing journal handles torn tails on next open, but owner-level power-loss validation is separate. Retry with the same durable idempotency key only after inspecting project state.
+Typed tool execution errors include `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `PATH_OUTSIDE_ROOT`, `LIMIT_EXCEEDED`, `DEPTH_LIMIT`, `REVISION_CONFLICT`, `IDEMPOTENCY_CONFLICT`, `CORRUPT_INPUT`, `STORAGE_ERROR`, `BUSY`, `TIMEOUT`, `DURABILITY_UNCERTAIN`, `INTERNAL_ERROR`. Exception traces, environment variables and absolute host paths are not sent through MCP. The deadline can terminate a worker during a journal write: `TIMEOUT` means **commit status unknown**, not an automatic rollback guarantee. The existing journal handles torn tails on next open, but owner-level power-loss validation is separate. Retry with the same durable idempotency key only after inspecting project state.
 
 ## Scope exclusions and security evidence
 
 This adapter rejects static symlinks/junctions/hardlinked journal paths before core I/O. It is **not** a proof of race-free handle-relative/no-follow I/O on Windows or against a malicious local process that can mutate the project tree during calls. The host must enforce a private root and one principal; BMB-030 owns hardening for symlink/junction TOCTOU, hostile multi-principal access, advanced cancellation, rate-limit persistence across process restarts, crash injection, CPU/Job Object limits and adversarial resource peaks. Stdio `notifications/cancelled` receives no reply but does not currently preempt an already executing synchronous request; a 30s hard deadline applies. Source and tests are synthetic-only under the project GPL/fixture policy.
 
-**NOT_RUN gates:** owner-native Windows ACL/Job Object, multi-process hostile symlink swaps, physical crashes, live external MCP-client compatibility, consumer BOMC readback, geometry validation and full agent benchmark. A green unit-test matrix is not evidence that these gates passed.
+**NOT_RUN gates:** owner-native Windows ACL/DACL and Job Object, multi-process hostile symlink/junction swaps and TOCTOU, physical crashes and cancellation, live external MCP-client/SDK compatibility (schema validation is not a live client), consumer BOMC readback, geometry validation and full agent benchmark. A green unit-test matrix is not evidence that these gates passed.
 
 ## Tests
 
@@ -76,6 +76,10 @@ This adapter rejects static symlinks/junctions/hardlinked journal paths before c
 python -m unittest discover -s tests -p test_bmb023_mcp.py -v
 ```
 
-Dedicated GitHub Actions `bmb023-mcp.yml` runs synthetic stdio/subprocess tests on Ubuntu and Windows plus BMB-022 CLI, BMB-010 journal, BMB-008 identity and BMB-011 assembly regression suites. Record exact PR HEAD, actual workflow URLs, truthful PASS/FAIL/NOT_RUN and owner merge gate in the issue and Notion before closure.
+Dedicated GitHub Actions `bmb023-mcp.yml` pins GitHub Actions to immutable commits, checks out and asserts the exact PR head (rather than GitHub's synthetic merge), prints Python/OS/run provenance, and runs synthetic stdio/subprocess tests on Ubuntu and Windows plus BMB-022 CLI, BMB-010 journal, BMB-008 identity and BMB-011 assembly regression suites. The additional published-schema tests use `jsonschema==4.23.0` and a vendored immutable copy of the official [MCP 2026-07-28 schema at upstream commit 271ecc9accafdd9b83a3c869fa67c22953b2af80](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/271ecc9accafdd9b83a3c869fa67c22953b2af80/schema/2026-07-28/schema.json), kept under `tests/fixtures/mcp-2026-07-28-schema.json`. This validates real request/response envelopes and tool input schemas independently of handwritten assertions. License/provenance: upstream Model Context Protocol schema, [MIT license](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/271ecc9accafdd9b83a3c869fa67c22953b2af80/LICENSE). Record exact PR HEAD, actual workflow URLs, truthful PASS/FAIL/NOT_RUN and owner merge gate in the issue and Notion before closure.
 
 References: [MCP 2026-07-28 stdio](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio), [Discovery](https://modelcontextprotocol.io/specification/2026-07-28/server/discover), [MCP request metadata](https://modelcontextprotocol.io/specification/2026-07-28/basic/index), [BMB-004 threat model](MCP-THREAT-MODEL.md), [BMB-022 CLI](BMB-022-HEADLESS-CLI.md).
+
+## Reclaim acceptance evidence
+
+Protocol corrections and exact-HEAD provenance are implemented in the existing PR #59; live CI verdict, final exact SHA, run links, and any skips must be recorded at [PR #59](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/59) and [Issue #23](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/23) after GitHub-hosted completion. Published schema validation and internal tool subprocess tests do **not** establish external SDK/client compatibility; that gate remains NOT_RUN until demonstrated with an independently compatible 2026-07-28 client. Do not merge or close on internal green tests alone.

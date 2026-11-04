@@ -109,6 +109,48 @@ class MCPTests(unittest.TestCase):
         self.assertEqual(out["result"]["structuredContent"]["error"]["code"], "IDEMPOTENCY_CONFLICT")
         self.assertEqual(original, (self.root / "modules" / "house__living" / "journal.jsonl").read_bytes())
 
+    def test_optional_arguments_accepts_zero_argument_tool(self):
+        out = self.valid(
+            request("tools/call", {"name": "bmb_validate_journals"}),
+            request("tools/call", {"name": "bmb_validate_journals", "arguments": {}}, 2),
+        )
+        self.assertTrue(out[0]["result"]["structuredContent"]["ok"])
+        self.assertEqual(out[0]["result"]["structuredContent"],
+                         out[1]["result"]["structuredContent"])
+
+    def test_missing_required_arguments_still_rejected(self):
+        out = self.valid(
+            request("tools/call", {"name": "bmb_create_module"}),
+            request("tools/call", {"name": "bmb_inspect_module", "arguments": {}}, 2),
+            request("tools/call", {"name": "bmb_create_module",
+                                   "arguments": {"moduleId": MID, "unexpected": True}}, 3),
+        )
+        for row in out:
+            self.assertTrue(row["result"]["isError"])
+            self.assertEqual(row["result"]["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
+        self.assertFalse((self.root / "modules").exists())
+
+    def test_protocol_errors_separate_from_tool_execution_errors(self):
+        out = self.valid(
+            request("tools/call", {"name": "not_a_real_tool"}),
+            request("tools/call", {"name": "bmb_inspect_module",
+                                   "arguments": {"moduleId": MID}}, 2),
+            request("tools/call", {"name": "bmb_validate_journals", "arguments": None}, 3),
+            request("tools/call", {"name": "bmb_validate_journals", "unexpected": 7}, 4),
+            request("tools/call", {"name": 42}, 5),
+            request("tools/call", {"name": "bmb_validate_journals",
+                                   "arguments": {"moduleId": MID}}, 6),
+        )
+        self.assertEqual(out[0]["error"]["code"], -32602)
+        self.assertNotIn("result", out[0])
+        self.assertTrue(out[1]["result"]["isError"])  # Missing module, genuine core failure.
+        self.assertIn("error", out[1]["result"]["structuredContent"])
+        for i in (2, 3, 4):
+            self.assertEqual(out[i]["error"]["code"], -32602)
+            self.assertNotIn("result", out[i])
+        self.assertTrue(out[5]["result"]["isError"])  # Invalid business input.
+        self.assertNotIn("error", out[5])
+
     def test_invalid_args_unknown_tool_and_shell_escape(self):
         for name, arg in [
             ("bmb_create_module", {"moduleId": "../../outside"}),
@@ -124,8 +166,9 @@ class MCPTests(unittest.TestCase):
             with self.subTest(name=name, arg=arg):
                 value = self.valid(tool(name, arg))[0]["result"]
                 self.assertEqual(value["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
-        value = self.valid(tool("unknown", {}))[0]["result"]
-        self.assertEqual(value["structuredContent"]["error"]["code"], "UNKNOWN_TOOL")
+        value = self.valid(tool("unknown", {}))[0]
+        self.assertEqual(value["error"]["code"], -32602)
+        self.assertNotIn("result", value)
         self.assertFalse((self.root / "modules").exists())
 
     def test_malformed_frame_and_duplicates(self):
@@ -225,7 +268,7 @@ class MCPTests(unittest.TestCase):
 
     def test_rate_limit_is_bounded_on_single_process(self):
         out = self.valid(*(tool("unknown", {}, i) for i in range(1, 62)))
-        self.assertEqual(out[0]["result"]["structuredContent"]["error"]["code"], "UNKNOWN_TOOL")
+        self.assertEqual(out[0]["error"]["code"], -32602)
         self.assertEqual(out[-1]["result"]["structuredContent"]["error"]["code"], "LIMIT_EXCEEDED")
 
     def test_large_inspection_never_returns_truncated_json(self):

@@ -381,13 +381,14 @@ class Server:
         if method == "server/discover":
             if set(params) != {"_meta"}:
                 return _rpc_error(ident, -32602, "Invalid discovery arguments")
-            return _success(ident, {"resultType": "complete", "supportedVersions": [VERSION],
+            return _success(ident, {"resultType": "complete", "ttlMs": 0, "cacheScope": "private",
+                                    "supportedVersions": [VERSION],
                                     "capabilities": {"tools": {}},
                                     "instructions": "Single root; writes require launcher grant. No arbitrary paths, shell or network."})
         if method == "tools/list":
             if set(params) != {"_meta"}:
                 return _rpc_error(ident, -32602, "Invalid list arguments")
-            return _success(ident, {"resultType": "complete", "tools": [
+            return _success(ident, {"resultType": "complete", "ttlMs": 0, "cacheScope": "private", "tools": [
                 {"name": name, "description": DESCRIPTIONS[name],
                  "inputSchema": {"type": "object", "additionalProperties": False,
                                  "properties": props, "required": required}}
@@ -395,11 +396,16 @@ class Server:
                 if self.writes or name not in WRITE_TOOLS]})
         if method != "tools/call":
             return _rpc_error(ident, -32601, "Method not found")
-        if set(params) != {"_meta", "name", "arguments"} or not isinstance(params.get("name"), str):
+        if (set(params) - {"_meta", "name", "arguments"}
+                or not isinstance(params.get("name"), str)
+                or not isinstance(params.get("arguments", {}), dict)):
             return _rpc_error(ident, -32602, "Invalid tool call")
-        name, args = params["name"], params["arguments"]
+        name, args = params["name"], params.get("arguments", {})
         try:
             self._rate()
+            if name not in SCHEMAS:
+                # Tool lookup errors are protocol errors, not tool execution failures.
+                return _rpc_error(ident, -32602, "Unknown tool")
             _limited(args)
             _validate_args(name, args)
             if name in WRITE_TOOLS and not self.writes:
