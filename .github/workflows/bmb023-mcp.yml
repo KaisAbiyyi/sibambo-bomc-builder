@@ -1,0 +1,49 @@
+name: BMB-023 stdio MCP acceptance
+on:
+  push:
+    paths:
+      - "agent/**"
+      - "cli/**"
+      - "core/identity/**"
+      - "core/storage/**"
+      - "core/assembly/**"
+      - "tests/test_bmb023_mcp.py"
+      - ".github/workflows/bmb023-mcp.yml"
+  pull_request:
+    paths:
+      - "agent/**"
+      - "cli/**"
+      - "core/identity/**"
+      - "core/storage/**"
+      - "core/assembly/**"
+      - "tests/test_bmb023_mcp.py"
+      - ".github/workflows/bmb023-mcp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stdio:
+    name: stdio and shared-core / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: MCP adversarial stdio integration
+        run: python -m unittest discover -s tests -p test_bmb023_mcp.py -v
+      - name: CLI subprocess regression
+        run: python -m unittest discover -s tests -p test_bmb022_cli.py -v
+      - name: Journal regression
+        run: python -m unittest discover -s tests -p test_bmb010_journal.py -v
+      - name: Identity regression
+        run: python -m unittest discover -s tests -p test_bmb008_identity.py -v
+      - name: Assembly regression
+        run: python -m unittest discover -s tests -p test_bmb011_assembly.py -v
