@@ -41,33 +41,36 @@ def prop(kind, **extra):
 
 
 SCHEMAS = {
-    "bmb_create_module": (["moduleId"], {"moduleId": prop("string", pattern=MODULE_ID_PATTERN.pattern)}),
+    "bmb_create_module": (["moduleId"], {"moduleId": prop("string", pattern=r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$")}),
     "bmb_inspect_module": (["moduleId"], {
-        "moduleId": prop("string", pattern=MODULE_ID_PATTERN.pattern),
+        "moduleId": prop("string", pattern=r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$"),
         "includeBlocks": prop("boolean"),
     }),
     "bmb_edit_module": (["moduleId", "expectedRevision", "idempotencyKey", "ops"], {
-        "moduleId": prop("string", pattern=MODULE_ID_PATTERN.pattern),
+        "moduleId": prop("string", pattern=r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$"),
         "expectedRevision": prop("integer", minimum=0),
-        "idempotencyKey": prop("string", pattern=KEY_PATTERN.pattern),
+        "idempotencyKey": prop("string", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
         "ops": prop("array", minItems=1, maxItems=256, items={
-            "type": "object", "additionalProperties": False,
-            "properties": {
-                "op": prop("string", enum=["add", "replace", "remove"]),
-                "id": prop("string", pattern=BLOCK_ID_PATTERN.pattern),
-                "data": prop("object"),
-            },
-            "required": ["op", "id"],
+            "oneOf": [
+                {"type": "object", "additionalProperties": False,
+                 "properties": {
+                     "op": prop("string", const=kind),
+                     "id": prop("string", pattern=r"^[a-z][a-z0-9-]{0,79}$"),
+                     **({"data": prop("object")} if kind != "remove" else {}),
+                 },
+                 "required": ["op", "id"] + (["data"] if kind != "remove" else [])}
+                for kind in ("add", "replace", "remove")
+            ],
         }),
         "minRevisions": prop("object", maxProperties=256, additionalProperties=prop("integer", minimum=0)),
     }),
     "bmb_rollback_module": (["moduleId", "expectedRevision", "idempotencyKey", "toRevision"], {
-        "moduleId": prop("string", pattern=MODULE_ID_PATTERN.pattern),
+        "moduleId": prop("string", pattern=r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$"),
         "expectedRevision": prop("integer", minimum=0),
-        "idempotencyKey": prop("string", pattern=KEY_PATTERN.pattern),
+        "idempotencyKey": prop("string", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"),
         "toRevision": prop("integer", minimum=0),
     }),
-    "bmb_validate_journals": ([], {"moduleId": prop("string", pattern=MODULE_ID_PATTERN.pattern)}),
+    "bmb_validate_journals": ([], {"moduleId": prop("string", pattern=r"^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$")}),
     "bmb_validate_assembly": (["document"], {"document": {
         "type": "object", "additionalProperties": False,
         "required": ["modules"],
@@ -337,6 +340,11 @@ class Server:
     def __init__(self, root, writes=False):
         self.root = Path(root)
         _guard_root(self.root)
+        root_stat = self.root.stat()
+        if (self.root == Path(self.root.anchor)
+                or (os.name == "posix" and (root_stat.st_uid != os.getuid()
+                    or (stat.S_IMODE(root_stat.st_mode) & 0o077)))):
+            raise ToolFailure("PERMISSION_DENIED", "Private owned project directory required")
         self.writes = writes
         self.calls_min = deque()
         self.calls_hour = deque()
