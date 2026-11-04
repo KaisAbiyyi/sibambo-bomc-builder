@@ -32,7 +32,7 @@ class MCPTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / "project"
-        self.root.mkdir()
+        self.root.mkdir(mode=0o700)
 
     def talk(self, *messages, writes=True, raw=None, root=None):
         argv = [sys.executable, "-m", "agent.bmb_mcp", "--root", str(root or self.root)]
@@ -256,6 +256,15 @@ class MCPTests(unittest.TestCase):
         finally:
             first.stdin.close()
             first.wait(timeout=10)
+
+
+
+    @unittest.skipUnless(os.name == "posix", "private-root mode enforced on POSIX")
+    def test_world_readable_project_root_is_rejected(self):
+        self.root.chmod(0o755)
+        rc, out, err = self.talk(request("server/discover"))
+        self.assertEqual((rc, out), (2, []))
+        self.assertIn(b"MCP launch rejected", err)
 
 
 
