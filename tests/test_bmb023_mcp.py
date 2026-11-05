@@ -137,6 +137,23 @@ class MCPTests(unittest.TestCase):
             self.assertEqual(row["result"]["structuredContent"]["error"]["code"], "CORRUPT_INPUT")
         self.assertEqual(journal.read_bytes(), damaged)
 
+    def test_scoped_read_isolates_an_unrelated_damaged_journal(self):
+        other = "house/other"
+        self.valid(tool("bmb_create_module", {"moduleId": MID}),
+                   tool("bmb_create_module", {"moduleId": other}, 2))
+        corrupted = self.root / "modules" / "house__other" / "journal.jsonl"
+        damaged = corrupted.read_bytes() + b'{"partial":'
+        corrupted.write_bytes(damaged)
+        out = self.valid(
+            tool("bmb_inspect_module", {"moduleId": MID}),
+            tool("bmb_validate_journals", {"moduleId": MID}, 2),
+            writes=False,
+        )
+        for row in out:
+            self.assertFalse(row["result"]["isError"], row)
+            self.assertTrue(row["result"]["structuredContent"]["ok"])
+        self.assertEqual(corrupted.read_bytes(), damaged)
+
     def test_read_only_empty_journal_is_not_unlinked(self):
         self.valid(tool("bmb_create_module", {"moduleId": MID}))
         journal = self.root / "modules" / "house__living" / "journal.jsonl"
