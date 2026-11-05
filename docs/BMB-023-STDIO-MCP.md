@@ -66,7 +66,7 @@ The shared `JournalStore.open()` initializes `modules/` even on an empty-project
 
 ## Non-mutating read tools on nonempty journals
 
-`bmb_inspect_module` and `bmb_validate_journals` reject an incomplete nonempty-project journal (`CORRUPT_INPUT`) when its file is missing, empty or lacks a terminating newline. This check occurs before handing the request to `JournalStore.open()`, whose normal core recovery can truncate torn tails or unlink unfinished creates. A read tool must not cause that recovery, even if the launcher also has `--allow-writes`. An operator can inspect and repair the journal separately through explicitly trusted maintenance, preserving the shared CLI/core behavior. This is a static private-root guarantee, not a TOCTOU or hostile co-tenant filesystem certification.
+`bmb_inspect_module` and `bmb_validate_journals` reject an incomplete nonempty-project journal (`CORRUPT_INPUT`) when its file is missing, empty or lacks a terminating newline. This check occurs before handing the request to `JournalStore.open()`, whose normal core recovery can truncate torn tails or unlink unfinished creates. Scoped `inspect` or `validate` checks only the selected journal, preserving isolation when another module is corrupt; whole-project validation checks every journal. A read tool must not cause that recovery, even if the launcher also has `--allow-writes`. An operator can inspect and repair the journal separately through explicitly trusted maintenance, preserving the shared CLI/core behavior. This is a static private-root guarantee, not a TOCTOU or hostile co-tenant filesystem certification.
 
 ## Error and failure semantics
 
