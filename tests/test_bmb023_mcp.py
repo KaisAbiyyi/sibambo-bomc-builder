@@ -122,6 +122,31 @@ class MCPTests(unittest.TestCase):
             self.assertEqual(row["result"]["structuredContent"]["error"]["code"], "STORAGE_ERROR")
         self.assertFalse((self.root / "modules").exists())
 
+    def test_read_only_torn_tail_does_not_repair_journal(self):
+        self.valid(tool("bmb_create_module", {"moduleId": MID}))
+        journal = self.root / "modules" / "house__living" / "journal.jsonl"
+        damaged = journal.read_bytes() + b'{"partial":'
+        journal.write_bytes(damaged)
+        out = self.valid(
+            tool("bmb_inspect_module", {"moduleId": MID}),
+            tool("bmb_validate_journals", {}, 2),
+            writes=False,
+        )
+        for row in out:
+            self.assertTrue(row["result"]["isError"])
+            self.assertEqual(row["result"]["structuredContent"]["error"]["code"], "CORRUPT_INPUT")
+        self.assertEqual(journal.read_bytes(), damaged)
+
+    def test_read_only_empty_journal_is_not_unlinked(self):
+        self.valid(tool("bmb_create_module", {"moduleId": MID}))
+        journal = self.root / "modules" / "house__living" / "journal.jsonl"
+        journal.write_bytes(b"")
+        out = self.valid(tool("bmb_validate_journals", {}), writes=False)[0]
+        self.assertTrue(out["result"]["isError"])
+        self.assertEqual(out["result"]["structuredContent"]["error"]["code"], "CORRUPT_INPUT")
+        self.assertTrue(journal.exists())
+        self.assertEqual(journal.read_bytes(), b"")
+
     def test_optional_arguments_accepts_zero_argument_tool(self):
         out = self.valid(
             request("tools/call", {"name": "bmb_validate_journals"}),
