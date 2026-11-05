@@ -19,9 +19,13 @@ The modules author 4 floor slabs, external perimeter walls, four singly owned in
 
 ## Localized revision
 
-\`build_house()\` yields baseline revision 1 for every module. \`build_house(revised=True)\` increments **only bedroom-a** to revision 2 and widens its *private exterior window* from 1.0 m to 1.2 m. It does not alter any shared doorway, seam, dependency minimum, room transform, roof, or other module. Per-module canonical JSON SHA256 values prove that **living, bedroom-b, bath and roof remain byte-identical as serialized modules**. The BOMC document necessarily changes because the overall compiled artifact contains the changed window; this is a full derived recompile, not a claim of binary patch/delta.
+\`build_house()\` yields baseline revision 1 for every module. \`build_house(revised=True)\` increments **only bedroom-a** to revision 2 and widens its *private exterior window* from 1.0 m to 1.2 m. It does not alter any shared doorway, seam, dependency minimum, room transform, roof, or other module. Per-module canonical JSON SHA256 values prove that **living, bedroom-b, bath and roof remain byte-identical as serialized modules**. The BMB-010 journal test additionally seeds and reopens five real per-module hash-chained journals, rejects a stale CAS edit, commits *only* the Bedroom A replacement, and verifies the other four journal files' exact bytes and modification timestamps are unchanged after reopening. The revised assembly rebuilt from persisted journal blocks compiles to the same BOMC SHA256 as the revised fixture; idempotent replay does not rewrite a journal. The BOMC document necessarily changes because the overall compiled artifact contains the changed window; this is a full derived recompile, not a claim of binary patch/delta.
 
 A door width revision across a shared seam would require coordination and is deliberately not misrepresented as isolated. Bedroom-a revision 2 continues satisfying a bath dependency with minRevision=1.
+
+## BOMC 1.2 bounded label profile
+
+The existing compiler enforces a **254-entry string table** because this strict BOMC 1.2 subset uses one-byte string indices. Four rooms with three actual door cuts exceed that cap if every simple wall/slab face receives an automatically generated unique path label. The fixture uses the already approved BMB-018 face-annotation schema to reuse meaningful `wall solid surface`, `floor solid surface` and `roof solid surface` labels on **uncut** simple walls/slabs. Cut walls retain their mandatory unique face labels and true topology. Every face record, material binding, mesh, normal and coverage count remains present; this is not a compiler-limit bypass. **Labels are not unique face identifiers** and should not be used as a future edit-selection key.
 
 ## Reproduction
 
