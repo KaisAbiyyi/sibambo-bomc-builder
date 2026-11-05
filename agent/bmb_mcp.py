@@ -378,6 +378,10 @@ class Server:
         ident = packet["id"]
         if isinstance(ident, bool) or not isinstance(ident, (str, int)):
             return _rpc_error(None, -32600, "Invalid request id")
+        # Reject oversized opaque IDs before executing any tool: otherwise a
+        # valid bounded input can produce an oversized (or lost) commit receipt.
+        if isinstance(ident, str) and len(ident) > 1024:
+            return _rpc_error(None, -32600, "Request id too large")
         params = packet.get("params", {})
         if not isinstance(params, dict) or not isinstance(params.get("_meta"), dict):
             return _rpc_error(ident, -32602, "Required metadata missing")
@@ -477,7 +481,12 @@ def run(root, writes=False, reader=None, writer=None):
                 response = _rpc_error(None, -32700 if exc.code == "INVALID_ARGUMENT" else -32600,
                                       "Malformed or excessive JSON")
             if response is not None:
-                data = json.dumps(response, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+                # Cover every JSON-RPC reply, not only tools/call. ASCII
+                # escaping also safely serializes escaped surrogate IDs.
+                data = json.dumps(response, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("utf-8")
+                if len(data) > MAX_RESPONSE:
+                    data = json.dumps(_rpc_error(None, -32600, "Response frame too large"),
+                                      separators=(",", ":"), allow_nan=False).encode("utf-8")
                 writer.write(data + b"\n")
                 writer.flush()
     finally:
