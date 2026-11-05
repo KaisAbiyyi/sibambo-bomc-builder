@@ -64,6 +64,10 @@ These caps can be *lowered* in later hardening; do not assume all production res
 
 The shared `JournalStore.open()` initializes `modules/` even on an empty-project read. The MCP adapter short-circuits **only** empty-project journal validation to the exact empty summary, and returns `STORAGE_ERROR` for scoped lookups when no journal directory exists. This prevents unintended directory creation in read-only mode without modifying the shared core. Static root checks and the exclusive process lock still apply. Existing nonempty journals continue through the original CLI/shared core.
 
+## Non-mutating read tools on nonempty journals
+
+`bmb_inspect_module` and `bmb_validate_journals` reject an incomplete nonempty-project journal (`CORRUPT_INPUT`) when its file is missing, empty or lacks a terminating newline. This check occurs before handing the request to `JournalStore.open()`, whose normal core recovery can truncate torn tails or unlink unfinished creates. A read tool must not cause that recovery, even if the launcher also has `--allow-writes`. An operator can inspect and repair the journal separately through explicitly trusted maintenance, preserving the shared CLI/core behavior. This is a static private-root guarantee, not a TOCTOU or hostile co-tenant filesystem certification.
+
 ## Error and failure semantics
 
 Typed tool execution errors include `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `PATH_OUTSIDE_ROOT`, `LIMIT_EXCEEDED`, `DEPTH_LIMIT`, `REVISION_CONFLICT`, `IDEMPOTENCY_CONFLICT`, `CORRUPT_INPUT`, `STORAGE_ERROR`, `BUSY`, `TIMEOUT`, `DURABILITY_UNCERTAIN`, `INTERNAL_ERROR`. Exception traces, environment variables and absolute host paths are not sent through MCP. The deadline can terminate a worker during a journal write: `TIMEOUT` means **commit status unknown**, not an automatic rollback guarantee. The existing journal handles torn tails on next open, but owner-level power-loss validation is separate. Retry with the same durable idempotency key only after inspecting project state.
