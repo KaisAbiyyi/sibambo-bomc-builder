@@ -184,6 +184,21 @@ class MCPTests(unittest.TestCase):
         self.assertNotIn("result", value)
         self.assertFalse((self.root / "modules").exists())
 
+    def test_response_frame_is_bounded_for_discovery_with_large_request_id(self):
+        # The input remains within MAX_FRAME; response metadata must not make
+        # an otherwise valid frame exceed MAX_RESPONSE. No journal writes.
+        msg = request("server/discover")
+        msg["id"] = ""
+        compact = lambda value: json.dumps(value, separators=(",", ":")).encode("utf-8")
+        pad = 256 * 1024 - len(compact(msg)) - 2
+        msg["id"] = "r" * pad
+        raw = compact(msg) + b"\\n"
+        self.assertLessEqual(len(raw), 256 * 1024)
+        rc, out, err = self.talk(raw=raw, writes=False)
+        self.assertEqual((rc, len(out)), (0, 1), err)
+        self.assertLessEqual(len(compact(out[0])), 256 * 1024)
+        self.assertFalse((self.root / "modules").exists())
+
     def test_malformed_frame_and_duplicates(self):
         for raw in (b'{"jsonrpc":"2.0","id":1,"id":2,"method":"tools/list"}\n',
                     b'{"not":"json"\n', b'\xff\n', b'{"x":NaN}\n'):
