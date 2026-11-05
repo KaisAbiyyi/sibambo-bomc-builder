@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from agentguide.controller import (
     ControllerError, FIXTURE, META, MCPClient, REPO, _error_code, _request, _tool,
@@ -76,6 +77,97 @@ class ScriptedAgentTests(unittest.TestCase):
             self.assertEqual(_error_code(calls[0], "read-only create"), "PERMISSION_DENIED")
             self.assertEqual(calls[1]["result"]["structuredContent"]["data"]["revisions"], {})
             self.assertFalse((root / "modules").exists())
+
+
+    def test_red_gate_unexpected_stale_acceptance_must_not_queue_repair(self):
+        """If the transport says stale edit succeeded, no repair or replay may have been sent."""
+        original = MCPClient.batch
+        seen = []
+
+        def injected(client, actions):
+            for method, params in actions:
+                if method == "tools/call":
+                    seen.append((params["name"], (params["arguments"] or {}).get("idempotencyKey")))
+            responses = original(client, actions)
+            for idx, (method, params) in enumerate(actions):
+                if method == "tools/call" and (params["arguments"] or {}).get("idempotencyKey") == "bmb025-stale":
+                    responses[idx] = copy.deepcopy(responses[idx])
+                    responses[idx]["result"]["isError"] = False
+                    responses[idx]["result"]["structuredContent"] = {
+                        "ok": True, "data": {"revision": 1, "replayed": False}}
+            return responses
+
+        with tempfile.TemporaryDirectory(prefix="bmb025-stale-gate-") as tmp:
+            root = Path(tmp) / "project"
+            with mock.patch.object(MCPClient, "batch", injected):
+                with self.assertRaises(ControllerError):
+                    run_scenario(root, copy.deepcopy(self.scenario), copy.deepcopy(self.assembly))
+            self.assertNotIn(("bmb_edit_module", "bmb025-door-095"), seen)
+            from core.storage.journal import JournalStore
+            self.assertEqual(JournalStore.open(root).revision("house/floor-1/living"), 1)
+
+    def test_red_gate_corrupt_stale_inspection_must_not_queue_repair(self):
+        """An unexpected post-stale revision/hash halts before any recovery mutation."""
+        original = MCPClient.batch
+        seen = []
+        stale_seen = False
+
+        def injected(client, actions):
+            nonlocal stale_seen
+            for method, params in actions:
+                if method == "tools/call":
+                    key = (params["arguments"] or {}).get("idempotencyKey")
+                    seen.append((params["name"], key))
+                    if key == "bmb025-stale":
+                        stale_seen = True
+            responses = original(client, actions)
+            if stale_seen:
+                for idx, (method, params) in enumerate(actions):
+                    if method == "tools/call" and params["name"] == "bmb_inspect_module":
+                        if params["arguments"]["moduleId"] == "house/floor-1/living":
+                            responses[idx] = copy.deepcopy(responses[idx])
+                            responses[idx]["result"]["structuredContent"]["data"]["journalHash"] = "f" * 64
+                            break
+            return responses
+
+        with tempfile.TemporaryDirectory(prefix="bmb025-inspect-gate-") as tmp:
+            root = Path(tmp) / "project"
+            with mock.patch.object(MCPClient, "batch", injected):
+                with self.assertRaises(ControllerError):
+                    run_scenario(root, copy.deepcopy(self.scenario), copy.deepcopy(self.assembly))
+            self.assertNotIn(("bmb_edit_module", "bmb025-door-095"), seen)
+            from core.storage.journal import JournalStore
+            self.assertEqual(JournalStore.open(root).revision("house/floor-1/living"), 1)
+
+    def test_red_revised_assembly_input_must_reflect_accepted_journal_width(self):
+        """Assert the document actually SENT over MCP is the revised synthetic 0.95m graph."""
+        original = MCPClient.batch
+        documents = []
+
+        def observed(client, actions):
+            for method, params in actions:
+                if method == "tools/call" and params["name"] == "bmb_validate_assembly":
+                    document = params["arguments"]["document"]
+                    if document.get("schemaVersion") == "1.0.0":
+                        documents.append(copy.deepcopy(document))
+            return original(client, actions)
+
+        with tempfile.TemporaryDirectory(prefix="bmb025-ir-") as tmp:
+            with mock.patch.object(MCPClient, "batch", observed):
+                result = run_scenario(Path(tmp) / "project",
+                                      copy.deepcopy(self.scenario), copy.deepcopy(self.assembly))
+        self.assertEqual(len(documents), 1)
+        document = documents[0]
+        living = next(m for m in document["modules"] if m["moduleId"] == "house/floor-1/living")
+        hall = next(m for m in document["modules"] if m["moduleId"] == "house/floor-1/hall")
+        door = next(op for op in living["operations"] if op["kind"] == "opening-cut")
+        self.assertEqual(door["width"], 0.95)
+        self.assertEqual(living["ports"][0]["width"], 0.95)
+        self.assertEqual(hall["ports"][0]["width"], 0.95)
+        self.assertEqual(living["revision"], 2)
+        self.assertEqual(hall["dependencies"][0]["minRevision"], 2)
+        self.assertEqual(result["observations"]["validatedDoorWidthM"], 0.95)
+        self.assertEqual(result["gates"]["revised_synthetic_ir_projection"], "PASS")
 
 
 if __name__ == "__main__":
