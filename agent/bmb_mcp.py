@@ -183,17 +183,24 @@ def _guard_root(root: Path):
         raise ToolFailure("LIMIT_EXCEEDED", "Module count limit")
 
 
-def _guard_nonmutating_journal_reads(root: Path):
-    """Refuse implicit JournalStore.open() repair from MCP read tools.
+def _guard_nonmutating_journal_reads(root: Path, module_id=None):
+    """Refuse implicit journal recovery without losing scoped-read isolation.
 
-    The shared CLI core may truncate torn tails or unlink incomplete creates
-    while loading. This adapter must not mutate journals in an inspect or
-    validate request, even when the launcher separately allows write tools.
+    The shared CLI core can truncate torn tails or unlink incomplete creates
+    during load. Inspect only the requested module for scoped read tools;
+    whole-project validation still checks every journal.
     """
     base = root / "modules"
     if not base.exists():
         return
-    for directory in base.iterdir():
+    if module_id is None:
+        directories = base.iterdir()
+    else:
+        selected = base / module_id.replace("/", "__")
+        if not selected.exists():
+            return  # The shared core reports missing-module STORAGE_ERROR.
+        directories = (selected,)
+    for directory in directories:
         journal = directory / JOURNAL
         try:
             with journal.open("rb") as stream:
@@ -297,7 +304,7 @@ def _worker(conn, root, name, args):
             resource.setrlimit(resource.RLIMIT_AS, (min(soft, cap) if soft > 0 else cap, hard))
         _guard_root(Path(root))
         if name in ("bmb_validate_journals", "bmb_inspect_module"):
-            _guard_nonmutating_journal_reads(Path(root))
+            _guard_nonmutating_journal_reads(Path(root), args.get("moduleId"))
         # JournalStore.open() creates modules/ even on reads. Preserve the
         # shared core while keeping empty-project queries strictly non-mutating.
         # Static root/link validation above remains mandatory on every call.
