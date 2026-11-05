@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT))
 from bomc.compiler.graph_to_bomc import CompileError, compile_document  # noqa: E402
 from core.assembly import AssemblyError, DuplicateOwnershipError, assemble  # noqa: E402
 from core.geometry.openings import build_wall_with_openings  # noqa: E402
+from core.storage.journal import JournalStore  # noqa: E402
+from core.identity.store import StaleRevisionError  # noqa: E402
 from examples.bmb026_house import (ROOM_IDS, ROOMS, build_house, canonical_hash, evidence)  # noqa: E402
 from tests.interop.reader import read as independent_read  # noqa: E402
 
@@ -95,6 +97,53 @@ class FourRoomTests(unittest.TestCase):
                           if o["opId"] == "exterior-window"], [1.2])
         self.assertEqual(assemble(self.baseline["modules"]).seams,
                          assemble(self.revised["modules"]).seams)
+
+
+    def test_real_per_module_journal_revision_preserves_other_files(self):
+        """BMB-010 persistence proof, not merely two regenerated JSON snapshots."""
+        target = ROOM_IDS["bedroom-a"]
+        before, after = modules(self.baseline), modules(self.revised)
+        with tempfile.TemporaryDirectory(prefix="bmb026-journal-") as temp:
+            store = JournalStore(temp)
+            journal_paths = {}
+            for mid, module in sorted(before.items()):
+                self.assertEqual(store.create_module(mid), 0)
+                result = store.apply(mid, 0, "bmb026-initial",
+                                     [{"op": "add", "id": "source", "data": module}])
+                self.assertEqual((result.revision, result.replayed), (1, False))
+                journal_paths[mid] = (Path(temp) / "modules" /
+                                      mid.replace("/", "__") / "journal.jsonl")
+            preserved = {mid: (path.read_bytes(), path.stat().st_mtime_ns)
+                         for mid, path in journal_paths.items() if mid != target}
+            original_target = journal_paths[target].read_bytes()
+            with self.assertRaises(StaleRevisionError):
+                store.apply(target, 0, "bmb026-stale",
+                            [{"op": "replace", "id": "source", "data": after[target]}])
+            self.assertEqual(journal_paths[target].read_bytes(), original_target)
+            actual = store.apply(target, 1, "bmb026-exterior-window",
+                                 [{"op": "replace", "id": "source", "data": after[target]}])
+            self.assertEqual((actual.revision, actual.replayed), (2, False))
+            self.assertNotEqual(journal_paths[target].read_bytes(), original_target)
+            reopened = JournalStore.open(temp)
+            for mid, source in sorted(after.items()):
+                revision, blocks = reopened.snapshot(mid)
+                self.assertEqual(revision, 2 if mid == target else 1)
+                self.assertEqual(blocks["source"], source)
+                if mid != target:
+                    file_path = journal_paths[mid]
+                    self.assertEqual((file_path.read_bytes(), file_path.stat().st_mtime_ns),
+                                     preserved[mid], "unrelated module file was rewritten")
+            self.assertEqual(
+                compile_document({"schemaVersion": "1.0.0",
+                                  "modules": [reopened.snapshot(mid)[1]["source"]
+                                              for mid in sorted(after)]}).sha256,
+                compile_document(self.revised).sha256)
+            replay = reopened.apply(target, 1, "bmb026-exterior-window",
+                                    [{"op": "replace", "id": "source", "data": after[target]}])
+            self.assertTrue(replay.replayed)
+            self.assertEqual(replay.revision, 2)
+            self.assertEqual({mid: journal_paths[mid].read_bytes() for mid in preserved},
+                             {mid: data[0] for mid, data in preserved.items()})
 
     def test_both_states_compile_and_independent_builder_binary_read(self):
         for doc in (self.baseline, self.revised):
