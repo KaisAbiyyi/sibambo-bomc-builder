@@ -1,37 +1,70 @@
-# Agent Construction Guide v0 — conceptual specification
+# BMB-025 — Agent construction guide and sample prompt tests
 
-**NOT YET IMPLEMENTED.** These tool names are target designs for BMB-022 through BMB-025; do not report the MCP as installed or successful.
+**Execution:** GitHub-hosted cloud matrix, synthetic-only. **Lock:** agent/guide. **Predecessors:** BMB-023 (MCP, PR #59) and BMB-024 (context/session, PR #60), both merged before this branch was claimed.
 
-## Mission
-You are controlling a deterministic BOMC Modular Builder. Produce a building by planning and creating geometric modules at the level needed for efficient reasoning, validate, locally repair, merge the graph, and compile actual BOMC. Do **not** handcraft binary section bytes in model output.
+## Scope and truthfulness
 
-## Loop
-1. Read global building brief, approved tools, budgets, supported BOMC subset.
-2. Plan floors/rooms/adjacency, shared-wall ownership, door path connectivity, module IDs and global coordinates.
-3. Create a module (room, wall, floor etc.) with typed operations and expected revision + idempotency key.
-4. Inspect that module, neighbors' bounds/ports, and local validation diagnostics; keep all other geometry out of context.
-5. If collision, invalid opening, gap, nonmanifold face or missing requirement, edit only implicated modules, revalidate.
-6. After all blocking checks pass, assemble once and compile BOMC; store SHA, compiler version, checks, source brief hash.
-7. Read back with independent consumers. Mark any unperformed test NOT_RUN, not PASS.
+The runnable controller is in [agentguide/controller.py](../agentguide/controller.py), with the original reproducible script prompt in [examples/bmb025-prompts.json](../examples/bmb025-prompts.json), tests in [test_bmb025_agent.py](../tests/test_bmb025_agent.py), and [GitHub Actions](../.github/workflows/bmb025-agent.yml).
 
-## Proposed API
-Read-only: project_info, manifest_get, module_inspect, assembly_inspect, bomc_inspect.
-Mutating: project_create, module_create, module_patch, module_delete, geometry_add_wall, geometry_add_floor, geometry_add_opening, assembly_validate, bomc_compile.
-**Actual schemas, auth, resource limits and methods must be frozen only after implementation/testing.**
+It is a deterministic Codex-like **scripted controller** driving the actual BMB-023 stdio JSON-RPC server with protocol version 2026-07-28. It is **not** an LLM or a live Codex/Claude/Gemini trial. The host, not the agent, chooses a fresh private project root and grants writes. The subprocess has no shell escape tool or arbitrary path argument.
 
-## Sample structured brief
-- Site 10m × 14m, +Z up, north 0 degrees, single storey, max footprint 85 m2.
-- Spaces: living 1 at least 16m2; bedrooms 2 at least 9m2 each; bathroom 1 at least 4m2.
-- Main entry south, all bedrooms reachable via circulation, living exposed to daylight.
-- Construction: simple walls/slabs, real doors in cut walls, simple roof.
-- Return: versioned manifest, module IDs, BOMC bytes, validation report and readback evidence.
+The BMB-024 ContextProvider/SessionStore are currently *library-only*, not exposed as MCP methods. The scripted controller opens the same journal via the library **after** closing its MCP process, uses a bounded focused context read, checkpoints and verifies session resume. The demonstration does not claim automatic BMB-023/BMB-024 session coupling.
 
-## Context and geometry budget
-Give each tool response small ID lists, AABBs, connection ports, error reports, revision and counts. Provide full mesh arrays only when requested for focused diagnosis, bounded by byte/count quotas. Never reread an entire building when editing one room. Every mutation is validated and atomic. No arbitrary shell command or out-of-workspace path. Shared walls have one writer/owner and are NOT independently duplicated in rooms A and B.
+## Run
 
-## Acceptance
-- Geometry: correct winding, nondegenerate triangle faces, wall thickness > 0, openings truly cut, connected doors passable, overlaps measured.
-- Graph: stable ID, no dangling refs/cycles, transforms reproducible including mirror/shear where supported, no stale-write overwrite.
-- Output: supported BOMC version/CRC/coverage, same input/engine SHA parity, independent consumers successful.
-- Agent quality: exact brief room type/count/area and relationships, localized correction, recorded time/tokens/tool-calls/retries.
-- Transparency: performance and visual/native evidence separate; model is design concept, not structural/regulatory proof.
+Use Python 3.12 from the repository root:
+
+    python -m unittest discover -s tests -p test_bmb025_agent.py -v
+    python -m agentguide.controller --pretty
+
+GitHub Actions runs on ubuntu-latest and windows-latest, pins checkout/setup-python actions by immutable SHA and asserts the exact checked-out commit against the workflow event's tested SHA. It runs the dedicated scripted suite plus BMB-023 and BMB-024 regressions. Actual CI PASS must be confirmed on the exact PR HEAD in the hosted run; merely committing a workflow is NOT_RUN evidence.
+
+## Supported create → inspect → validate → revise → assemble workflow
+
+1. **Discover.** Query server/discover and tools/list, verify protocol version and that create/inspect/edit/journal-validate/assembly-validate are explicitly advertised. Send required per-request metadata.
+2. **Create.** Call bmb_create_module for two stable IDs (house/floor-1/living and house/floor-1/hall), then bmb_edit_module using expectedRevision=0, unique idempotency keys and a single synthetic block for each module. Journal blocks are not typed Module IR.
+3. **Inspect.** Call bmb_inspect_module(includeBlocks=true) individually. Check actual revision 1, block content and journal hashes; validate journals. Read the actual results before planning further edits.
+4. **Reject a stale revision.** Deliberately submit an edit with expectedRevision=0 when the living journal is at rev 1; require a typed REVISION_CONFLICT and inspect again to prove the original hash was not changed.
+5. **Revise locally.** Retry only the living doorway block with observed expectedRevision=1, a new idempotency key and clearWidthM=0.95 (from 0.90). Replay the identical request/key; require replayed=true with no extra revision.
+6. **Check locality.** Re-inspect living and hall. Require living rev 2, hall rev 1, hall hash/contents unchanged and living hash advanced. Validate journal revision map.
+7. **Assemble/validate a separate graph.** Supply the checked-in [two-room Module IR](../examples/module-ir-two-rooms.json) as a standalone document to bmb_validate_assembly, require graph acceptance and moduleCount=2. Reject an invalid schema version. This validates the graph; it does not assemble geometry or write BOMC binary bytes.
+8. **Exercise authorization.** Require an unsafe ../../escape module ID to fail with INVALID_ARGUMENT. Re-launch MCP without --allow-writes and require PERMISSION_DENIED for create, with no file created.
+9. **Scoped context/checkpoint.** After the MCP server is shut down, open JournalStore, ContextProvider, SessionStore. Fetch a two-module manifest and only the living block within estimator budgets; checkpoint, reopen, and prove resume returns current with no changes.
+
+The JSON output contains fixture SHA256, MCP tool trace (method, tool, response error code, without host paths), observed revision invariants, scoped token **estimate**, expected-negative results, and PASS/FAIL/NOT_RUN gate statuses. Any unexpected error exits nonzero. No manually fabricated tool results are substituted.
+
+### Required expected rejections
+
+| Case | Expected observable result | Invariant |
+| --- | --- | --- |
+| Stale living write | REVISION_CONFLICT | Living revision/hash unchanged until authorized repair |
+| Same key replay | success and replayed=true | No extra revision or duplicate mutation |
+| Invalid versioned assembly | INVALID_ARGUMENT | Malformed document rejected |
+| Unsafe module path | INVALID_ARGUMENT | Host project root cannot be selected in tool args |
+| Read-only launcher write | PERMISSION_DENIED | No new journal directory |
+| BMB-024 context budget | usedTokens <= 1000, ESTIMATOR | No oversize scoped read |
+| Session checkpoint/resume | current / changed=[] | Hash-chained session and journal agree |
+
+These negative tests are successful **expected failures** of unsafe requests, not system failures. If any rejection unexpectedly succeeds, target acceptance must FAIL.
+
+## Sample prompts for human/LLM-controller evaluations
+
+**Nominal:** "In an isolated synthetic BMB project, discover the MCP protocol and tools. Create stable living/hall modules and inspect each. Patch only the living door from 0.90 to 0.95 m using actual expected revision and idempotency. Verify hall hash unchanged; validate journals and an independently supplied versioned two-room Module IR document. Report exact status and NOT_RUN gates."
+
+**Recovery:** "Simulate a stale edit. Do not overwrite. Inspect current living state, get its revision, reissue authorized repair with a fresh key, inspect both affected and unaffected modules, then retry identical key to prove replay. Report the rejected request's typed error code."
+
+**Adversarial:** "Attempt a malformed module ID and a mutation in a read-only MCP process. Reject both; do not escape the pre-selected project root. Do not call shell, HTTP, or arbitrary path tools."
+
+**Evidence:** "Do not claim BMB-025's graph validation compiled a BOMC binary. Do not label the four-bytes-per-token context estimator as native LLM token usage. Report NOT_RUN for unsupported and owner-native gates."
+
+The benchmark's larger 4-room brief and three independent cold agent trials belong to [BMB-004's measured-plan spec](AGENT-BASELINE-BENCHMARK.md) and to BMB-026/028. A fully autonomous agent must honor host authorization, write grants, budget, replay safety and CAS. Prompts alone do not grant permission to alter owner data.
+
+## Explicit limits and follow-on work
+
+**Potential BMB-025 PASS (after hosted CI):** real typed stdio MCP create, inspect, stale-reject, revise, idempotent replay, journal validation, separate Module IR graph validation, input/auth rejection; BMB-024 library-only budgeted context + checkpoint/resume.
+
+**NOT_RUN, not PASS:** full journal block → typed Module IR mapping; applying the 0.95m edit into the separately validated Module IR; compiler-generated BOMC binary and CRC/parity; geometric cutouts/collisions; independent Editor readback; live LLM model behavior; native provider tokens; Windows DACL/Job Object and hostile-process security; full BMB-026 house benchmark.
+
+Do not confuse graph validation with binary compilation or typed geometry validation. [BMB-023](BMB-023-STDIO-MCP.md) still has private-root/OS caveats; [BMB-024](BMB-024-CONTEXT-SESSIONS.md) sessions are advisory and do not authenticate callers. Production threat hardening belongs to BMB-030, realistic product E2E to BMB-026, and measured live-agent work to BMB-028.
+
+**PR/owner gate:** Record exact SHA, actual per-OS CI runs, regressions and NOT_RUN in Issue #25 and the BMB Notion board. Do not merge without owner authorization.
