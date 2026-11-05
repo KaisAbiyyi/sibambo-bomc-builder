@@ -620,6 +620,65 @@ class WriteAheadTests(Base):
         self.assertEqual([e["type"] for e in self.lines()][-2:], ["intent", "uncertain"])
         self.assertEqual(again.pending()[0]["intent"], self.s.pending()[0]["intent"])
 
+    def uncertain_create(self, module="house/f1/b"):
+        """A new module's genesis line is visible after fsync fails, but may not be durable."""
+        calls = {"n": 0}
+        real = os.fsync
+
+        def fail_genesis_fsync(fd):
+            calls["n"] += 1
+            if calls["n"] == 2:  # 1 = session intent; 2 = journal create entry
+                raise OSError("create journal fsync failed")
+            return real(fd)
+
+        with mock.patch.object(journal_mod.os, "fsync", side_effect=fail_genesis_fsync):
+            with self.assertRaises(DurabilityUncertainError):
+                self.s.create_module(self.store, module)
+        self.assertEqual(self.store.uncertain_modules(), [module])
+        self.assertTrue(self.s.pending()[0]["durabilityUncertain"])
+        return module
+
+    def test_uncertain_create_reopened_requires_adopt_and_unconfirmed_acceptance(self):
+        module = self.uncertain_create()
+        reopened_store = JournalStore.open(self.root)
+        self.assertEqual(reopened_store.uncertain_modules(), [])  # in-memory quarantine did not survive restart
+        session = self.sessions.open("agent-1")
+        self.assertTrue(session.pending()[0]["durabilityUncertain"])
+
+        only_adopt = session.reconcile(reopened_store, adopt=[module])
+        self.assertEqual(only_adopt["resolved"], [])
+        self.assertTrue(only_adopt["open"][0]["reason"].startswith("DURABILITY_UNCONFIRMED"))
+        with self.assertRaises(SessionError):
+            session.apply(reopened_store, self.m, 0, "blocked", [block(1)])
+
+        only_accept = session.reconcile(reopened_store, accept_unconfirmed=[module])
+        self.assertEqual(only_accept["resolved"], [])
+        self.assertTrue(only_accept["open"][0]["reason"].startswith("UNVERIFIED_CREATE"))
+
+        accepted = session.reconcile(reopened_store, adopt=[module], accept_unconfirmed=[module])
+        self.assertEqual((accepted["resolved"][0]["status"], accepted["pending"]), ("applied", 0))
+        step = next(s for s in session.steps() if s["tool"] == "create_module" and s["request"]["module"] == module)
+        self.assertTrue(step["result"]["adopted"])
+        self.assertFalse(step["result"]["durable"])
+        report = session.replay_into(JournalStore.open(Path(self._tmp.name) / "uncertain-create-replay"))
+        self.assertEqual((report["replayedWrites"], report["nonDurableSteps"]), (2, 1))
+
+    def test_uncertain_create_same_store_recovery_precedes_durable_adoption(self):
+        module = self.uncertain_create()
+        with mock.patch.object(journal_mod.os, "fsync", side_effect=OSError("recovery still failing")):
+            failed = self.s.reconcile(self.store, adopt=[module])
+        self.assertEqual(failed["resolved"], [])
+        self.assertTrue(failed["open"][0]["reason"].startswith("DURABILITY_UNCERTAIN"))
+        self.assertEqual(self.store.uncertain_modules(), [module])
+        self.assertEqual(len(self.s.steps()), 1)
+
+        succeeded = self.s.reconcile(self.store, adopt=[module])
+        self.assertEqual((succeeded["resolved"][0]["status"], succeeded["pending"]), ("applied", 0))
+        self.assertEqual(self.store.uncertain_modules(), [])
+        step = next(s for s in self.s.steps() if s["tool"] == "create_module" and s["request"]["module"] == module)
+        self.assertEqual((step["result"]["adopted"], step["result"]["durable"]), (True, True))
+        self.assertEqual(self.s.replay_into(JournalStore.open(Path(self._tmp.name) / "recovered-create-replay"))["nonDurableSteps"], 0)
+
     def test_a_create_cannot_be_attributed_to_a_pre_existing_module(self):
         other = JournalStore.open(self.root, modules=[])
         other.create_module("house/f1/older")                                  # exists before the intent
