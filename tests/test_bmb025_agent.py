@@ -32,14 +32,17 @@ class ScriptedAgentTests(unittest.TestCase):
             self.assertTrue(result["observations"]["hallHashUnchanged"])
             self.assertTrue(result["observations"]["livingHashAdvanced"])
             self.assertEqual(result["observations"]["graphModules"], 2)
+            self.assertEqual(result["observations"]["validatedDoorWidthM"], 0.95)
+            self.assertEqual(len(result["observations"]["validatedGraphSha256"]), 64)
             self.assertEqual(result["observations"]["resume"], "current")
-            self.assertEqual(result["observations"]["mcpToolCalls"], 18)
+            self.assertEqual(result["observations"]["mcpToolCalls"], 19)
             self.assertEqual(result["fixtureSha256"], hashlib.sha256(FIXTURE.read_bytes()).hexdigest())
             self.assertEqual(result["unexpectedFailures"], [])
             self.assertTrue(all(x in {"PASS", "NOT_RUN"} for x in result["gates"].values()))
             for gate in ("mcp_discovery", "create_inspect", "stale_edit_rejected", "local_repair",
                          "idempotent_replay", "unrelated_module_unchanged", "journal_integrity",
-                         "synthetic_ir_graph_validation", "unsafe_input_rejected",
+                         "synthetic_ir_graph_validation", "revised_synthetic_ir_projection",
+                         "recovery_stage_gates", "unsafe_input_rejected",
                          "readonly_write_denied", "scoped_context", "checkpoint_resume"):
                 self.assertEqual(result["gates"][gate], "PASS", gate)
             for gate in ("journal_ir_mapping", "typed_geometry_or_bomc_compile",
