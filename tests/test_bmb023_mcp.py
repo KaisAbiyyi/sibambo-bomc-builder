@@ -199,6 +199,22 @@ class MCPTests(unittest.TestCase):
         self.assertLessEqual(len(compact(out[0])), 256 * 1024)
         self.assertFalse((self.root / "modules").exists())
 
+    def test_large_request_id_does_not_execute_mutating_tool(self):
+        msg = tool("bmb_create_module", {"moduleId": MID})
+        msg["id"] = "x" * 2048
+        rc, out, err = self.talk(msg, writes=True)
+        self.assertEqual((rc, len(out)), (0, 1), err)
+        self.assertEqual(out[0]["error"]["code"], -32600)
+        self.assertFalse((self.root / "modules").exists())
+
+    def test_escaped_surrogate_request_id_does_not_crash_server(self):
+        msg = request("server/discover")
+        msg["id"] = json.loads(r'"\ud800"')
+        out = self.valid(msg, request("tools/list", ident=2), writes=False)
+        self.assertEqual(out[0]["id"], msg["id"])
+        self.assertEqual(out[1]["id"], 2)
+        self.assertFalse((self.root / "modules").exists())
+
     def test_malformed_frame_and_duplicates(self):
         for raw in (b'{"jsonrpc":"2.0","id":1,"id":2,"method":"tools/list"}\n',
                     b'{"not":"json"\n', b'\xff\n', b'{"x":NaN}\n'):
