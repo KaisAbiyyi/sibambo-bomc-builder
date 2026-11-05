@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "scenarioId": "bmb025-two-room-local-revision",
+  "prompt": "Create a fictitious living room connected to a hall. Use durable module IDs, inspect both modules, reject a stale edit, revise only the living doorway clear width from 0.90 m to 0.95 m, verify unchanged hall state and idempotent replay, then validate the bundled two-room Module IR assembly. Report any unsupported BOMC compiler or independent readback as NOT_RUN.",
+  "modules": [
+    {"id": "house/floor-1/living", "block": "entry-door", "value": {"role": "doorway", "clearWidthM": 0.9}},
+    {"id": "house/floor-1/hall", "block": "circulation", "value": {"role": "hallway", "reachable": true}}
+  ],
+  "revision": {"module": "house/floor-1/living", "block": "entry-door", "fromWidthM": 0.9, "toWidthM": 0.95},
+  "assemblySource": "examples/module-ir-two-rooms.json"
+}
