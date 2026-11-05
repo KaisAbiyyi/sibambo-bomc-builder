@@ -354,8 +354,15 @@ class Session:
             if module in discard or module not in store.modules():
                 return "abandoned", {}
             if module in adopt:
+                durable = True
+                if seq in self._uncertain_intents and not recovered:
+                    if module not in accept:
+                        return ("open", "DURABILITY_UNCONFIRMED: the create was logged as durability-uncertain, "
+                                        "but the journal was reopened; pass accept_unconfirmed=[...] to adopt "
+                                        "without claiming durability")
+                    durable = False
                 return "applied", {"revision": 0, "replayed": False, "tail": provider.revision_hashes(module)[0],
-                                   "durable": True, "adopted": True}
+                                   "durable": durable, "adopted": True}
             return ("open", "UNVERIFIED_CREATE: the module exists but the journal cannot show that this intent created it; "
                             "pass adopt=[...] or discard=[...]")
         if module not in store.modules():
