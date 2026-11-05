@@ -21,6 +21,7 @@ from types import SimpleNamespace
 
 from cli.bmb import _error as cli_error, _run as cli_run
 from core.identity.store import BLOCK_ID_PATTERN, KEY_PATTERN, MODULE_ID_PATTERN
+from core.storage.journal import JOURNAL
 
 VERSION = "2026-07-28"
 META_VERSION = "io.modelcontextprotocol/protocolVersion"
@@ -182,6 +183,30 @@ def _guard_root(root: Path):
         raise ToolFailure("LIMIT_EXCEEDED", "Module count limit")
 
 
+def _guard_nonmutating_journal_reads(root: Path):
+    """Refuse implicit JournalStore.open() repair from MCP read tools.
+
+    The shared CLI core may truncate torn tails or unlink incomplete creates
+    while loading. This adapter must not mutate journals in an inspect or
+    validate request, even when the launcher separately allows write tools.
+    """
+    base = root / "modules"
+    if not base.exists():
+        return
+    for directory in base.iterdir():
+        journal = directory / JOURNAL
+        try:
+            with journal.open("rb") as stream:
+                size = stream.seek(0, os.SEEK_END)
+                if size == 0:
+                    raise ToolFailure("CORRUPT_INPUT", "Journal requires recovery outside read tools")
+                stream.seek(-1, os.SEEK_END)
+                if stream.read(1) != b"\n":
+                    raise ToolFailure("CORRUPT_INPUT", "Journal requires recovery outside read tools")
+        except OSError as exc:
+            raise ToolFailure("CORRUPT_INPUT", "Journal unavailable for read-only inspection") from exc
+
+
 def _validate_args(name, args):
     if name not in SCHEMAS:
         raise ToolFailure("UNKNOWN_TOOL", "Tool not found")
@@ -271,6 +296,8 @@ def _worker(conn, root, name, args):
             cap = 512 * 1024 * 1024
             resource.setrlimit(resource.RLIMIT_AS, (min(soft, cap) if soft > 0 else cap, hard))
         _guard_root(Path(root))
+        if name in ("bmb_validate_journals", "bmb_inspect_module"):
+            _guard_nonmutating_journal_reads(Path(root))
         # JournalStore.open() creates modules/ even on reads. Preserve the
         # shared core while keeping empty-project queries strictly non-mutating.
         # Static root/link validation above remains mandatory on every call.
