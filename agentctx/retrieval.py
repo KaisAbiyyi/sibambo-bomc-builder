@@ -70,12 +70,16 @@ class ContextProvider:
     def project_digest(self) -> str:
         return digest([[m, r, h] for m, (r, h) in sorted(self.state().items())])
 
-    def revision_hashes(self, module_id: str) -> list[str]:
-        """Entry hash for revision 0..n of one module, read from its (already verified) journal file."""
+    def revision_entries(self, module_id: str) -> list[dict]:
+        """Journal entry (parsed) for revision 0..n of one module, read from its already verified journal file."""
         _module_id(module_id)
         _need(module_id in self.store.modules(), "UNKNOWN_MODULE", f"unknown module {module_id!r}")
         path = Path(self.store._root) / "modules" / _dirname(module_id) / JOURNAL
-        return [json.loads(line)["hash"] for line in path.read_bytes().split(b"\n")[:-1]]
+        return [json.loads(line) for line in path.read_bytes().split(b"\n")[:-1]]
+
+    def revision_hashes(self, module_id: str) -> list[str]:
+        """Entry hash for revision 0..n of one module."""
+        return [e["hash"] for e in self.revision_entries(module_id)]
 
     def _block_count(self, module_id: str) -> int:
         return len(self.store._blocks[module_id])  # no deep copy: a manifest must stay cheap for big projects

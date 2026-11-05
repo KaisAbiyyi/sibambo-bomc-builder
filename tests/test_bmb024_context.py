@@ -1,6 +1,7 @@
 """BMB-024 scoped context retrieval, token budgets, checkpoints, resume and replay: synthetic data only."""
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,9 @@ from agentctx import (  # noqa: E402
     estimate_tokens)
 from agentctx import evidence, retrieval, session as session_mod  # noqa: E402
 from agentctx.evidence import BATH, HALL, LIV  # noqa: E402
+from core.identity import StaleRevisionError  # noqa: E402
+from core.storage import DurabilityUncertainError, StorageError  # noqa: E402
+from core.storage import journal as journal_mod  # noqa: E402
 from core.storage.journal import JournalStore  # noqa: E402
 
 
@@ -395,7 +399,7 @@ class CheckpointResumeTests(SessionBase):
         self.assertEqual(json.loads(out.stdout), json.loads(json.dumps(sessions.open("agent-1").resume(ContextProvider(store)), sort_keys=True)))
 
 
-class RecordedWriteAndReplayTests(Base):
+class RecordBase(Base):
     def record(self, root):
         store = JournalStore.open(root)
         sessions = SessionStore(root)
@@ -408,6 +412,8 @@ class RecordedWriteAndReplayTests(Base):
         s.rollback(store, "house/f1/a", 1, "a-undo", 0)
         return store, sessions, s
 
+
+class RecordedWriteAndReplayTests(RecordBase):
     def test_only_effective_writes_are_logged(self):
         store, sessions, s = self.record(self.root)
         count = len(s.steps())
@@ -462,6 +468,207 @@ class RecordedWriteAndReplayTests(Base):
         with self.assertRaises(SessionError):
             s.apply(store, "house/f1/a", 2, "too-big", ops)
         self.assertEqual(store.tail_hash("house/f1/a"), before)
+
+
+class WriteAheadTests(Base):
+    """The journal must never change without the session knowing (or being able to find out)."""
+
+    def setUp(self):
+        super().setUp()
+        self.store = JournalStore.open(self.root)
+        self.sessions = SessionStore(self.root)
+        self.s = self.sessions.create("agent-1")
+        self.s.create_module(self.store, "house/f1/a")
+        self.m = "house/f1/a"
+
+    def journal_state(self):
+        return self.store.revision(self.m), self.store.tail_hash(self.m)
+
+    def lines(self):
+        return [json.loads(x) for x in self.sessions.path("agent-1").read_bytes().split(b"\n")[:-1]]
+
+    def test_a_full_session_refuses_the_write_before_the_journal_changes(self):
+        before = self.journal_state()
+        with mock.patch.object(session_mod, "MAX_ENTRIES", self.s._seq + 1):         # room for the intent but not its outcome
+            with self.assertRaises(SessionError):
+                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.journal_state(), before)
+        self.assertEqual(self.s.pending(), [])
+        with mock.patch.object(session_mod, "MAX_FILE_BYTES", self.s._size + 700):  # the outcome reserve does not fit
+            with self.assertRaises(SessionError):
+                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.journal_state(), before)
+        with mock.patch.object(session_mod, "MAX_ENTRIES", self.s._seq + 2):         # exactly enough: intent and outcome
+            self.assertEqual(self.s.apply(self.store, self.m, 0, "k1", [block(1)]).revision, 1)
+        self.assertEqual((len(self.s.steps()), self.s.pending()), (2, []))
+
+    def test_a_broken_session_refuses_before_mutating(self):
+        with mock.patch.object(session_mod.os, "fsync", side_effect=OSError("disk")):
+            with self.assertRaises(SessionError):
+                self.s.manifest(ContextProvider(self.store))
+        before = self.journal_state()
+        with self.assertRaises(SessionError):
+            self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.journal_state(), before)
+
+    def test_an_outcome_that_cannot_be_recorded_is_recovered_by_reconcile(self):
+        original = session_mod.Session._append
+
+        def fail_outcome(session, fields, *args, **kwargs):
+            if fields["type"] == "outcome":
+                session._broken = True
+                raise SessionError("session write failed (disk full); reopen it")
+            return original(session, fields, *args, **kwargs)
+
+        with mock.patch.object(session_mod.Session, "_append", fail_outcome):
+            with self.assertRaises(SessionError) as ctx:
+                self.s.apply(self.store, self.m, 0, "k1", [block(1), block(2)])
+        self.assertIn("reconcile", str(ctx.exception))
+        self.assertEqual(self.store.revision(self.m), 1)                      # the journal did change
+        reopened = self.sessions.open("agent-1")
+        self.assertEqual([p["tool"] for p in reopened.pending()], ["apply"])
+        self.assertEqual(len(reopened.steps()), 1)                            # only the create is a step so far
+        with self.assertRaises(SessionError):                                 # writes are refused until reconciled
+            reopened.apply(self.store, self.m, 1, "k2", [block(3)])
+        reopened.manifest(ContextProvider(self.store))                        # reads still work
+        report = reopened.reconcile(self.store)
+        self.assertEqual(report, {"resolved": [{"intent": report["resolved"][0]["intent"], "status": "applied"}], "pending": 0})
+        self.assertEqual(reopened.reconcile(self.store)["resolved"], [])      # idempotent
+        write = [s for s in reopened.steps() if s["tool"] == "apply"][0]
+        self.assertEqual((write["result"]["revision"], write["result"]["tail"]), self.journal_state())
+        self.assertEqual(reopened.apply(self.store, self.m, 1, "k2", [block(3)]).revision, 2)
+        target = JournalStore.open(Path(self._tmp.name) / "copy")                 # and the recovered history replays exactly
+        self.assertEqual(self.sessions.open("agent-1").replay_into(target)["replayedWrites"], 3)
+        self.assertEqual(target.tail_hash(self.m), self.store.tail_hash(self.m))
+
+    def test_an_intent_whose_write_never_happened_is_abandoned(self):
+        before = self.journal_state()
+        with mock.patch.object(self.store, "apply", side_effect=StorageError("storage unavailable")):
+            with self.assertRaises(StorageError):
+                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.journal_state(), before)
+        self.assertEqual(len(self.s.pending()), 1)
+        with self.assertRaises(SessionError):
+            self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.s.reconcile(self.store)["resolved"][0]["status"], "abandoned")
+        self.assertEqual(self.s.apply(self.store, self.m, 0, "k1", [block(1)]).revision, 1)   # retry now works
+        self.assertEqual([s["tool"] for s in self.s.steps()], ["create_module", "apply"])
+
+    def test_a_durability_uncertain_write_is_found_and_recorded(self):
+        calls = {"n": 0}
+        real = os.fsync
+
+        def second_fsync_fails(fd):
+            calls["n"] += 1
+            if calls["n"] == 2:                  # 1 = the session intent, 2 = the journal's commit
+                raise OSError("fsync failed")
+            return real(fd)
+
+        with mock.patch.object(journal_mod.os, "fsync", side_effect=second_fsync_fails):
+            with self.assertRaises(DurabilityUncertainError):
+                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(len(self.s.pending()), 1)
+        self.assertEqual(self.s.reconcile(self.store)["resolved"][0]["status"], "applied")
+        step = [x for x in self.s.steps() if x["tool"] == "apply"][0]
+        self.assertEqual((step["result"]["revision"], step["result"]["tail"]), self.journal_state())
+
+    def test_a_different_request_under_the_same_key_is_a_conflict_and_is_never_replayed(self):
+        real_apply = self.store.apply
+
+        def other_ops_then_fail(module, expected, key, ops, mins=None):
+            real_apply(module, expected, key, [block(99)], mins)       # the journal gets different operations ...
+            raise StorageError("lost the answer")                      # ... and the caller never hears back
+
+        with mock.patch.object(self.store, "apply", side_effect=other_ops_then_fail):
+            with self.assertRaises(StorageError):
+                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        self.assertEqual(self.s.reconcile(self.store)["resolved"][0]["status"], "conflict")
+        self.assertEqual([x["tool"] for x in self.s.steps()], ["create_module"])
+        self.assertEqual(self.s.replay_into(JournalStore.open(Path(self._tmp.name) / "copy"))["replayedWrites"], 1)
+
+    def test_rejected_and_idempotent_calls_resolve_immediately(self):
+        self.s.apply(self.store, self.m, 0, "k1", [block(1)])
+        with self.assertRaises(StaleRevisionError):
+            self.s.apply(self.store, self.m, 0, "k2", [block(2)])
+        self.assertTrue(self.s.apply(self.store, self.m, 0, "k1", [block(1)]).replayed)
+        self.assertEqual(self.s.pending(), [])
+        statuses = [e["status"] for e in self.lines() if e["type"] == "outcome"]
+        self.assertEqual(statuses, ["applied", "applied", "rejected", "noop"])
+        self.assertEqual(len(self.s.steps()), 2)
+
+
+class ReplayContractTests(RecordBase):
+    def test_replay_into_the_original_verifies_history_and_reports_extra_revisions(self):
+        store, sessions, s = self.record(self.root)
+        clean = sessions.open("agent-1").replay_into(store)
+        self.assertEqual((clean["historyVerified"], clean["finalStateMatches"], clean["extraRevisions"]), (True, True, {}))
+        store.apply("house/f1/b", 2, "later", [block(7)])             # a legitimate change after the session
+        report = sessions.open("agent-1").replay_into(store)
+        self.assertEqual((report["historyVerified"], report["finalStateMatches"], report["extraRevisions"]),
+                         (True, False, {"house/f1/b": 1}))
+        with self.assertRaises(ReplayDivergence):
+            sessions.open("agent-1").replay_into(store, require_final_state=True)
+
+    def test_an_already_applied_write_is_checked_against_its_journal_hash(self):
+        store, sessions, s = self.record(self.root)
+        wrong = ["0" * 64] * 10
+        with mock.patch.object(ContextProvider, "revision_hashes", return_value=wrong):
+            with self.assertRaises(ReplayDivergence):
+                sessions.open("agent-1").replay_into(store)
+        self.assertEqual(sessions.open("agent-1").replay_into(store)["replayedWrites"], 6)
+
+    def test_replay_into_an_empty_store_matches_the_final_state(self):
+        store, sessions, s = self.record(self.root)
+        report = sessions.open("agent-1").replay_into(JournalStore.open(Path(self._tmp.name) / "fresh"), require_final_state=True)
+        self.assertEqual((report["finalStateMatches"], report["extraRevisions"], report["modules"]), (True, {}, 2))
+
+
+@unittest.skipUnless(os.name == "posix", "POSIX permission bits; Windows ACLs are not validated")
+class PermissionTests(Base):
+    def mode(self, path):
+        return stat.S_IMODE(os.lstat(path).st_mode)
+
+    def test_files_and_directory_are_owner_only_even_with_a_permissive_umask(self):
+        old = os.umask(0)
+        try:
+            sessions = SessionStore(self.root)
+            s = sessions.create("agent-1")
+            s.checkpoint(ContextProvider(JournalStore.open(self.root)))
+        finally:
+            os.umask(old)
+        self.assertEqual(self.mode(sessions.root), 0o700)
+        self.assertEqual(self.mode(sessions.path("agent-1")), 0o600)
+
+    def test_loose_existing_permissions_are_tightened(self):
+        sessions = SessionStore(self.root)
+        sessions.root.mkdir(parents=True)
+        os.chmod(sessions.root, 0o755)
+        s = sessions.create("agent-1")
+        self.assertEqual(self.mode(sessions.root), 0o700)
+        os.chmod(sessions.path("agent-1"), 0o644)               # e.g. left by an older version
+        os.chmod(sessions.root, 0o777)
+        sessions.open("agent-1")
+        self.assertEqual((self.mode(sessions.root), self.mode(sessions.path("agent-1"))), (0o700, 0o600))
+
+    def test_symlinked_session_file_or_directory_is_refused(self):
+        sessions = SessionStore(self.root)
+        s = sessions.create("agent-1")
+        elsewhere = Path(self._tmp.name) / "elsewhere.jsonl"
+        elsewhere.write_bytes(sessions.path("agent-1").read_bytes())
+        sessions.path("agent-1").unlink()
+        sessions.path("agent-1").symlink_to(elsewhere)
+        with self.assertRaises(SessionError):
+            sessions.open("agent-1")
+        with self.assertRaises(SessionError):                   # an open handle must not follow a swapped-in link either
+            s.checkpoint(ContextProvider(JournalStore.open(self.root)))
+        self.assertEqual(elsewhere.read_bytes().count(b"\n"), 1)
+        real = Path(self._tmp.name) / "other-root"
+        (real / "sessions").mkdir(parents=True)
+        link_root = Path(self._tmp.name) / "link-root"
+        link_root.mkdir()
+        (link_root / "sessions").symlink_to(real / "sessions")
+        with self.assertRaises(SessionError):
+            SessionStore(link_root).create("agent-1")
 
 
 if __name__ == "__main__":

@@ -13,10 +13,12 @@ import hashlib
 import json
 import os
 import re
+import stat
 from pathlib import Path
 
 from agentctx.budget import canonical, digest
 from agentctx.retrieval import MAX_TOKENS, MIN_TOKENS, ContextProvider
+from core.identity.store import IdentityError
 from core.storage.journal import JournalStore
 
 SESSION_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
@@ -28,6 +30,7 @@ MAX_FILE_BYTES = 4 * 1024 * 1024
 DEFAULT_TOKEN_CAP = 50_000
 MAX_TOKEN_CAP = 1_000_000
 MAX_REPORTED = 50
+OUTCOME_RESERVE_BYTES = 2048   # room kept free for the entry that resolves an open intent
 
 
 class SessionError(ValueError):
@@ -64,6 +67,34 @@ def _entry_hash(entry: dict) -> str:
     return hashlib.sha256(canonical({k: v for k, v in entry.items() if k != "hash"}).encode()).hexdigest()
 
 
+def _check_private(path: Path, *, directory: bool) -> None:
+    """POSIX: refuse symlinks and foreign owners, tighten group/other access to 0o700 / 0o600. Windows ACLs are not validated."""
+    if os.name != "posix":
+        return
+    try:
+        info = os.lstat(path)
+    except OSError as exc:
+        raise SessionError(f"cannot inspect {path.name}: {exc}") from exc
+    kind = stat.S_ISDIR if directory else stat.S_ISREG
+    _need(kind(info.st_mode), f"{path.name} must be a plain {'directory' if directory else 'file'} (no symlinks)")
+    _need(info.st_uid == os.geteuid(), f"{path.name} is owned by another user")
+    if info.st_mode & 0o077:
+        os.chmod(path, 0o700 if directory else 0o600)
+        _need(not os.lstat(path).st_mode & 0o077, f"cannot restrict {path.name} to its owner")
+
+
+def _private_dir(path: Path) -> None:
+    """Create the sessions directory owner-only, or validate and tighten an existing one."""
+    try:
+        os.mkdir(path, 0o700)
+    except FileExistsError:
+        pass
+    except FileNotFoundError:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        os.mkdir(path, 0o700)
+    _check_private(path, directory=True)
+
+
 class SessionStore:
     def __init__(self, root: str | os.PathLike) -> None:
         self.root = Path(root) / "sessions"
@@ -80,7 +111,7 @@ class SessionStore:
         _need(brief_hash is None or (isinstance(brief_hash, str) and re.fullmatch(r"[0-9a-f]{64}", brief_hash)),
               "brief_hash must be a lowercase sha256 hex digest")
         _need(type(token_cap) is int and MIN_TOKENS <= token_cap <= MAX_TOKEN_CAP, "token_cap out of range")
-        self.root.mkdir(parents=True, exist_ok=True)
+        _private_dir(self.root)
         session = Session(path)
         session._append({"type": "session", "id": session_id, "briefHash": brief_hash, "tokenCap": token_cap}, create=True)
         session.token_cap, session.brief_hash = token_cap, brief_hash
@@ -88,7 +119,9 @@ class SessionStore:
 
     def open(self, session_id: str) -> "Session":
         path = self.path(session_id)
-        _need(path.is_file(), f"unknown session {session_id!r}")
+        _need(path.is_file() or path.is_symlink(), f"unknown session {session_id!r}")
+        _check_private(self.root, directory=True)
+        _check_private(path, directory=False)
         session = Session(path)
         session._load()
         return session
@@ -104,6 +137,7 @@ class Session:
         self.tokens_used = 0
         self._steps: list[dict] = []
         self._checkpoints: list[dict] = []
+        self._pending: dict[int, dict] = {}   # write intents recorded before the journal call, not yet resolved
         self._broken = False
 
     # --- file ------------------------------------------------------------------
@@ -135,28 +169,46 @@ class Session:
             _need(kind == "session" and entry["id"] == self.path.stem, "bad session header")
             self.token_cap, self.brief_hash = entry["tokenCap"], entry["briefHash"]
         elif kind == "step":
-            _need(entry["effect"] in ("read", "write"), "bad step effect")
+            _need(entry["effect"] == "read", "bad step effect")
             self._steps.append(entry)
-            self.tokens_used += entry["tokens"] if entry["effect"] == "read" else 0
+            self.tokens_used += entry["tokens"]
+        elif kind == "intent":
+            _need(entry["tool"] in ("create_module", "apply", "rollback") and isinstance(entry["request"], dict), "bad intent")
+            self._pending[entry["seq"]] = entry
+        elif kind == "outcome":
+            intent = self._pending.pop(entry["intent"], None)
+            _need(intent is not None, "outcome without an open intent")
+            _need(entry["status"] in ("applied", "noop", "rejected", "abandoned", "conflict"), "bad outcome status")
+            if entry["status"] == "applied":
+                self._steps.append(self._write_step(intent, entry))
         elif kind == "checkpoint":
             _need(isinstance(entry["modules"], dict), "bad checkpoint")
             self._checkpoints.append(entry)
         else:
             raise ValueError(f"unknown entry type {kind!r}")
 
-    def _append(self, fields: dict, create: bool = False) -> dict:
+    @staticmethod
+    def _write_step(intent: dict, outcome: dict) -> dict:
+        return {"v": 1, "seq": intent["seq"], "prev": intent["prev"], "type": "step", "effect": "write",
+                "tool": intent["tool"], "request": intent["request"], "tokens": 0, "result": outcome["result"]}
+
+    def _append(self, fields: dict, create: bool = False, reserve_entries: int = 0, reserve_bytes: int = 0) -> dict:
         _need(not self._broken, "session is broken after a failed write; reopen it")
-        _need(self._seq + 1 <= MAX_ENTRIES, "session entry budget exceeded")
+        if self._pending and fields["type"] != "outcome":  # always keep room for the entry that resolves the open intent
+            reserve_entries, reserve_bytes = max(reserve_entries, 1), max(reserve_bytes, OUTCOME_RESERVE_BYTES)
+        _need(self._seq + 1 + reserve_entries <= MAX_ENTRIES, "session entry budget exceeded")
         entry = {"v": 1, "seq": self._seq + 1, "prev": self._tail, **fields}
         entry["hash"] = _entry_hash(entry)
         line = (canonical(entry) + "\n").encode()
-        _need(len(line) <= MAX_LINE_BYTES and self._size + len(line) <= MAX_FILE_BYTES, "session size budget exceeded")
+        _need(len(line) <= MAX_LINE_BYTES and self._size + len(line) + reserve_bytes <= MAX_FILE_BYTES,
+              "session size budget exceeded")
         if not create and self.path.stat().st_size != self._size:
             self._broken = True
             raise SessionError("session file changed on disk; reopen it")
-        flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_BINARY", 0) | (os.O_CREAT | os.O_EXCL if create else 0)
+        flags = (os.O_WRONLY | os.O_APPEND | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+                 | (os.O_CREAT | os.O_EXCL if create else 0))
         try:
-            fd = os.open(self.path, flags, 0o644)
+            fd = os.open(self.path, flags, 0o600)  # owner-only: the file holds full write requests, block data included
             try:
                 view = memoryview(line)
                 while view:
@@ -199,16 +251,81 @@ class Session:
 
     # --- recorded writes --------------------------------------------------------------
     def _write(self, tool: str, request: dict, call, store: JournalStore, module_id: str) -> object:
+        """Write-ahead: record the intent, run the journal call, then record the outcome.
+
+        The intent is durable before the journal can change, and the room for its outcome is reserved up
+        front, so a session that is full or broken refuses the write *before* the journal is touched. If the
+        outcome cannot be recorded afterwards (I/O failure) the intent stays open: reopen the session and call
+        `reconcile(store)`; writes are refused until then.
+        """
+        _need(not self._pending, f"{len(self._pending)} write intent(s) are unresolved; call reconcile(store)")
         _need(len(canonical(request).encode()) <= MAX_REQUEST_BYTES, "request too large to record")
-        result = call()  # exceptions propagate unlogged: nothing was committed
+        intent = self._append({"type": "intent", "tool": tool, "request": request}, reserve_entries=1,
+                              reserve_bytes=OUTCOME_RESERVE_BYTES)
+        self._pending[intent["seq"]] = intent
+        try:
+            result = call()
+        except IdentityError:           # rejected: validation and stale-write errors guarantee nothing was committed
+            self._resolve(intent, "rejected", {})
+            raise
+        # any other failure (storage, durability) leaves the outcome unknown: the intent stays open for reconcile
         if getattr(result, "replayed", False):
-            return result  # an idempotent retry changed nothing, so there is nothing to replay
-        entry = self._append({"type": "step", "effect": "write", "tool": tool, "request": request, "tokens": 0,
-                              "result": {"revision": result if isinstance(result, int) else result.revision,
-                                         "replayed": getattr(result, "replayed", False),
-                                         "tail": store.tail_hash(module_id)}})
-        self._steps.append(entry)
+            self._resolve(intent, "noop", {})   # an idempotent retry changed nothing, so there is nothing to replay
+            return result
+        revision = result if isinstance(result, int) else result.revision
+        self._resolve(intent, "applied", {"revision": revision, "replayed": False, "tail": store.tail_hash(module_id)})
         return result
+
+    def _resolve(self, intent: dict, status: str, result: dict) -> None:
+        try:
+            outcome = self._append({"type": "outcome", "intent": intent["seq"], "status": status, "result": result})
+        except SessionError as exc:
+            raise SessionError(f"the journal call finished but its outcome could not be recorded ({exc}); "
+                               "reopen the session and call reconcile(store)") from exc
+        self._pending.pop(intent["seq"], None)
+        if status == "applied":
+            self._steps.append(self._write_step(intent, outcome))
+
+    def pending(self) -> list[dict]:
+        """Write intents whose outcome was never recorded (crash, I/O error): resolve them with `reconcile(store)`."""
+        return [{"intent": s, "tool": e["tool"], "module": e["request"].get("module")} for s, e in sorted(self._pending.items())]
+
+    def reconcile(self, store: JournalStore) -> dict:
+        """Decide, from the journal itself, what happened to every open intent and record it.
+
+        applied    — the journal holds exactly this request (same key, revision, operations): the write is now a step.
+        abandoned  — the journal holds nothing for it: it never happened and is not replayed.
+        conflict   — the journal holds a different request under the same key: reported, never replayed.
+        """
+        resolved = []
+        provider = ContextProvider(store)
+        for seq, intent in sorted(self._pending.items()):
+            status, result = self._inspect(intent, store, provider)
+            self._resolve(intent, status, result)
+            resolved.append({"intent": seq, "status": status})
+        return {"resolved": resolved, "pending": len(self._pending)}
+
+    @staticmethod
+    def _inspect(intent: dict, store: JournalStore, provider: ContextProvider) -> tuple[str, dict]:
+        r, module = intent["request"], intent["request"]["module"]
+        if module not in store.modules():
+            return "abandoned", {}
+        entries = provider.revision_entries(module)
+        if intent["tool"] == "create_module":
+            return "applied", {"revision": 0, "replayed": False, "tail": entries[0]["hash"]}
+        found = next((e for e in entries[1:] if e["key"] == r["key"]), None)
+        if found is None:
+            return "abandoned", {}
+        if intent["tool"] == "apply":
+            same = (found["type"] == "commit" and found["rev"] - 1 == r["expectedRevision"]
+                    and found["ops"] == type(store)._check_ops(r["ops"])
+                    and found["mins"] == dict(sorted((r["minRevisions"] or {}).items())))
+        else:
+            same = (found["type"] == "rollback" and found["rev"] - 1 == r["expectedRevision"]
+                    and found["rollbackTo"] == r["toRevision"])
+        if not same:
+            return "conflict", {}
+        return "applied", {"revision": found["rev"], "replayed": False, "tail": found["hash"]}
 
     def create_module(self, store: JournalStore, module_id: str) -> int:
         return self._write("create_module", {"module": module_id}, lambda: store.create_module(module_id), store, module_id)
@@ -271,18 +388,26 @@ class Session:
                 "omitted": omitted, "tokensUsed": self.tokens_used, "tokensRemaining": self.remaining_tokens()}
 
     # --- replay ----------------------------------------------------------------------------
-    def replay_into(self, target: JournalStore) -> dict:
-        """Re-run the recorded writes, in order, against `target`; every result must match the recording."""
-        count = 0
+    def replay_into(self, target: JournalStore, *, require_final_state: bool = False) -> dict:
+        """Re-run the recorded writes, in order, against `target` and verify the HISTORY they produced.
+
+        Contract. For every recorded write the target must end up with the recorded revision AND the recorded
+        journal hash at that revision: a freshly applied write is compared with the target's newest hash, a write
+        the target already had (idempotent replay) is compared with the target's journal entry at that revision.
+        So a successful replay proves the target contains exactly the recorded history for every module it touched.
+
+        It does NOT, by default, prove the target's *final* state equals the recording: later revisions made after
+        the session are legitimate. The report always says so (`finalStateMatches`, `extraRevisions`); pass
+        `require_final_state=True` to turn any extra revision into a `ReplayDivergence`.
+        """
+        count, last = 0, {}
+        provider = ContextProvider(target)
         for s in self._steps:
             if s["effect"] != "write":
                 continue
             r, rec = s["request"], s["result"]
             replayed = False
             if s["tool"] == "create_module" and r["module"] in target.modules():
-                # already present (replay into the original or a partial copy): it must be the same module
-                if ContextProvider(target).revision_hashes(r["module"])[0] != rec["tail"]:
-                    raise ReplayDivergence(f"step {s['seq']}: existing module {r['module']} has a different origin")
                 revision, replayed = 0, True
             elif s["tool"] == "create_module":
                 revision = target.create_module(r["module"])
@@ -293,8 +418,14 @@ class Session:
                 revision, replayed = got.revision, got.replayed
             if revision != rec["revision"]:
                 raise ReplayDivergence(f"step {s['seq']}: revision {revision}, recorded {rec['revision']}")
-            if not replayed and target.tail_hash(r["module"]) != rec["tail"]:
-                raise ReplayDivergence(f"step {s['seq']}: journal hash differs from the recording")
+            # newly applied: the newest hash; already present: the hash recorded at that revision, never skipped
+            actual = (provider.revision_hashes(r["module"])[revision] if replayed else target.tail_hash(r["module"]))
+            if actual != rec["tail"]:
+                raise ReplayDivergence(f"step {s['seq']}: journal hash at revision {revision} differs from the recording")
+            last[r["module"]] = (revision, rec["tail"])
             count += 1
-        return {"replayedWrites": count, "modules": len(target.modules())}
-
+        extra = {m: target.revision(m) - rev for m, (rev, _) in sorted(last.items()) if target.revision(m) != rev}
+        if require_final_state and extra:
+            raise ReplayDivergence(f"target has revisions beyond the recording: {extra}")
+        return {"replayedWrites": count, "modules": len(last), "historyVerified": True,
+                "finalStateMatches": not extra, "extraRevisions": extra}
