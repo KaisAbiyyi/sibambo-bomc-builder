@@ -192,7 +192,7 @@ class MCPTests(unittest.TestCase):
         compact = lambda value: json.dumps(value, separators=(",", ":")).encode("utf-8")
         pad = 256 * 1024 - len(compact(msg)) - 2
         msg["id"] = "r" * pad
-        raw = compact(msg) + b"\\n"
+        raw = compact(msg) + b"\n"
         self.assertLessEqual(len(raw), 256 * 1024)
         rc, out, err = self.talk(raw=raw, writes=False)
         self.assertEqual((rc, len(out)), (0, 1), err)
