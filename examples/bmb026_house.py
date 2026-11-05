@@ -139,6 +139,38 @@ def _connect(modules: dict[str, dict], owner: str, peer: str, side: str,
          "surfaceOpId": f"wall-{side}"})
 
 
+
+def _annotate_repeated_solid_faces(module: dict) -> None:
+    """Use the approved BMB-018 face-annotation schema to reuse semantic labels.
+
+    BOMC 1.2's pinned single-byte string indices cap the total dictionary at
+    254. Cut walls retain full per-face labels, so repeated simple wall/slab
+    faces share a meaningful *non-unique* role label while all individual
+    geometry, material IDs, winding and face records remain distinct.
+    """
+    cut_walls = {op["targetWallOpId"] for op in module["operations"]
+                 if op["kind"] == "opening-cut"}
+    annotations = []
+    for op in module["operations"]:
+        if op["kind"] == "floor-slab":
+            keys = ["top", "bottom"] + [f"side-{i}"
+                    for i in range(len(op["footprint"]))]
+        elif op["kind"] == "wall-run" and op["opId"] not in cut_walls:
+            # Every wall in this fixture is a straight two-point run.
+            assert len(op["path"]) == 2
+            keys = ["front-0", "back-0", "top-0", "bottom-0", "start", "end"]
+        else:
+            continue
+        mat = op["materialId"]
+        for key in keys:
+            annotations.append({
+                "opId": op["opId"], "faceKey": key, "role": op["role"],
+                "frontMaterialId": mat, "backMaterialId": mat,
+                "label": f"{op['role']} solid surface",
+            })
+    module["faceAnnotations"] = annotations
+
+
 def build_house(*, revised: bool = False) -> dict:
     """Generate Module IR from immutable dimensions, no filesystem writes."""
     if type(revised) is not bool:
@@ -157,7 +189,10 @@ def build_house(*, revised: bool = False) -> dict:
         {"moduleId": ROOM_IDS["bedroom-a"], "minRevision": 1},
         {"moduleId": ROOM_IDS["bedroom-b"], "minRevision": 1},
     ]
-    return {"schemaVersion": "1.0.0", "modules": [*modules.values(), _roof()]}
+    output = [*modules.values(), _roof()]
+    for item in output:
+        _annotate_repeated_solid_faces(item)
+    return {"schemaVersion": "1.0.0", "modules": output}
 
 
 def evidence() -> tuple[dict, dict, dict]:
