@@ -70,6 +70,11 @@ class ContextProvider:
     def project_digest(self) -> str:
         return digest([[m, r, h] for m, (r, h) in sorted(self.state().items())])
 
+    def journal_exists(self, module_id: str) -> bool:
+        """Is there a journal file for the module on disk, whether or not this store handle has loaded it?"""
+        _module_id(module_id)
+        return (Path(self.store._root) / "modules" / _dirname(module_id) / JOURNAL).exists()
+
     def revision_entries(self, module_id: str) -> list[dict]:
         """Journal entry (parsed) for revision 0..n of one module, read from its already verified journal file."""
         _module_id(module_id)

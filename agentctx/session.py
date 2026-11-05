@@ -20,6 +20,7 @@ from agentctx.budget import canonical, digest
 from agentctx.retrieval import MAX_TOKENS, MIN_TOKENS, ContextProvider
 from core.identity.store import IdentityError
 from core.storage.journal import JournalStore
+from core.storage import DurabilityUncertainError
 
 SESSION_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
 GENESIS = "0" * 64
@@ -138,6 +139,7 @@ class Session:
         self._steps: list[dict] = []
         self._checkpoints: list[dict] = []
         self._pending: dict[int, dict] = {}   # write intents recorded before the journal call, not yet resolved
+        self._uncertain_intents: set[int] = set()  # intents whose journal write reported unknown durability
         self._broken = False
 
     # --- file ------------------------------------------------------------------
@@ -175,8 +177,12 @@ class Session:
         elif kind == "intent":
             _need(entry["tool"] in ("create_module", "apply", "rollback") and isinstance(entry["request"], dict), "bad intent")
             self._pending[entry["seq"]] = entry
+        elif kind == "uncertain":
+            _need(entry["intent"] in self._pending, "uncertain marker without an open intent")
+            self._uncertain_intents.add(entry["intent"])
         elif kind == "outcome":
             intent = self._pending.pop(entry["intent"], None)
+            self._uncertain_intents.discard(entry["intent"])
             _need(intent is not None, "outcome without an open intent")
             _need(entry["status"] in ("applied", "noop", "rejected", "abandoned", "conflict"), "bad outcome status")
             if entry["status"] == "applied":
@@ -196,7 +202,7 @@ class Session:
         _need(not self._broken, "session is broken after a failed write; reopen it")
         if self._pending and fields["type"] != "outcome":  # always keep room for the entry that resolves the open intent
             reserve_entries, reserve_bytes = max(reserve_entries, 1), max(reserve_bytes, OUTCOME_RESERVE_BYTES)
-        _need(self._seq + 1 + reserve_entries <= MAX_ENTRIES, "session entry budget exceeded")
+        _need(self._seq + 2 + reserve_entries <= MAX_ENTRIES, "session entry budget exceeded")  # entries after = seq + 2, as _load() counts them
         entry = {"v": 1, "seq": self._seq + 1, "prev": self._tail, **fields}
         entry["hash"] = _entry_hash(entry)
         line = (canonical(entry) + "\n").encode()
@@ -260,20 +266,32 @@ class Session:
         """
         _need(not self._pending, f"{len(self._pending)} write intent(s) are unresolved; call reconcile(store)")
         _need(len(canonical(request).encode()) <= MAX_REQUEST_BYTES, "request too large to record")
-        intent = self._append({"type": "intent", "tool": tool, "request": request}, reserve_entries=1,
-                              reserve_bytes=OUTCOME_RESERVE_BYTES)
+        fields = {"type": "intent", "tool": tool, "request": request}
+        if tool == "create_module":  # what the journal looked like before: lets reconcile rule out a pre-existing module
+            provider = ContextProvider(store)  # a stale store handle may not know a module another writer created
+            fields["before"] = {"moduleExists": module_id in store.modules() or provider.journal_exists(module_id),
+                                "projectDigest": provider.project_digest()}
+        intent = self._append(fields, reserve_entries=2, reserve_bytes=2 * OUTCOME_RESERVE_BYTES)
         self._pending[intent["seq"]] = intent
         try:
             result = call()
         except IdentityError:           # rejected: validation and stale-write errors guarantee nothing was committed
             self._resolve(intent, "rejected", {})
             raise
-        # any other failure (storage, durability) leaves the outcome unknown: the intent stays open for reconcile
+        except DurabilityUncertainError:  # the line may be visible but is not known to be durable: say so in the log
+            try:
+                self._append({"type": "uncertain", "intent": intent["seq"]})
+                self._uncertain_intents.add(intent["seq"])
+            except SessionError:
+                pass                    # the session is broken now; the open intent is still there for reconcile
+            raise
+        # any other failure (storage) leaves the outcome unknown: the intent stays open for reconcile
         if getattr(result, "replayed", False):
             self._resolve(intent, "noop", {})   # an idempotent retry changed nothing, so there is nothing to replay
             return result
         revision = result if isinstance(result, int) else result.revision
-        self._resolve(intent, "applied", {"revision": revision, "replayed": False, "tail": store.tail_hash(module_id)})
+        self._resolve(intent, "applied", {"revision": revision, "replayed": False, "tail": store.tail_hash(module_id),
+                                          "durable": True})
         return result
 
     def _resolve(self, intent: dict, status: str, result: dict) -> None:
@@ -288,32 +306,61 @@ class Session:
 
     def pending(self) -> list[dict]:
         """Write intents whose outcome was never recorded (crash, I/O error): resolve them with `reconcile(store)`."""
-        return [{"intent": s, "tool": e["tool"], "module": e["request"].get("module")} for s, e in sorted(self._pending.items())]
+        return [{"intent": s, "tool": e["tool"], "module": e["request"].get("module"),
+                 "durabilityUncertain": s in self._uncertain_intents} for s, e in sorted(self._pending.items())]
 
-    def reconcile(self, store: JournalStore) -> dict:
-        """Decide, from the journal itself, what happened to every open intent and record it.
+    def reconcile(self, store: JournalStore, *, adopt=(), discard=(), accept_unconfirmed=()) -> dict:
+        """Decide, from the journal itself, what happened to every open intent; never certify what it cannot prove.
 
-        applied    — the journal holds exactly this request (same key, revision, operations): the write is now a step.
-        abandoned  — the journal holds nothing for it: it never happened and is not replayed.
-        conflict   — the journal holds a different request under the same key: reported, never replayed.
+        applied    — the journal holds exactly this request (same key, revision, operations); it becomes a step.
+        abandoned  — nothing in the journal (or, for a create, the module already existed): never replayed.
+        conflict   — a different request under the same key: reported, never replayed.
+        stays open — recorded in `open` with a reason, and writes stay refused, when it cannot be proven:
+          * `UNVERIFIED_CREATE`: the module exists but a create leaves no identity in the journal (every creation of
+            a module id writes the same genesis entry), so this intent cannot be told apart from a foreign create.
+            The host decides: `adopt=[module ids]` records it as applied and flagged `adopted`, `discard=[...]`
+            records it as abandoned.
+          * `DURABILITY_UNCERTAIN`: the journal quarantined the module after an fsync failure. `store.recover` is
+            attempted first; only after it succeeds is the write recorded (as durable). A visible line is never
+            taken for a durable commit.
+          * `DURABILITY_UNCONFIRMED`: the session logged an uncertain write and the store was reopened (so it no
+            longer knows). Recorded only with `accept_unconfirmed=[module ids]`, and then flagged `durable: false`.
         """
-        resolved = []
+        adopt, discard, accept = set(adopt), set(discard), set(accept_unconfirmed)
+        resolved, open_ = [], []
         provider = ContextProvider(store)
         for seq, intent in sorted(self._pending.items()):
-            status, result = self._inspect(intent, store, provider)
-            self._resolve(intent, status, result)
-            resolved.append({"intent": seq, "status": status})
-        return {"resolved": resolved, "pending": len(self._pending)}
+            decision = self._inspect(intent, store, provider, adopt, discard, accept)
+            if decision[0] == "open":
+                open_.append({"intent": seq, "module": intent["request"]["module"], "reason": decision[1]})
+                continue
+            self._resolve(intent, *decision)
+            resolved.append({"intent": seq, "status": decision[0]})
+        return {"resolved": resolved, "open": open_, "pending": len(self._pending)}
 
-    @staticmethod
-    def _inspect(intent: dict, store: JournalStore, provider: ContextProvider) -> tuple[str, dict]:
-        r, module = intent["request"], intent["request"]["module"]
+    def _inspect(self, intent: dict, store: JournalStore, provider: ContextProvider, adopt: set, discard: set,
+                 accept: set) -> tuple:
+        r, module, seq = intent["request"], intent["request"]["module"], intent["seq"]
+        recovered = False
+        if module in store.uncertain_modules():
+            try:
+                store.recover(module)
+            except DurabilityUncertainError as exc:
+                return ("open", f"DURABILITY_UNCERTAIN: recovery failed ({exc})")
+            recovered = True
+        if intent["tool"] == "create_module":
+            if intent["before"]["moduleExists"]:
+                return "abandoned", {"reason": "the module existed before the intent, so the create could not have succeeded"}
+            if module in discard or module not in store.modules():
+                return "abandoned", {}
+            if module in adopt:
+                return "applied", {"revision": 0, "replayed": False, "tail": provider.revision_hashes(module)[0],
+                                   "durable": True, "adopted": True}
+            return ("open", "UNVERIFIED_CREATE: the module exists but the journal cannot show that this intent created it; "
+                            "pass adopt=[...] or discard=[...]")
         if module not in store.modules():
             return "abandoned", {}
-        entries = provider.revision_entries(module)
-        if intent["tool"] == "create_module":
-            return "applied", {"revision": 0, "replayed": False, "tail": entries[0]["hash"]}
-        found = next((e for e in entries[1:] if e["key"] == r["key"]), None)
+        found = next((e for e in provider.revision_entries(module)[1:] if e["key"] == r["key"]), None)
         if found is None:
             return "abandoned", {}
         if intent["tool"] == "apply":
@@ -325,7 +372,13 @@ class Session:
                     and found["rollbackTo"] == r["toRevision"])
         if not same:
             return "conflict", {}
-        return "applied", {"revision": found["rev"], "replayed": False, "tail": found["hash"]}
+        result = {"revision": found["rev"], "replayed": False, "tail": found["hash"], "durable": True}
+        if seq in self._uncertain_intents and not recovered:
+            if module not in accept:
+                return ("open", "DURABILITY_UNCONFIRMED: the write was logged as durability-uncertain and the journal has "
+                                "been reopened; establish durability independently or pass accept_unconfirmed=[...]")
+            result["durable"] = False
+        return "applied", result
 
     def create_module(self, store: JournalStore, module_id: str) -> int:
         return self._write("create_module", {"module": module_id}, lambda: store.create_module(module_id), store, module_id)
@@ -428,4 +481,5 @@ class Session:
         if require_final_state and extra:
             raise ReplayDivergence(f"target has revisions beyond the recording: {extra}")
         return {"replayedWrites": count, "modules": len(last), "historyVerified": True,
-                "finalStateMatches": not extra, "extraRevisions": extra}
+                "finalStateMatches": not extra, "extraRevisions": extra,
+                "nonDurableSteps": sum(1 for s in self._steps if s["effect"] == "write" and not s["result"].get("durable", True))}

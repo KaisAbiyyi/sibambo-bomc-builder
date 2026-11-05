@@ -489,7 +489,8 @@ class WriteAheadTests(Base):
 
     def test_a_full_session_refuses_the_write_before_the_journal_changes(self):
         before = self.journal_state()
-        with mock.patch.object(session_mod, "MAX_ENTRIES", self.s._seq + 1):         # room for the intent but not its outcome
+        n = self.s._seq + 1                                                          # entries written so far
+        with mock.patch.object(session_mod, "MAX_ENTRIES", n + 2):                   # room for the intent and one more, not for the reserve
             with self.assertRaises(SessionError):
                 self.s.apply(self.store, self.m, 0, "k1", [block(1)])
         self.assertEqual(self.journal_state(), before)
@@ -498,7 +499,7 @@ class WriteAheadTests(Base):
             with self.assertRaises(SessionError):
                 self.s.apply(self.store, self.m, 0, "k1", [block(1)])
         self.assertEqual(self.journal_state(), before)
-        with mock.patch.object(session_mod, "MAX_ENTRIES", self.s._seq + 2):         # exactly enough: intent and outcome
+        with mock.patch.object(session_mod, "MAX_ENTRIES", n + 3):                   # exactly enough: intent plus the reserved outcome and marker
             self.assertEqual(self.s.apply(self.store, self.m, 0, "k1", [block(1)]).revision, 1)
         self.assertEqual((len(self.s.steps()), self.s.pending()), (2, []))
 
@@ -532,7 +533,7 @@ class WriteAheadTests(Base):
             reopened.apply(self.store, self.m, 1, "k2", [block(3)])
         reopened.manifest(ContextProvider(self.store))                        # reads still work
         report = reopened.reconcile(self.store)
-        self.assertEqual(report, {"resolved": [{"intent": report["resolved"][0]["intent"], "status": "applied"}], "pending": 0})
+        self.assertEqual(report, {"resolved": [{"intent": report["resolved"][0]["intent"], "status": "applied"}], "open": [], "pending": 0})
         self.assertEqual(reopened.reconcile(self.store)["resolved"], [])      # idempotent
         write = [s for s in reopened.steps() if s["tool"] == "apply"][0]
         self.assertEqual((write["result"]["revision"], write["result"]["tail"]), self.journal_state())
@@ -554,7 +555,8 @@ class WriteAheadTests(Base):
         self.assertEqual(self.s.apply(self.store, self.m, 0, "k1", [block(1)]).revision, 1)   # retry now works
         self.assertEqual([s["tool"] for s in self.s.steps()], ["create_module", "apply"])
 
-    def test_a_durability_uncertain_write_is_found_and_recorded(self):
+    def uncertain_write(self, key="k1"):
+        """An apply whose journal fsync fails after the line is written: visible, not known to be durable."""
         calls = {"n": 0}
         real = os.fsync
 
@@ -566,11 +568,130 @@ class WriteAheadTests(Base):
 
         with mock.patch.object(journal_mod.os, "fsync", side_effect=second_fsync_fails):
             with self.assertRaises(DurabilityUncertainError):
-                self.s.apply(self.store, self.m, 0, "k1", [block(1)])
-        self.assertEqual(len(self.s.pending()), 1)
-        self.assertEqual(self.s.reconcile(self.store)["resolved"][0]["status"], "applied")
+                self.s.apply(self.store, self.m, 0, key, [block(1)])
+
+    def test_a_visible_but_not_durable_write_is_never_certified_during_quarantine(self):
+        self.uncertain_write()
+        self.assertEqual(self.store.uncertain_modules(), [self.m])
+        self.assertTrue(self.s.pending()[0]["durabilityUncertain"])           # the session logged the uncertainty
+        steps_before = len(self.s.steps())
+        with mock.patch.object(journal_mod.os, "fsync", side_effect=OSError("still failing")):
+            report = self.s.reconcile(self.store)                             # recovery is attempted and fails
+        self.assertEqual(report["resolved"], [])
+        self.assertTrue(report["open"][0]["reason"].startswith("DURABILITY_UNCERTAIN"))
+        self.assertEqual((len(self.s.steps()), len(self.s.pending()), self.store.uncertain_modules()), (steps_before, 1, [self.m]))
+        with self.assertRaises(SessionError):                                  # and nothing else is written meanwhile
+            self.s.apply(self.store, self.m, 1, "k2", [block(2)])
+        target = JournalStore.open(Path(self._tmp.name) / "copy")
+        self.assertEqual(self.s.replay_into(target)["replayedWrites"], 1)    # only the certified create is replayed
+        self.assertNotIn(self.m, [] if self.m not in target.modules() else [m for m in target.modules() if target.revision(m) > 0])
+
+    def test_recovery_makes_the_write_durable_and_only_then_records_it(self):
+        self.uncertain_write()
+        report = self.s.reconcile(self.store)                                  # fsync works again: recover() runs first
+        self.assertEqual([r["status"] for r in report["resolved"]], ["applied"])
+        self.assertEqual((self.store.uncertain_modules(), self.s.pending()), ([], []))
         step = [x for x in self.s.steps() if x["tool"] == "apply"][0]
-        self.assertEqual((step["result"]["revision"], step["result"]["tail"]), self.journal_state())
+        self.assertEqual((step["result"]["revision"], step["result"]["tail"], step["result"]["durable"]), (1, self.store.tail_hash(self.m), True))
+        self.assertEqual(self.s.replay_into(JournalStore.open(Path(self._tmp.name) / "copy"))["nonDurableSteps"], 0)
+
+    def test_after_a_restart_the_logged_uncertainty_still_blocks_certification(self):
+        self.uncertain_write()
+        reopened_store = JournalStore.open(self.root)                         # the new store no longer knows about the quarantine
+        self.assertEqual(reopened_store.uncertain_modules(), [])
+        session = self.sessions.open("agent-1")
+        self.assertTrue(session.pending()[0]["durabilityUncertain"])
+        report = session.reconcile(reopened_store)
+        self.assertEqual(report["resolved"], [])
+        self.assertTrue(report["open"][0]["reason"].startswith("DURABILITY_UNCONFIRMED"))
+        with self.assertRaises(SessionError):
+            session.apply(reopened_store, self.m, 1, "k2", [block(2)])
+        accepted = session.reconcile(reopened_store, accept_unconfirmed=[self.m])   # an explicit, recorded decision
+        self.assertEqual([r["status"] for r in accepted["resolved"]], ["applied"])
+        step = [x for x in session.steps() if x["tool"] == "apply"][0]
+        self.assertFalse(step["result"]["durable"])                            # and it stays flagged
+        report = session.replay_into(JournalStore.open(Path(self._tmp.name) / "copy"))
+        self.assertEqual((report["replayedWrites"], report["nonDurableSteps"]), (2, 1))
+        self.assertEqual(session.apply(reopened_store, self.m, 1, "k2", [block(2)]).revision, 2)
+
+    def test_the_uncertain_marker_survives_a_broken_session(self):
+        self.uncertain_write()
+        again = self.sessions.open("agent-1")
+        self.assertEqual([e["type"] for e in self.lines()][-2:], ["intent", "uncertain"])
+        self.assertEqual(again.pending()[0]["intent"], self.s.pending()[0]["intent"])
+
+    def test_a_create_cannot_be_attributed_to_a_pre_existing_module(self):
+        other = JournalStore.open(self.root, modules=[])
+        other.create_module("house/f1/older")                                  # exists before the intent
+        with mock.patch.object(self.store, "create_module", side_effect=StorageError("interrupted")):
+            with self.assertRaises(StorageError):
+                self.s.create_module(self.store, "house/f1/older")
+        self.assertTrue([e for e in self.lines() if e["type"] == "intent"][-1]["before"]["moduleExists"])
+        report = self.s.reconcile(JournalStore.open(self.root))
+        self.assertEqual(report["resolved"][0]["status"], "abandoned")
+        self.assertEqual([x["tool"] for x in self.s.steps()], ["create_module"])        # not recorded as this session's create
+
+    def test_a_create_by_another_writer_is_not_claimed_unless_the_host_decides(self):
+        with mock.patch.object(self.store, "create_module", side_effect=StorageError("interrupted before the journal call")):
+            with self.assertRaises(StorageError):
+                self.s.create_module(self.store, "house/f1/b")
+        JournalStore.open(self.root, modules=[]).create_module("house/f1/b")    # a foreign writer creates it meanwhile
+        fresh = JournalStore.open(self.root)
+        report = self.s.reconcile(fresh)
+        self.assertEqual(report["resolved"], [])
+        self.assertTrue(report["open"][0]["reason"].startswith("UNVERIFIED_CREATE"))
+        with self.assertRaises(SessionError):
+            self.s.apply(fresh, "house/f1/a", 0, "k1", [block(1)])               # blocked until the host decides
+        adopted = self.sessions.open("agent-1")
+        self.assertEqual(adopted.reconcile(fresh, adopt=["house/f1/b"])["resolved"][0]["status"], "applied")
+        step = [x for x in adopted.steps() if x["request"]["module"] == "house/f1/b"][0]
+        self.assertTrue(step["result"]["adopted"])                               # the audit trail says it was adopted
+        self.assertEqual(adopted.replay_into(JournalStore.open(Path(self._tmp.name) / "copy"))["replayedWrites"], 2)
+
+    def test_discarding_an_unverified_create_unblocks_the_session(self):
+        with mock.patch.object(self.store, "create_module", side_effect=StorageError("interrupted")):
+            with self.assertRaises(StorageError):
+                self.s.create_module(self.store, "house/f1/b")
+        JournalStore.open(self.root, modules=[]).create_module("house/f1/b")
+        fresh = JournalStore.open(self.root)
+        self.assertEqual(self.s.reconcile(fresh, discard=["house/f1/b"])["resolved"][0]["status"], "abandoned")
+        self.assertEqual(self.s.apply(fresh, "house/f1/a", 0, "k1", [block(1)]).revision, 1)
+        self.assertEqual([x["tool"] for x in self.s.steps()], ["create_module", "apply"])
+
+    def test_our_own_create_whose_outcome_was_lost_needs_an_explicit_decision_too(self):
+        original = session_mod.Session._append
+
+        def fail_outcome(session, fields, *args, **kwargs):
+            if fields["type"] == "outcome":
+                session._broken = True
+                raise SessionError("session write failed (disk full); reopen it")
+            return original(session, fields, *args, **kwargs)
+
+        with mock.patch.object(session_mod.Session, "_append", fail_outcome):
+            with self.assertRaises(SessionError):
+                self.s.create_module(self.store, "house/f1/b")
+        session = self.sessions.open("agent-1")
+        fresh = JournalStore.open(self.root)
+        self.assertTrue(session.reconcile(fresh)["open"][0]["reason"].startswith("UNVERIFIED_CREATE"))
+        self.assertEqual(session.reconcile(fresh, adopt=["house/f1/b"])["resolved"][0]["status"], "applied")
+        copy = JournalStore.open(Path(self._tmp.name) / "copy")
+        session.replay_into(copy)
+        self.assertEqual(copy.tail_hash("house/f1/b"), fresh.tail_hash("house/f1/b"))
+
+    def test_entry_limit_is_exact_and_matches_what_load_accepts(self):
+        n = self.s._seq + 1                                                   # entries in the file
+        provider = ContextProvider(self.store)
+        with mock.patch.object(session_mod, "MAX_ENTRIES", n):
+            with self.assertRaises(SessionError):
+                self.s.checkpoint(provider)                                   # entry n+1 would exceed MAX_ENTRIES = n
+        with mock.patch.object(session_mod, "MAX_ENTRIES", n + 1):
+            self.s.checkpoint(provider)                                       # exactly one more fits
+            with self.assertRaises(SessionError):
+                self.s.checkpoint(provider)                                   # and the next does not
+            self.assertEqual(len(self.sessions.open("agent-1").steps()), 1)   # _load accepts a file of exactly MAX_ENTRIES entries
+        with mock.patch.object(session_mod, "MAX_ENTRIES", n):
+            with self.assertRaises(SessionError):
+                self.sessions.open("agent-1")                                 # one over the limit is refused on load
 
     def test_a_different_request_under_the_same_key_is_a_conflict_and_is_never_replayed(self):
         real_apply = self.store.apply
