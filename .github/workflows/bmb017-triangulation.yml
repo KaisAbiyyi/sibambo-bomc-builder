@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install existing regression dependency
-        run: python -m pip install 'jsonschema==4.23.0'
+        run: python -m pip install 'jsonschema==4.23.0' 'mcp==2.3.0'
       - name: Focused BMB-017 triangulation tests
         run: python -m unittest discover -s tests -p test_bmb017_triangulation.py -v
       - name: Existing builder regression suite
