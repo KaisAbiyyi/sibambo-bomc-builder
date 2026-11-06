@@ -21,8 +21,10 @@ from agentctx.retrieval import MAX_TOKENS, MIN_TOKENS, ContextProvider
 from core.identity.store import IdentityError
 from core.storage.journal import JournalStore
 from core.storage import DurabilityUncertainError
+from core.textsafe import show
 
 SESSION_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
+WINDOWS_DEVICE = re.compile(r"(con|prn|aux|nul|com[1-9]|lpt[1-9])\Z")  # 'con.jsonl' opens the console on Windows
 GENESIS = "0" * 64
 MAX_ENTRIES = 10_000
 MAX_LINE_BYTES = 128 * 1024
@@ -55,7 +57,7 @@ def _no_duplicates(pairs):
     out = {}
     for k, v in pairs:
         if k in out:
-            raise ValueError(f"duplicate key {k!r}")
+            raise ValueError(f"duplicate key {show(k)}")
         out[k] = v
     return out
 
@@ -101,7 +103,8 @@ class SessionStore:
         self.root = Path(root) / "sessions"
 
     def path(self, session_id: str) -> Path:
-        _need(isinstance(session_id, str) and SESSION_ID.match(session_id) is not None, f"invalid session id {session_id!r}")
+        _need(isinstance(session_id, str) and SESSION_ID.match(session_id) is not None, f"invalid session id {show(session_id)}")
+        _need(WINDOWS_DEVICE.match(session_id) is None, f"session id {show(session_id)} is a reserved device name")
         return self.root / f"{session_id}.jsonl"
 
     def sessions(self) -> list[str]:
@@ -120,7 +123,7 @@ class SessionStore:
 
     def open(self, session_id: str) -> "Session":
         path = self.path(session_id)
-        _need(path.is_file() or path.is_symlink(), f"unknown session {session_id!r}")
+        _need(path.is_file() or path.is_symlink(), f"unknown session {show(session_id)}")
         _check_private(self.root, directory=True)
         _check_private(path, directory=False)
         session = Session(path)
@@ -160,7 +163,7 @@ class Session:
                 _need(isinstance(entry, dict) and entry.get("seq") == n and entry.get("prev") == prev
                       and entry.get("hash") == _entry_hash(entry), "chain, sequence or hash mismatch")
                 self._apply_loaded(entry, n)
-            except (ValueError, KeyError, TypeError, UnicodeDecodeError) as exc:
+            except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError) as exc:
                 raise SessionError(f"{self.path.name}: corrupt at line {n + 1}: {exc}") from exc
             prev = entry["hash"]
         self._tail, self._size, self._seq = prev, len(data), len(lines) - 1
@@ -191,7 +194,7 @@ class Session:
             _need(isinstance(entry["modules"], dict), "bad checkpoint")
             self._checkpoints.append(entry)
         else:
-            raise ValueError(f"unknown entry type {kind!r}")
+            raise ValueError(f"unknown entry type {show(kind)}")
 
     @staticmethod
     def _write_step(intent: dict, outcome: dict) -> dict:
@@ -223,7 +226,7 @@ class Session:
             finally:
                 os.close(fd)
         except FileExistsError as exc:
-            raise SessionError(f"session {self.path.stem!r} already exists") from exc
+            raise SessionError(f"session {show(self.path.stem)} already exists") from exc
         except OSError as exc:
             self._broken = True  # outcome unknown: the entry may or may not be on disk
             raise SessionError(f"session write failed ({exc}); reopen it") from exc

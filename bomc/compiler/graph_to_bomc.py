@@ -21,6 +21,7 @@ from core.assembly.merge import Assembly, AssemblyError, assemble
 from bomc.compiler.semantic_v12 import encode_semantic, GeometryEncodingError
 from core.graph import dag
 from core.geometry.semantics import validate_module_faces, SemanticFaceError
+from core.textsafe import show
 
 MODULE_FIELDS = {
     "schemaVersion", "moduleId", "parentId", "revision", "localFrame",
@@ -138,7 +139,7 @@ def compile_assembly(assembly: Assembly) -> Compiled:
             vec = bounds[part]
             _need(isinstance(vec, list) and len(vec) == 3, f"{mid}: malformed bounds")
             for v in vec:
-                _need(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 1e6,
+                _need(type(v) in (int, float) and abs(v) <= 1e6 and math.isfinite(v),  # magnitude first: isfinite(10**400) overflows
                       f"{mid}: invalid bounds")
         if not doc["operations"]:
             _need(all(v == 0 for part in ("min", "max") for v in bounds[part]),
@@ -243,7 +244,7 @@ def compile_definition_graph(graph: dag.DefinitionGraph, root_definition: str) -
 def _unique_pairs(pairs: list[tuple[str, object]]) -> dict:
     result = {}
     for k, v in pairs:
-        _need(k not in result, f"duplicate JSON key {k!r}")
+        _need(k not in result, f"duplicate JSON key {show(k)}")
         result[k] = v
     return result
 

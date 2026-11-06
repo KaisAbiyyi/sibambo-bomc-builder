@@ -17,6 +17,7 @@ from core.graph import dag
 from core.identity.store import MODULE_ID_PATTERN
 from core.storage.journal import JOURNAL, JournalStore, _dirname
 from core.validator import validate_assembly
+from core.textsafe import show
 
 DEFAULT_TOKENS = 1500
 MAX_TOKENS = 8000
@@ -50,7 +51,7 @@ def _budget(value: object) -> int:
 
 
 def _module_id(value: object, label: str = "module id") -> str:
-    _need(isinstance(value, str) and MODULE_ID_PATTERN.match(value) is not None, "BAD_ID", f"{label}: invalid {value!r}")
+    _need(isinstance(value, str) and MODULE_ID_PATTERN.match(value) is not None, "BAD_ID", f"{label}: invalid {show(value)}")
     return value
 
 
@@ -78,7 +79,7 @@ class ContextProvider:
     def revision_entries(self, module_id: str) -> list[dict]:
         """Journal entry (parsed) for revision 0..n of one module, read from its already verified journal file."""
         _module_id(module_id)
-        _need(module_id in self.store.modules(), "UNKNOWN_MODULE", f"unknown module {module_id!r}")
+        _need(module_id in self.store.modules(), "UNKNOWN_MODULE", f"unknown module {show(module_id)}")
         path = Path(self.store._root) / "modules" / _dirname(module_id) / JOURNAL
         return [json.loads(line) for line in path.read_bytes().split(b"\n")[:-1]]
 
@@ -124,7 +125,7 @@ class ContextProvider:
         """The module, its dependency edges, scoped diagnostics and nearby modules, in priority order."""
         limit = _budget(max_tokens)
         _module_id(module_id)
-        _need(module_id in self.store.modules(), "UNKNOWN_MODULE", f"unknown module {module_id!r}")
+        _need(module_id in self.store.modules(), "UNKNOWN_MODULE", f"unknown module {show(module_id)}")
         _need(type(depth) is int and 0 <= depth <= MAX_DEPTH, "BAD_DEPTH", f"depth must be 0..{MAX_DEPTH}")
         wanted = [] if blocks is None else blocks
         _need(isinstance(wanted, list) and len(wanted) <= MAX_REQUESTED_BLOCKS and all(isinstance(b, str) for b in wanted),

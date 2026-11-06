@@ -17,6 +17,7 @@ from core.storage import (
     ConcurrentWriteError, CorruptJournalError, DurabilityUncertainError,
     JournalStore, StorageError,
 )
+from core.textsafe import show
 
 MAX_INPUT_BYTES = 1024 * 1024
 MAX_OUTPUT_BYTES = 1024 * 1024
@@ -35,13 +36,13 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict:
     result = {}
     for name, value in pairs:
         if name in result:
-            raise CLIError(f"duplicate JSON field {name!r}")
+            raise CLIError(f"duplicate JSON field {show(name)}")
         result[name] = value
     return result
 
 
 def _reject_constant(value: str) -> None:
-    raise CLIError(f"non-finite JSON constant {value!r}")
+    raise CLIError(f"non-finite JSON constant {show(value)}")
 
 
 def _input_json(stream) -> dict:

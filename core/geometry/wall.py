@@ -13,7 +13,11 @@ _ID = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
 def _number(value, name, *, positive=False):
-    if type(value) not in (int, float) or not math.isfinite(value):
+    if type(value) not in (int, float):
+        raise ValueError(f"{name} must be finite numeric metres")
+    if type(value) is int and abs(value) > _LIMIT:  # compare before float(): a huge int would raise OverflowError
+        raise ValueError(f"{name} outside supported metre range")
+    if not math.isfinite(value):
         raise ValueError(f"{name} must be finite numeric metres")
     value = float(value)
     if abs(value) > _LIMIT or (positive and value <= _EPS):
