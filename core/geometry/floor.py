@@ -13,6 +13,7 @@ import math
 import re
 from dataclasses import dataclass
 from fractions import Fraction
+from core.textsafe import show
 
 ID_RE = re.compile(r"[a-z][a-z0-9-]*\Z")
 ROLES = ("floor", "wall", "ceiling", "roof", "opening", "door", "window", "structural", "other")
@@ -121,12 +122,12 @@ def build_floor_slab(op: dict) -> FloorSlab:
     for key in ("opId", "footprint", "thickness", "elevation"):
         _need(key in op, f"missing {key}")
     op_id = op["opId"]
-    _need(isinstance(op_id, str) and len(op_id) <= 80 and ID_RE.match(op_id), f"invalid opId {op_id!r}")
+    _need(isinstance(op_id, str) and len(op_id) <= 80 and ID_RE.match(op_id), f"invalid opId {show(op_id)}")
     material = op.get("materialId")
     _need(material is None or (isinstance(material, str) and len(material) <= 80 and ID_RE.match(material)),
-          f"invalid materialId {material!r}")
+          f"invalid materialId {show(material)}")
     role = op.get("role", "floor")
-    _need(role in ROLES, f"invalid role {role!r}")
+    _need(role in ROLES, f"invalid role {show(role)}")
     thickness = _number(op["thickness"], "thickness")
     _need(0 < thickness <= MAX_THICKNESS, f"thickness must be in (0, {MAX_THICKNESS}] m")
     z0 = _number(op["elevation"], "elevation")

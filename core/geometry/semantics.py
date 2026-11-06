@@ -18,17 +18,30 @@ class SemanticFaceError(ValueError):
     """Invalid authored face semantics."""
 
 
+MAX_JSON_DEPTH = 64
+MAX_JSON_NODES = 2_000_000
+
+
 def _check_finite(value):
-    if type(value) is float and not math.isfinite(value):
-        raise SemanticFaceError("non-finite JSON number")
-    if type(value) is list:
-        for item in value:
-            _check_finite(item)
-    if type(value) is dict:
-        for key, item in value.items():
-            if type(key) is not str:
-                raise SemanticFaceError("non-string JSON key")
-            _check_finite(item)
+    """Reject non-finite numbers and non-string keys, iteratively and within depth and size budgets (no recursion)."""
+    stack, count = [(value, 1)], 0
+    while stack:
+        item, depth = stack.pop()
+        count += 1
+        if count > MAX_JSON_NODES:
+            raise SemanticFaceError("JSON value count exceeds budget")
+        if depth > MAX_JSON_DEPTH:
+            raise SemanticFaceError("JSON nesting exceeds depth budget")
+        kind = type(item)
+        if kind is float and not math.isfinite(item):
+            raise SemanticFaceError("non-finite JSON number")
+        if kind is list:
+            stack.extend((child, depth + 1) for child in item)
+        elif kind is dict:
+            for key, child in item.items():
+                if type(key) is not str:
+                    raise SemanticFaceError("non-string JSON key")
+                stack.append((child, depth + 1))
 
 
 def _valid_face_key(op, key):
@@ -157,7 +170,7 @@ def decode_authored_module(payload):
     try:
         module = json.loads(payload.decode("utf-8"), object_pairs_hook=_unique_pairs,
                             parse_constant=_reject_constant)
-    except (UnicodeError, ValueError, TypeError) as exc:
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         if isinstance(exc, SemanticFaceError):
             raise
         raise SemanticFaceError("invalid UTF-8 JSON") from exc
