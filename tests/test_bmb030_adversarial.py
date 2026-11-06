@@ -14,6 +14,8 @@ import shutil
 import struct
 import sys
 import tempfile
+import time
+import tracemalloc
 import unittest
 import zlib
 from pathlib import Path
@@ -685,6 +687,55 @@ class ErrorMessageTests(unittest.TestCase):
                          lambda: provider.module(deep), lambda: provider.revision_entries(deep)):
                 self.typed(call)
             self.typed(lambda: SessionStore(root).path(deep))
+
+
+class HarnessBudgetTests(unittest.TestCase):
+    """The resource budgets must hold on every exit path, in particular when the target ends in a typed rejection
+    (the common case for hostile input). The checks used to sit after the try/finally, so any exception skipped them."""
+
+    def test_a_slow_typed_rejection_is_over_budget(self):
+        with self.assertRaises(h.BudgetExceeded):
+            with h.budget(seconds=0.001):
+                time.sleep(0.05)
+                raise ValueError("typed rejection")
+
+    def test_an_allocating_typed_rejection_is_over_budget_and_tracing_is_restored(self):
+        self.assertFalse(tracemalloc.is_tracing())
+        with self.assertRaises(h.BudgetExceeded):
+            with h.budget(seconds=30, peak_mb=1):
+                blob = bytearray(8 * 1024 * 1024)
+                raise ValueError("typed rejection")
+        self.assertFalse(tracemalloc.is_tracing(), "the harness must leave tracemalloc as it found it")
+        del blob
+
+    def test_a_fast_typed_rejection_passes_through_unchanged(self):
+        with self.assertRaises(ValueError) as caught:
+            with h.budget(seconds=5, peak_mb=64):
+                raise ValueError("typed rejection")
+        self.assertEqual(str(caught.exception), "typed rejection")
+
+    def test_a_fast_normal_return_is_accepted(self):
+        with h.budget(seconds=5, peak_mb=64):
+            sum(range(1000))
+
+    def test_run_reports_an_over_budget_typed_rejection_as_a_defect(self):
+        def slow(_doc):
+            time.sleep(0.05)
+            raise ValueError("typed rejection")
+
+        def fast(_doc):
+            raise ValueError("typed rejection")
+
+        self.assertEqual([i for i, _ in h.run(slow, {"a": 1}, random.Random(0), 3, (ValueError,), seconds=0.001)], [0, 1, 2])
+        self.assertTrue(all(isinstance(e, h.BudgetExceeded) for _, e in h.run(slow, {"a": 1}, random.Random(0), 3, (ValueError,), seconds=0.001)))
+        self.assertEqual(h.run(fast, {"a": 1}, random.Random(0), 3, (ValueError,), seconds=5), [])
+
+    def test_a_defect_that_is_also_over_budget_keeps_the_original_exception_in_the_chain(self):
+        with self.assertRaises(h.BudgetExceeded) as caught:
+            with h.budget(seconds=0.001):
+                time.sleep(0.05)
+                raise TypeError("a real defect")
+        self.assertIsInstance(caught.exception.__context__, TypeError)
 
 
 def rpc(method, params=None, ident=1):

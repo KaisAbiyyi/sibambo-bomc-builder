@@ -26,9 +26,15 @@ class BudgetExceeded(AssertionError):
 @contextmanager
 def budget(seconds: float = 5.0, peak_mb: float | None = None):
     """Fail if the block takes longer than `seconds` of wall time or, when `peak_mb` is given, allocates more than
-    that many MiB at once. Memory tracing slows code down a lot, so it is opt-in for the explicit resource tests."""
+    that many MiB at once. Memory tracing slows code down a lot, so it is opt-in for the explicit resource tests.
+
+    The limits are checked on EVERY exit path, including when the block ends in an exception: a typed rejection that
+    took too long or allocated too much is still a defect, so BudgetExceeded replaces it (the original stays on
+    `__context__`). They are measured after the block returns; this is not a preemptive timeout, so a target that
+    never returns is not detected here (use a killable subprocess for a hard hang guarantee)."""
     tracing = peak_mb is not None
     already = tracemalloc.is_tracing()
+    base = 0
     if tracing:
         if not already:
             tracemalloc.start()
@@ -44,10 +50,10 @@ def budget(seconds: float = 5.0, peak_mb: float | None = None):
             peak = tracemalloc.get_traced_memory()[1] - base
             if not already:
                 tracemalloc.stop()
-    if elapsed > seconds:
-        raise BudgetExceeded(f"took {elapsed:.2f}s (limit {seconds}s)")
-    if tracing and peak > peak_mb * 1024 * 1024:
-        raise BudgetExceeded(f"peaked at {peak / 1048576:.1f} MiB (limit {peak_mb} MiB)")
+        if elapsed > seconds:
+            raise BudgetExceeded(f"took {elapsed:.2f}s (limit {seconds}s)")
+        if tracing and peak > peak_mb * 1024 * 1024:
+            raise BudgetExceeded(f"peaked at {peak / 1048576:.1f} MiB (limit {peak_mb} MiB)")
 
 
 def deep_list(n: int):
