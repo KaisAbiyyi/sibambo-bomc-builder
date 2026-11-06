@@ -14,6 +14,7 @@ on:
       - 'core/geometry/__init__.py'
       - 'tests/test_bmb016_roof.py'
       - '.github/workflows/bmb016-roof.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
