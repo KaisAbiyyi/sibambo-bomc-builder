@@ -21,6 +21,7 @@ from core.assembly.merge import Assembly, AssemblyError, assemble
 from bomc.compiler.semantic_v12 import encode_semantic, GeometryEncodingError
 from core.graph import dag
 from core.geometry.semantics import validate_module_faces, SemanticFaceError
+from core.textsafe import show
 
 MODULE_FIELDS = {
     "schemaVersion", "moduleId", "parentId", "revision", "localFrame",
@@ -243,7 +244,7 @@ def compile_definition_graph(graph: dag.DefinitionGraph, root_definition: str) -
 def _unique_pairs(pairs: list[tuple[str, object]]) -> dict:
     result = {}
     for k, v in pairs:
-        _need(k not in result, f"duplicate JSON key {k!r}")
+        _need(k not in result, f"duplicate JSON key {show(k)}")
         result[k] = v
     return result
 

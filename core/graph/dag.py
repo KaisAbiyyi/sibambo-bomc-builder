@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import re
+from core.textsafe import show
 
 ID_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
 IDENTITY = (1.0, 0.0, 0.0, 0.0,
@@ -43,7 +44,7 @@ def _need(test: bool, reason: str) -> None:
 
 def _id(value: object, label: str) -> str:
     _need(isinstance(value, str) and ID_PATTERN.match(value) is not None,
-          f"{label}: invalid id {value!r}")
+          f"{label}: invalid id {show(value)}")
     return value
 
 
@@ -152,24 +153,24 @@ class DefinitionGraph:
         return sorted(self._defs)
 
     def instances(self, definition: str) -> list[tuple[str, str, tuple[float, ...]]]:
-        _need(self._known(definition), f"unknown definition {definition!r}")
+        _need(self._known(definition), f"unknown definition {show(definition)}")
         return [(i, t, m) for i, (t, m) in sorted(self._defs[definition].items())]
 
     # edits
     def add_definition(self, definition: str) -> None:
         _id(definition, "definition")
-        _need(definition not in self._defs, f"duplicate definition {definition!r}")  # validated as a str above
+        _need(definition not in self._defs, f"duplicate definition {show(definition)}")  # validated as a str above
         _need(len(self._defs) < MAX_DEFINITIONS, "definition budget exceeded")
         self._defs[definition] = {}
 
     def add_instance(self, owner: str, instance: str, target: str,
                      transform: tuple[float, ...] = IDENTITY) -> None:
         _id(instance, "instance")
-        _need(self._known(owner), f"unknown definition {owner!r}")
-        _need(self._known(target), f"unknown definition {target!r}")
-        _need(instance not in self._defs[owner], f"duplicate instance {owner}/{instance}")
+        _need(self._known(owner), f"unknown definition {show(owner)}")
+        _need(self._known(target), f"unknown definition {show(target)}")
+        _need(instance not in self._defs[owner], f"duplicate instance {show(owner)}/{show(instance)}")
         _need(len(self._defs[owner]) < MAX_INSTANCES_PER_DEFINITION, "instance budget exceeded")
-        m = validate_transform(transform, f"{owner}/{instance}")
+        m = validate_transform(transform, f"{show(owner)}/{show(instance)}")
         loop = self._path_between(target, owner)
         if loop is not None:
             raise CycleError([owner] + loop)
@@ -177,13 +178,13 @@ class DefinitionGraph:
 
     def set_transform(self, owner: str, instance: str, transform: tuple[float, ...]) -> None:
         _need(self._known(owner) and isinstance(instance, str) and instance in self._defs[owner],
-              f"unknown instance {owner}/{instance}")
-        m = validate_transform(transform, f"{owner}/{instance}")
+              f"unknown instance {show(owner)}/{show(instance)}")
+        m = validate_transform(transform, f"{show(owner)}/{show(instance)}")
         self._defs[owner][instance] = (self._defs[owner][instance][0], m)
 
     def remove_instance(self, owner: str, instance: str) -> None:
         _need(self._known(owner) and isinstance(instance, str) and instance in self._defs[owner],
-              f"unknown instance {owner}/{instance}")
+              f"unknown instance {show(owner)}/{show(instance)}")
         del self._defs[owner][instance]
 
     # analysis
@@ -253,7 +254,7 @@ class DefinitionGraph:
         Paths are slash-joined instance ids (`wing/room`). Output order and
         values do not depend on insertion order.
         """
-        _need(self._known(root), f"unknown definition {root!r}")
+        _need(self._known(root), f"unknown definition {show(root)}")
         cycle = self.find_cycle()
         if cycle:
             raise CycleError(cycle)

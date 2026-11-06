@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass
 
 from core.graph import dag
+from core.textsafe import show
 
 SCHEMA_VERSION = "1.0.0"
 MODULE_ID = re.compile(r"[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+\Z")
@@ -44,13 +45,13 @@ def _need(test: bool, reason: str) -> None:
 
 
 def _sid(value: object, label: str) -> str:
-    _need(isinstance(value, str) and SMALL_ID.match(value) is not None, f"{label}: invalid id {value!r}")
+    _need(isinstance(value, str) and SMALL_ID.match(value) is not None, f"{label}: invalid id {show(value)}")
     return value
 
 
 def _mid(value: object, label: str) -> str:
     _need(isinstance(value, str) and len(value) <= 180 and MODULE_ID.match(value) is not None,
-          f"{label}: invalid module id {value!r}")
+          f"{label}: invalid module id {show(value)}")
     return value
 
 
@@ -78,7 +79,7 @@ class Assembly:
 
     def neighbours(self, module_id: str) -> list[str]:
         """Modules sharing a seam with `module_id`, sorted."""
-        _need(module_id in self.modules, f"unknown module {module_id!r}")
+        _need(module_id in self.modules, f"unknown module {show(module_id)}")
         return sorted({p for s in self.seams if module_id in s.participants
                        for p in s.participants if p != module_id})
 
@@ -113,7 +114,7 @@ def _copy_modules(modules: object) -> dict[str, dict]:
         except (TypeError, ValueError, RecursionError) as exc:
             raise AssemblyError(f"module {n}: not plain JSON") from exc
         mid = _mid(module.get("moduleId"), f"module {n}")
-        _need(mid not in out, f"duplicate module {mid!r}")
+        _need(mid not in out, f"duplicate module {show(mid)}")
         _need(module.get("schemaVersion") == SCHEMA_VERSION, f"{mid}: unsupported schemaVersion")
         _need(type(module.get("revision")) is int and module["revision"] >= 0, f"{mid}: bad revision")
         parent = module.get("parentId")
@@ -159,8 +160,8 @@ def _check_links(mods: dict[str, dict]) -> tuple[dict[str, tuple[float, ...]], t
             need = d.get("minRevision")
             _need(type(need) is int and need >= 0, f"{mid}: dependency {dep} has a bad minRevision")
             _need(dep != mid, f"{mid}: depends on itself")
-            _need(dep in mods, f"{mid}: dependency {dep!r} is not in the assembly")
-            _need(dep not in seen, f"{mid}: duplicate dependency {dep!r}")
+            _need(dep in mods, f"{mid}: dependency {show(dep)} is not in the assembly")
+            _need(dep not in seen, f"{mid}: duplicate dependency {show(dep)}")
             _need(mods[dep]["revision"] >= need,
                   f"{mid}: dependency {dep} at revision {mods[dep]['revision']}, need >= {need}")
             seen.add(dep)
@@ -246,15 +247,15 @@ def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> 
         for seam in _list(module, "ownedSeams", mid):
             _need(isinstance(seam, dict), f"{mid}: seam must be an object")
             sid = _sid(seam.get("seamId"), f"{mid}.seam")
-            _need((mid, sid) not in owned, f"{mid}: duplicate seam {sid!r}")
-            _need(seam.get("ownerModuleId") == mid, f"{mid}.{sid}: declared by {mid} but owned by {seam.get('ownerModuleId')!r}")
+            _need((mid, sid) not in owned, f"{mid}: duplicate seam {show(sid)}")
+            _need(seam.get("ownerModuleId") == mid, f"{mid}.{sid}: declared by {mid} but owned by {show(seam.get('ownerModuleId'))}")
             parts = seam.get("participants")
             _need(isinstance(parts, list) and len(parts) == 2 and all(isinstance(p, str) for p in parts)
                   and parts[0] != parts[1], f"{mid}.{sid}: participants must be two distinct modules")
             _need(mid in parts, f"{mid}.{sid}: owner is not a participant")
             for p in parts:
-                _need(p in mods, f"{mid}.{sid}: participant {p!r} is not in the assembly")
-            _need(isinstance(seam.get("surfaceOpId"), str) and seam["surfaceOpId"] in ops, f"{mid}.{sid}: surfaceOpId {seam.get('surfaceOpId')!r} is not an operation of {mid}")
+                _need(p in mods, f"{mid}.{sid}: participant {show(p)} is not in the assembly")
+            _need(isinstance(seam.get("surfaceOpId"), str) and seam["surfaceOpId"] in ops, f"{mid}.{sid}: surfaceOpId {show(seam.get('surfaceOpId'))} is not an operation of {mid}")
             owned[(mid, sid)] = seam
 
     ports: dict[tuple[str, str], dict] = {}
@@ -262,7 +263,7 @@ def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> 
         for raw in _list(module, "ports", mid):
             _need(isinstance(raw, dict), f"{mid}: port must be an object")
             wp = _world_port(mid, raw, world[mid])
-            _need(wp["id"] not in ports, f"{mid}: duplicate port {wp['id'][1]!r}")
+            _need(wp["id"] not in ports, f"{mid}: duplicate port {show(wp['id'][1])}")
             ports[wp["id"]] = wp
 
     seams: list[Seam] = []
@@ -280,7 +281,7 @@ def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> 
         if pair in done:
             continue
         done.add(pair)
-        _need(a["seam"] == b["seam"], f"{label}: peers name different seams ({a['seam']!r} vs {b['seam']!r})")
+        _need(a["seam"] == b["seam"], f"{label}: peers name different seams ({show(a['seam'])} vs {show(b['seam'])})")
         _need(abs(sum(x * y for x, y in zip(a["normal"], b["normal"])) + 1) <= NORMAL_TOL,
               f"{label}: port normals are not opposite in world space")
         _need(math.dist(a["pos"], b["pos"]) <= POSITION_TOL, f"{label}: peer port frames do not coincide")
@@ -292,15 +293,15 @@ def _check_seams(mods: dict[str, dict], world: dict[str, tuple[float, ...]]) -> 
         sid, members = a["seam"], (pair[0][0], pair[1][0])
         owners = [m for m in members if (m, sid) in owned]
         if len(owners) > 1:
-            raise DuplicateOwnershipError(f"seam {sid!r} between {members[0]} and {members[1]} is owned by both")
-        _need(len(owners) == 1, f"seam {sid!r} between {members[0]} and {members[1]} has no owner")
+            raise DuplicateOwnershipError(f"seam {show(sid)} between {members[0]} and {members[1]} is owned by both")
+        _need(len(owners) == 1, f"seam {show(sid)} between {members[0]} and {members[1]} has no owner")
         seam = owned[(owners[0], sid)]
         _need(sorted(seam["participants"]) == sorted(members),
               f"{owners[0]}.{sid}: participants do not match the connected modules")
         used.add((owners[0], sid))
         seams.append(Seam(sid, owners[0], tuple(sorted(members)), seam["surfaceOpId"], pair))
     stray = sorted(set(owned) - used)
-    _need(not stray, f"seam {stray[0][1]!r} owned by {stray[0][0]} is not referenced by a port pair" if stray else "")
+    _need(not stray, f"seam {show(stray[0][1])} owned by {stray[0][0]} is not referenced by a port pair" if stray else "")
     return tuple(sorted(seams, key=lambda s: (s.participants, s.seam_id)))
 
 

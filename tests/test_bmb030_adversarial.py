@@ -539,10 +539,10 @@ class PathTraversalTests(unittest.TestCase):
         self.root.mkdir(mode=0o700)
 
     def listing(self):
-        return sorted(str(p.relative_to(self.outer)) for p in self.outer.rglob("*"))
+        return sorted(p.relative_to(self.outer).as_posix() for p in self.outer.rglob("*"))
 
     def assertContained(self):
-        outside = [e for e in self.listing() if e != "project" and not e.startswith("project" + os.sep)]
+        outside = [e for e in self.listing() if e != "project" and not e.startswith("project/")]
         self.assertEqual(outside, [], "something was created outside the project root")
 
     def test_module_and_key_ids_never_escape_the_project_root(self):
@@ -633,6 +633,58 @@ class PathTraversalTests(unittest.TestCase):
 
 META = {"io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {},
         "io.modelcontextprotocol/clientInfo": {"name": "qa", "version": "1"}}
+
+
+class ErrorMessageTests(unittest.TestCase):
+    """A rejection message is built before the check it reports on, from the hostile value itself.
+
+    `repr` of a very deeply nested value raises RecursionError, and where that happens depends on the platform's C
+    stack: the 5 000-deep fuzz values passed on Linux and failed on Windows. 200 000 levels fail everywhere, so this
+    test does not depend on the platform. Every entry point that names an id, key or role must answer with its typed
+    error, and the message must stay short."""
+
+    DEPTH = 200_000
+
+    def deep(self):
+        return h.deep_list(self.DEPTH)
+
+    def typed(self, call, *errors):
+        errors = errors or (ValueError,)
+        with self.assertRaises(errors) as caught:
+            call()
+        self.assertLess(len(str(caught.exception)), 1000)
+
+    def test_floor_and_wall_identifiers(self):
+        for key in ("opId", "materialId", "role"):
+            with self.subTest(key=key):
+                self.typed(lambda: build_floor_slab(dict(OPS["floor-1"], **{key: self.deep()})))
+
+    def test_assembly_and_graph_identifiers(self):
+        deep = self.deep()
+        self.typed(lambda: assemble([dict(TWO_ROOMS["modules"][0], moduleId=deep)]), AssemblyError)
+        graph = dag.DefinitionGraph()
+        graph.add_definition("a")
+        for call in (lambda: graph.add_definition(deep), lambda: graph.add_instance(deep, "i", "a", dag.IDENTITY),
+                     lambda: graph.add_instance("a", deep, "a", dag.IDENTITY), lambda: graph.instances(deep),
+                     lambda: graph.world_transforms(deep), lambda: graph.remove_instance("a", deep)):
+            self.typed(call, dag.GraphError)
+
+    def test_journal_identity_and_session_identifiers(self):
+        deep = self.deep()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "project"
+            root.mkdir(mode=0o700)
+            store = JournalStore.open(root)
+            store.create_module("safe/mod")
+            provider = ContextProvider(store)
+            block = [{"op": "add", "id": "b", "data": {}}]
+            for call in (lambda: store.create_module(deep), lambda: store.snapshot(deep), lambda: store.rollback(deep, 1, "k", 0),
+                         lambda: store.apply(deep, 0, "k", block), lambda: store.apply("safe/mod", 0, deep, block),
+                         lambda: store.apply("safe/mod", 0, "k", [{"op": "add", "id": deep, "data": {}}]),
+                         lambda: store.apply("safe/mod", deep, "k", block), lambda: store.rollback("safe/mod", 1, "k", deep),
+                         lambda: provider.module(deep), lambda: provider.revision_entries(deep)):
+                self.typed(call)
+            self.typed(lambda: SessionStore(root).path(deep))
 
 
 def rpc(method, params=None, ident=1):

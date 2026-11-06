@@ -13,6 +13,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from core.textsafe import show
 
 MODULE_ID_PATTERN = re.compile(r"[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+\Z")
 BLOCK_ID_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
@@ -59,7 +60,7 @@ def _need(test: bool, reason: str) -> None:
 
 def _slug(pattern: re.Pattern, value: object, label: str) -> str:
     _need(isinstance(value, str) and pattern.match(value) is not None,
-          f"{label}: invalid id {value!r}")
+          f"{label}: invalid id {show(value)}")
     return value
 
 
@@ -91,8 +92,11 @@ class ModuleStore:
     def modules(self) -> list[str]:
         return sorted(self._rev)
 
+    def _known(self, module_id: object) -> bool:
+        return isinstance(module_id, str) and module_id in self._rev   # `in` hashes: a list must not reach it
+
     def revision(self, module_id: str) -> int:
-        _need(module_id in self._rev, f"unknown module {module_id!r}")
+        _need(self._known(module_id), f"unknown module {show(module_id)}")
         return self._rev[module_id]
 
     def snapshot(self, module_id: str) -> tuple[int, dict[str, dict]]:
@@ -103,7 +107,7 @@ class ModuleStore:
     # edits
     def create_module(self, module_id: str) -> int:
         _slug(MODULE_ID_PATTERN, module_id, "module")
-        _need(module_id not in self._rev, f"duplicate module {module_id!r}")
+        _need(not self._known(module_id), f"duplicate module {show(module_id)}")
         _need(len(self._rev) < MAX_MODULES, "module budget exceeded")
         self._rev[module_id] = 0
         self._blocks[module_id] = {}
@@ -118,7 +122,7 @@ class ModuleStore:
         minimums, then the ops themselves. Only a fully valid batch bumps the
         revision (by exactly one) and records the key.
         """
-        _need(module_id in self._rev, f"unknown module {module_id!r}")
+        _need(self._known(module_id), f"unknown module {show(module_id)}")
         _need(type(expected_revision) is int and expected_revision >= 0, "expected_revision must be a non-negative int")
         _slug(KEY_PATTERN, idempotency_key, "idempotency key")
         _need(isinstance(ops, list) and 0 < len(ops) <= MAX_OPS_PER_BATCH, "ops must be 1..256 entries")
@@ -133,7 +137,7 @@ class ModuleStore:
         seen = self._keys[module_id].get(idempotency_key)
         if seen is not None:
             if seen[0] != fp:
-                raise IdempotencyConflictError(f"idempotency key {idempotency_key!r} reused for a different request")
+                raise IdempotencyConflictError(f"idempotency key {show(idempotency_key)} reused for a different request")
             return ApplyResult(module_id, seen[1], True)
 
         if expected_revision != self._rev[module_id]:
@@ -147,14 +151,14 @@ class ModuleStore:
         for item in checked:
             block, op = item["id"], item["op"]
             if op == "add":
-                _need(block not in staged, f"duplicate block {block!r}")
+                _need(block not in staged, f"duplicate block {show(block)}")
                 _need(len(staged) < MAX_BLOCKS_PER_MODULE, "block budget exceeded")
                 staged[block] = item["data"]
             elif op == "replace":
-                _need(block in staged, f"unknown block {block!r}")
+                _need(block in staged, f"unknown block {show(block)}")
                 staged[block] = item["data"]
             else:
-                _need(block in staged, f"unknown block {block!r}")
+                _need(block in staged, f"unknown block {show(block)}")
                 del staged[block]
 
         new_rev = self._rev[module_id] + 1

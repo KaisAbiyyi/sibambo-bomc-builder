@@ -19,6 +19,7 @@ from pathlib import Path
 from core.identity.store import (
     KEY_PATTERN, MODULE_ID_PATTERN, ApplyResult, IdempotencyConflictError, IdentityError,
     ModuleStore, StaleRevisionError, _fingerprint)
+from core.textsafe import show
 
 GENESIS = "0" * 64
 JOURNAL = "journal.jsonl"
@@ -64,7 +65,7 @@ def _dirname(module_id: str) -> str:
 def _module_id(dirname: str) -> str:
     module_id = dirname.replace("__", "/")
     if MODULE_ID_PATTERN.match(module_id) is None or _dirname(module_id) != dirname:
-        raise CorruptJournalError(f"unexpected directory {dirname!r} under modules/")
+        raise CorruptJournalError(f"unexpected directory {show(dirname)} under modules/")
     return module_id
 
 
@@ -99,7 +100,7 @@ class JournalStore(ModuleStore):
         wanted = sorted(found) if modules is None else list(modules)
         for module_id in wanted:
             if not isinstance(module_id, str) or module_id not in found:
-                raise StorageError(f"no journal for module {module_id!r}")
+                raise StorageError(f"no journal for module {show(module_id)}")
         for module_id in sorted(set(wanted)):
             store._load(module_id)
         return store
@@ -297,20 +298,20 @@ class JournalStore(ModuleStore):
         History is kept: revision numbers only grow. A repeated key with the
         same request replays; the same key for a different request is rejected.
         """
-        if module_id not in self._rev:
-            raise IdentityError(f"unknown module {module_id!r}")
+        if not self._known(module_id):
+            raise IdentityError(f"unknown module {show(module_id)}")
         self._refuse_uncertain(module_id, None)
         if type(expected_revision) is not int or expected_revision < 0:
             raise IdentityError("expected_revision must be a non-negative int")
         if type(to_revision) is not int or to_revision < 0:
             raise IdentityError("to_revision must be a non-negative int")
         if not isinstance(idempotency_key, str) or KEY_PATTERN.match(idempotency_key) is None:
-            raise IdentityError(f"idempotency key: invalid id {idempotency_key!r}")
+            raise IdentityError(f"idempotency key: invalid id {show(idempotency_key)}")
         fp = _fingerprint(module_id, expected_revision, [{"op": "rollback", "to": to_revision}], {})
         seen = self._keys[module_id].get(idempotency_key)
         if seen is not None:
             if seen[0] != fp:
-                raise IdempotencyConflictError(f"idempotency key {idempotency_key!r} reused for a different request")
+                raise IdempotencyConflictError(f"idempotency key {show(idempotency_key)} reused for a different request")
             return ApplyResult(module_id, seen[1], True)
         if expected_revision != self._rev[module_id]:
             raise StaleRevisionError(module_id, expected_revision, self._rev[module_id])
@@ -347,7 +348,8 @@ class JournalStore(ModuleStore):
 
     def _refuse_uncertain(self, module_id: str, min_revisions: object) -> None:
         deps = set(min_revisions) if isinstance(min_revisions, dict) else set()
-        blocked = sorted(({module_id} | deps) & self._uncertain)
+        own = {module_id} if isinstance(module_id, str) else set()   # an unhashable id is rejected by the base class
+        blocked = sorted((own | deps) & self._uncertain)
         if blocked:  # even an idempotent replay must not report success for a record that may be lost
             raise DurabilityUncertainError(f"{blocked[0]}: durability of the newest record is unknown; call recover()")
 
@@ -358,8 +360,8 @@ class JournalStore(ModuleStore):
         over the journal, and the module is reloaded and checked. If any step fails the
         module stays quarantined and the original file is left in place.
         """
-        if module_id not in self._rev:
-            raise IdentityError(f"unknown module {module_id!r}")
+        if not self._known(module_id):
+            raise IdentityError(f"unknown module {show(module_id)}")
         if module_id not in self._uncertain:
             return
         path = self._path(module_id)
