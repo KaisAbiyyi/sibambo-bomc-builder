@@ -23,6 +23,7 @@ from core.storage.journal import JournalStore
 from core.storage import DurabilityUncertainError
 
 SESSION_ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
+WINDOWS_DEVICE = re.compile(r"(con|prn|aux|nul|com[1-9]|lpt[1-9])\Z")  # 'con.jsonl' opens the console on Windows
 GENESIS = "0" * 64
 MAX_ENTRIES = 10_000
 MAX_LINE_BYTES = 128 * 1024
@@ -102,6 +103,7 @@ class SessionStore:
 
     def path(self, session_id: str) -> Path:
         _need(isinstance(session_id, str) and SESSION_ID.match(session_id) is not None, f"invalid session id {session_id!r}")
+        _need(WINDOWS_DEVICE.match(session_id) is None, f"session id {session_id!r} is a reserved device name")
         return self.root / f"{session_id}.jsonl"
 
     def sessions(self) -> list[str]:
@@ -160,7 +162,7 @@ class Session:
                 _need(isinstance(entry, dict) and entry.get("seq") == n and entry.get("prev") == prev
                       and entry.get("hash") == _entry_hash(entry), "chain, sequence or hash mismatch")
                 self._apply_loaded(entry, n)
-            except (ValueError, KeyError, TypeError, UnicodeDecodeError) as exc:
+            except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError) as exc:
                 raise SessionError(f"{self.path.name}: corrupt at line {n + 1}: {exc}") from exc
             prev = entry["hash"]
         self._tail, self._size, self._seq = prev, len(data), len(lines) - 1

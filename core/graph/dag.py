@@ -143,26 +143,30 @@ class DefinitionGraph:
         # defId -> {instanceId: (targetDefId, transform)}
         self._defs: dict[str, dict[str, tuple[str, tuple[float, ...]]]] = {}
 
+    def _known(self, name: object) -> bool:
+        """Membership that is safe for any hostile argument: an unhashable value is simply not a definition."""
+        return isinstance(name, str) and name in self._defs
+
     # queries
     def definitions(self) -> list[str]:
         return sorted(self._defs)
 
     def instances(self, definition: str) -> list[tuple[str, str, tuple[float, ...]]]:
-        _need(definition in self._defs, f"unknown definition {definition!r}")
+        _need(self._known(definition), f"unknown definition {definition!r}")
         return [(i, t, m) for i, (t, m) in sorted(self._defs[definition].items())]
 
     # edits
     def add_definition(self, definition: str) -> None:
         _id(definition, "definition")
-        _need(definition not in self._defs, f"duplicate definition {definition!r}")
+        _need(definition not in self._defs, f"duplicate definition {definition!r}")  # validated as a str above
         _need(len(self._defs) < MAX_DEFINITIONS, "definition budget exceeded")
         self._defs[definition] = {}
 
     def add_instance(self, owner: str, instance: str, target: str,
                      transform: tuple[float, ...] = IDENTITY) -> None:
         _id(instance, "instance")
-        _need(owner in self._defs, f"unknown definition {owner!r}")
-        _need(target in self._defs, f"unknown definition {target!r}")
+        _need(self._known(owner), f"unknown definition {owner!r}")
+        _need(self._known(target), f"unknown definition {target!r}")
         _need(instance not in self._defs[owner], f"duplicate instance {owner}/{instance}")
         _need(len(self._defs[owner]) < MAX_INSTANCES_PER_DEFINITION, "instance budget exceeded")
         m = validate_transform(transform, f"{owner}/{instance}")
@@ -172,13 +176,13 @@ class DefinitionGraph:
         self._defs[owner][instance] = (target, m)
 
     def set_transform(self, owner: str, instance: str, transform: tuple[float, ...]) -> None:
-        _need(owner in self._defs and instance in self._defs[owner],
+        _need(self._known(owner) and isinstance(instance, str) and instance in self._defs[owner],
               f"unknown instance {owner}/{instance}")
         m = validate_transform(transform, f"{owner}/{instance}")
         self._defs[owner][instance] = (self._defs[owner][instance][0], m)
 
     def remove_instance(self, owner: str, instance: str) -> None:
-        _need(owner in self._defs and instance in self._defs[owner],
+        _need(self._known(owner) and isinstance(instance, str) and instance in self._defs[owner],
               f"unknown instance {owner}/{instance}")
         del self._defs[owner][instance]
 
@@ -249,7 +253,7 @@ class DefinitionGraph:
         Paths are slash-joined instance ids (`wing/room`). Output order and
         values do not depend on insertion order.
         """
-        _need(root in self._defs, f"unknown definition {root!r}")
+        _need(self._known(root), f"unknown definition {root!r}")
         cycle = self.find_cycle()
         if cycle:
             raise CycleError(cycle)

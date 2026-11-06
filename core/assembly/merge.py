@@ -24,6 +24,7 @@ MAX_MODULES = 1024
 MAX_ITEMS = 256               # ports, seams, dependencies per module (schema maxItems)
 MAX_OPERATIONS = 10_000       # operations per module (schema maxItems)
 MAX_PARENT_DEPTH = dag.MAX_DEPTH
+MAX_JSON_DEPTH = 64           # nesting accepted inside any module value (the real schema needs about 6)
 NORMAL_TOL = 1e-6
 POSITION_TOL = 1e-3           # metres
 SPAN_TOL = 1e-3               # metres
@@ -88,12 +89,25 @@ class Assembly:
         return [s for s in self.seams if s.owner == module_id]
 
 
+def _check_depth(value: object, label: str) -> None:
+    """Iterative nesting check: acceptance must not depend on the interpreter's recursion limit."""
+    stack = [(value, 1)]
+    while stack:
+        item, depth = stack.pop()
+        _need(depth <= MAX_JSON_DEPTH, f"{label}: JSON nesting exceeds depth {MAX_JSON_DEPTH}")
+        if isinstance(item, dict):
+            stack.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, (list, tuple)):
+            stack.extend((child, depth + 1) for child in item)
+
+
 def _copy_modules(modules: object) -> dict[str, dict]:
     _need(isinstance(modules, (list, tuple)) and 0 < len(modules) <= MAX_MODULES,
           f"modules must be a list of 1..{MAX_MODULES}")
     out: dict[str, dict] = {}
     for n, raw in enumerate(modules):
         _need(isinstance(raw, dict), f"module {n}: must be an object")
+        _check_depth(raw, f"module {n}")
         try:
             module = json.loads(json.dumps(raw, allow_nan=False))  # detach and require plain JSON
         except (TypeError, ValueError, RecursionError) as exc:
@@ -152,21 +166,29 @@ def _check_links(mods: dict[str, dict]) -> tuple[dict[str, tuple[float, ...]], t
             seen.add(dep)
         deps[mid] = sorted(seen)
 
+    # Iterative post-order DFS: a dependency chain as deep as the module cap must not hit the recursion limit.
     order: list[str] = []
     state: dict[str, int] = {}
-
-    def visit(mid: str, trail: tuple[str, ...]) -> None:
-        if state.get(mid) == 2:
-            return
-        _need(state.get(mid) != 1, "dependency cycle: " + " -> ".join(trail + (mid,)))
-        state[mid] = 1
-        for dep in deps[mid]:
-            visit(dep, trail + (mid,))
-        state[mid] = 2
-        order.append(mid)
-
-    for mid in mods:
-        visit(mid, ())
+    for start in mods:
+        if state.get(start) == 2:
+            continue
+        state[start] = 1
+        trail = [start]
+        stack = [iter(deps[start])]
+        while stack:
+            dep = next(stack[-1], None)
+            if dep is None:
+                node = trail.pop()
+                stack.pop()
+                state[node] = 2
+                order.append(node)
+                continue
+            if state.get(dep) == 2:
+                continue
+            _need(state.get(dep) != 1, "dependency cycle: " + " -> ".join(trail + [dep]))
+            state[dep] = 1
+            trail.append(dep)
+            stack.append(iter(deps[dep]))
     return world, tuple(order)
 
 

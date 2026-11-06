@@ -138,7 +138,7 @@ def compile_assembly(assembly: Assembly) -> Compiled:
             vec = bounds[part]
             _need(isinstance(vec, list) and len(vec) == 3, f"{mid}: malformed bounds")
             for v in vec:
-                _need(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 1e6,
+                _need(type(v) in (int, float) and abs(v) <= 1e6 and math.isfinite(v),  # magnitude first: isfinite(10**400) overflows
                       f"{mid}: invalid bounds")
         if not doc["operations"]:
             _need(all(v == 0 for part in ("min", "max") for v in bounds[part]),

@@ -162,7 +162,7 @@ class JournalStore(ModuleStore):
                 if n == 0:
                     self._history[module_id] = []
                 prev = entry["hash"]
-        except (ValueError, KeyError, TypeError, AttributeError, IdentityError) as exc:
+        except (ValueError, KeyError, TypeError, AttributeError, IdentityError, RecursionError) as exc:
             self._forget(module_id)
             raise CorruptJournalError(f"{module_id}: corrupt journal at line {n + 1}: {exc}") from exc
         self._tail[module_id] = (prev, len(data))
