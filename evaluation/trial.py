@@ -146,6 +146,17 @@ def readback_checks(document: dict, payload: bytes, receipt: dict) -> list:
                          f"reader {len(model['faces'])} vs compiler {receipt['faceCount']}"))
     checks.append(_check("triangles_match_receipt", model["triangles"] == receipt["triangleCount"],
                          f"reader {model['triangles']} vs compiler {receipt['triangleCount']}"))
+    # Every other number the result reports about the model is decoded independently too, not copied from the receipt.
+    decoded = {
+        "size_matches_receipt": (len(payload), receipt["sizeBytes"]),
+        "nodes_match_receipt": (len(model["nodes"]), receipt["nodeCount"]),
+        "meshes_match_receipt": (len(model["meshDefinitions"]), receipt["meshCount"]),
+        "vertices_match_receipt": (sum(model["meshVertices"]), receipt["vertexCount"]),
+        "materials_match_receipt": (model["counts"]["materials"], receipt["materialCount"]),
+        "strings_match_receipt": (len(model["strings"]), receipt["stringCount"]),
+    }
+    for check_id, (got, claimed) in decoded.items():
+        checks.append(_check(check_id, got == claimed, f"reader {got} vs compiler {claimed}"))
     checks.append(_check("sections_match_receipt", list(model["sections"]) == receipt["sections"], str(list(model["sections"]))))
     want = expected_world_bounds(document)
     if want is None:

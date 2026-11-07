@@ -32,7 +32,7 @@ Every check is `PASS`, `FAIL` or `NOT_RUN`:
 | `assembly_validator` | the BMB-012 validator accepts the assembly |
 | `floor_area_two_calculations_agree` | `build_floor_slab(...).area` from the real geometry core vs an independent shoelace sum of the footprints (18.0 m² here) |
 | `independent_readback` | the Builder's strict reader (`tests/interop/reader.py`, written independently of the compiler) accepts the bytes: CRC, directory, geometry |
-| `faces_match_receipt`, `triangles_match_receipt`, `sections_match_receipt` | what the reader decoded vs what the compiler claims |
+| `faces_`, `triangles_`, `nodes_`, `meshes_`, `vertices_`, `materials_`, `strings_`, `sections_match_receipt`, `size_matches_receipt` | every count and the size the result reports about the model, decoded by the reader and compared with what the compiler claims (none is merely copied from the receipt) |
 | `world_bounds` | the decoded bounds vs the union of the IR's module bounds under their translations (6 x 3 x 2.8 m) |
 | `geometry_semantics_valid_per_compiler` | the compiler's own semantic receipt |
 | `revision_locality_and_replay` | stale edit rejected, the untouched module's journal hash unchanged, replay idempotent |
@@ -42,7 +42,7 @@ The reader is a **Builder-side** decoder, not an original consumer; `editor_impo
 ## Protocol (from BMB-004)
 
 - **Cold trials.** Each trial is a fresh interpreter (`python -m evaluation.trial`) with a new private project directory; the compile runs in two further fresh interpreters. Nothing is reused. Default **three** trials.
-- **Deterministic vs descriptive.** Deterministic quantities must be **identical in every trial**; `deterministic.identical` in the summary records whether they were, and a difference fails the run. Descriptive quantities (time, memory) are summarized as min / median / nearest-rank P95 / max. With three trials a P95 is the maximum and is **descriptive, not a guarantee**.
+- **Deterministic vs descriptive.** Deterministic quantities must be **identical in every trial**, and so must the pins (fixture, assembly, compiler sources, golden, commit, fixture id, controller): trials that ran different inputs are not repeats even if their numbers coincide; `deterministic.identical` in the summary records whether they were, and a difference fails the run. Descriptive quantities (time, memory) are summarized as min / median / nearest-rank P95 / max. With three trials a P95 is the maximum and is **descriptive, not a guarantee**.
 - **Failed trials stay in the denominator.** A crashed or failing trial counts as failed and fails the run.
 - **Gates.** Each gate is `PASS`, `FAIL` or `NOT_RUN`. `overall` is `INCOMPLETE` while a mandatory consumer gate is `NOT_RUN`, and can never read `PASS` then.
 

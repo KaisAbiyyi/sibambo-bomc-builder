@@ -284,6 +284,22 @@ class ReadbackAndGeometryTests(unittest.TestCase):
         wrong = {**self.receipt, "sections": self.receipt["sections"][:-1]}
         self.assertIn("FAIL", [c["status"] for c in trial.readback_checks(ASSEMBLY, self.payload, wrong)])
 
+    def test_every_count_the_result_reports_is_independently_decoded(self):
+        # Review of the first version: vertexCount, meshCount and nodeCount were copied from the compiler receipt and
+        # never compared with the reader. Each reported number must now have a check that fails when it is wrong.
+        wanted = {"vertexCount": "vertices_match_receipt", "meshCount": "meshes_match_receipt",
+                  "nodeCount": "nodes_match_receipt", "materialCount": "materials_match_receipt",
+                  "stringCount": "strings_match_receipt", "sizeBytes": "size_matches_receipt"}
+        honest = {c["id"]: c["status"] for c in trial.readback_checks(ASSEMBLY, self.payload, self.receipt)}
+        for field, check in wanted.items():
+            with self.subTest(field=field):
+                self.assertEqual(honest.get(check), "PASS", f"missing or failing honest check {check}")
+                wrong = {**self.receipt, field: self.receipt[field] + 1}
+                statuses = {c["id"]: c["status"] for c in trial.readback_checks(ASSEMBLY, self.payload, wrong)}
+                self.assertEqual(statuses.get(check), "FAIL", f"a wrong {field} went unnoticed")
+                self.assertEqual({k: v for k, v in statuses.items() if k != check and v == "FAIL"}, {},
+                                 "one wrong number must fail exactly its own check")
+
     def test_bounds_that_disagree_with_the_ir_are_a_failure(self):
         shifted = copy.deepcopy(ASSEMBLY)
         shifted["modules"][1]["bounds"]["max"][0] = 5.0
@@ -438,6 +454,28 @@ class AggregationTests(unittest.TestCase):
     def test_all_trials_failed(self):
         s = runner.summarize([{"trialId": 1, "overall": "FAIL", "error": "x"}])
         self.assertEqual((s["trialsCompleted"], s["overall"]), (0, "FAIL"))
+
+    def test_trials_that_ran_different_inputs_are_not_identical_even_if_outputs_match(self):
+        # Review of the first version: the comparison ignored the pins, so different fixtures, compiler sources or
+        # commits that happened to give the same measured numbers still read as deterministic.
+        for label, mutate in (
+                ("fixture", lambda t: t["inputs"].update(promptFixtureSha256="0" * 64)),
+                ("assembly", lambda t: t["inputs"].update(assemblySha256="1" * 64)),
+                ("compiler source", lambda t: t["inputs"]["compilerSources"].update({trial.COMPILER_SOURCES[0]: "2" * 64})),
+                ("golden", lambda t: t["inputs"].update(goldenSha256="3" * 64)),
+                ("commit", lambda t: t.update(implementationSha="4" * 40)),
+                ("fixture id", lambda t: t.update(fixtureId="another-fixture")),
+                ("controller", lambda t: t.update(controller="someone-else"))):
+            with self.subTest(changed=label):
+                trials = self.clones(3)
+                mutate(trials[2])
+                summary = runner.summarize(trials)
+                self.assertFalse(summary["deterministic"]["identical"])
+                self.assertEqual(summary["overall"], "FAIL")
+                self.assertTrue(summary["deterministic"]["differingSections"])
+
+    def test_identical_pins_stay_identical(self):
+        self.assertTrue(runner.summarize(self.clones(3))["deterministic"]["identical"])
 
     def test_timing_differences_never_count_as_nondeterminism(self):
         trials = self.clones(3)

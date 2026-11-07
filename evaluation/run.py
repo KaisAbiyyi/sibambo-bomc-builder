@@ -41,7 +41,11 @@ def run_trial_process(index: int, timeout: int = 600) -> dict:
 
 def deterministic_view(trial: dict) -> dict:
     m = trial["metrics"]
-    return {"workflow": {k: m["workflow"][k] for k in DETERMINISTIC_WORKFLOW},
+    # The pins are part of "the same run": trials of different fixtures, compiler sources, golden or commit are not
+    # repeats of each other even if their measured numbers happen to coincide.
+    return {"pins": {"inputs": trial["inputs"], "implementationSha": trial["implementationSha"],
+                     "fixtureId": trial["fixtureId"], "controller": trial["controller"]},
+            "workflow": {k: m["workflow"][k] for k in DETERMINISTIC_WORKFLOW},
             "model": {k: m["model"][k] for k in DETERMINISTIC_MODEL},
             "checks": {c["id"]: c["status"] for c in trial["acceptance"]["checks"]},
             "gates": trial["gates"], "overall": trial["overall"]}
