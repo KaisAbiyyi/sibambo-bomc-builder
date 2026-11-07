@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/schemas/benchmark-result-v1.schema.json",
+  "title": "BMB-028 single-trial benchmark result (bmb028-result-v1)",
+  "description": "Extends the BMB-004 result envelope. Deterministic quantities must repeat exactly across trials; elapsed time and memory are descriptive. Gate values are PASS, FAIL or NOT_RUN; overall is never PASS while a mandatory consumer gate is NOT_RUN.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "fixtureId", "baselineFixtureId", "baselineStatus", "baselineNote", "implementationSha",
+               "controller", "trialId", "environment", "inputs", "metrics", "acceptance", "gates", "overall"],
+  "properties": {
+    "schemaVersion": {"const": "bmb028-result-v1"},
+    "fixtureId": {"type": "string"},
+    "baselineFixtureId": {"type": "string"},
+    "baselineStatus": {"enum": ["PASS", "FAIL", "NOT_RUN"]},
+    "baselineNote": {"type": "string"},
+    "implementationSha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+    "controller": {"type": "string"},
+    "trialId": {"type": "integer", "minimum": 1},
+    "environment": {"type": "object", "required": ["platform", "python", "cpuCount", "llm", "network"]},
+    "inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["promptFixtureSha256", "assemblySha256", "textHashing", "compilerSources", "goldenSha256"],
+      "properties": {
+        "promptFixtureSha256": {"$ref": "#/$defs/sha256"},
+        "textHashing": {"type": "string"},
+        "assemblySha256": {"$ref": "#/$defs/sha256"},
+        "compilerSources": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/sha256"}},
+        "goldenSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false, "required": ["workflow", "model"],
+      "properties": {
+        "workflow": {
+          "type": "object", "additionalProperties": false,
+          "required": ["requests", "toolCalls", "rejectedToolCalls", "retries", "rejectionCodes", "estimatedInputTokens",
+                       "estimatedOutputTokens", "tokenEstimator", "providerTokens", "providerTokensNote", "requestBytes",
+                       "responseBytes", "mcpProcessMs", "mcpBatches", "slowestBatchMs", "elapsedMs",
+                       "driverPeakPythonBytes", "childPeakRssBytes", "childPeakRssNote"],
+          "properties": {
+            "requests": {"type": "integer", "minimum": 1}, "toolCalls": {"type": "integer", "minimum": 1},
+            "rejectedToolCalls": {"type": "integer", "minimum": 0}, "retries": {"type": "integer", "minimum": 0},
+            "rejectionCodes": {"type": "array", "items": {"type": "string"}},
+            "estimatedInputTokens": {"type": "integer", "minimum": 0}, "estimatedOutputTokens": {"type": "integer", "minimum": 0},
+            "tokenEstimator": {"type": "string"}, "providerTokens": {"type": "null"}, "providerTokensNote": {"type": "string"},
+            "requestBytes": {"type": "integer", "minimum": 0}, "responseBytes": {"type": "integer", "minimum": 0},
+            "mcpProcessMs": {"type": "number", "minimum": 0}, "mcpBatches": {"type": "integer", "minimum": 1},
+            "slowestBatchMs": {"type": "number", "minimum": 0}, "elapsedMs": {"type": "number", "minimum": 0},
+            "driverPeakPythonBytes": {"type": "integer", "minimum": 0},
+            "childPeakRssBytes": {"type": ["integer", "null"], "minimum": 0}, "childPeakRssNote": {"type": "string"}
+          }
+        },
+        "model": {
+          "type": "object", "additionalProperties": false,
+          "required": ["bomcBytes", "sha256", "sections", "faceCount", "triangleCount", "vertexCount", "meshCount", "nodeCount",
+                       "coldCompiles", "identicalAcrossColdProcesses", "matchesCheckedInGolden", "floorAreaM2"],
+          "properties": {
+            "bomcBytes": {"type": ["integer", "null"], "minimum": 1}, "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+            "sections": {"type": ["array", "null"], "items": {"type": "integer"}},
+            "faceCount": {"type": ["integer", "null"]}, "triangleCount": {"type": ["integer", "null"]},
+            "vertexCount": {"type": ["integer", "null"]}, "meshCount": {"type": ["integer", "null"]},
+            "nodeCount": {"type": ["integer", "null"]},
+            "coldCompiles": {"type": "array", "minItems": 2, "maxItems": 2, "items": {
+              "type": "object", "required": ["wallMs", "compileMs", "peakRssBytes"]}},
+            "identicalAcrossColdProcesses": {"type": "boolean"},
+            "matchesCheckedInGolden": {"type": ["boolean", "null"]},
+            "floorAreaM2": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object", "additionalProperties": false, "required": ["checks"],
+      "properties": {"checks": {"type": "array", "minItems": 1, "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "status", "detail"],
+        "properties": {"id": {"type": "string"}, "status": {"enum": ["PASS", "FAIL", "NOT_RUN"]}, "detail": {"type": "string"}}}}}
+    },
+    "gates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["security", "geometry", "revision_locality", "determinism", "editor_import", "model_eval_import",
+                   "baseline_four_room_fixture", "live_llm_tokens", "metrics_recorded"],
+      "properties": {
+        "security": {"$ref": "#/$defs/gate"}, "geometry": {"$ref": "#/$defs/gate"}, "revision_locality": {"$ref": "#/$defs/gate"},
+        "determinism": {"$ref": "#/$defs/gate"}, "editor_import": {"$ref": "#/$defs/gate"},
+        "model_eval_import": {"$ref": "#/$defs/gate"}, "baseline_four_room_fixture": {"$ref": "#/$defs/gate"},
+        "live_llm_tokens": {"$ref": "#/$defs/gate"}, "metrics_recorded": {"$ref": "#/$defs/gate"}
+      }
+    },
+    "overall": {"enum": ["PASS", "FAIL", "INCOMPLETE"]}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gate": {"enum": ["PASS", "FAIL", "NOT_RUN"]}
+  }
+}
