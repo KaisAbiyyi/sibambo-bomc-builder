@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "survey-v1",
+  "surveyId": "demo-survey",
+  "answers": {"bedrooms": 2, "bathrooms": 1, "size": "compact"}
+}

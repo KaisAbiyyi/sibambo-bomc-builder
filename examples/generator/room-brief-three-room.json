@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "room-brief-v1",
+  "briefId": "demo-three-room",
+  "project": "house",
+  "floorId": "floor-1",
+  "depthM": 3.0,
+  "wallHeightM": 2.8,
+  "rooms": [
+    {"id": "living", "name": "Living room", "kind": "living", "widthM": 4.5},
+    {"id": "bedroom-1", "name": "Bedroom 1", "kind": "bedroom", "widthM": 3.0},
+    {"id": "bath-1", "name": "Bathroom", "kind": "bath", "widthM": 2.0}
+  ],
+  "doors": [
+    {"between": ["living", "bedroom-1"], "widthM": 0.9},
+    {"between": ["bedroom-1", "bath-1"], "widthM": 0.85}
+  ]
+}
