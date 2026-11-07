@@ -8,6 +8,7 @@ on:
       - "examples/rooms/**"
       - "examples/module-ir-two-rooms.json"
       - "tests/test_bmb029_rooms.py"
+      - "tests/test_bmb032_generator.py"
       - "tests/qa/**"
       - "docs/BMB-029-ROOMS-ADAPTER.md"
       - ".github/workflows/bmb029-rooms.yml"
@@ -19,6 +20,7 @@ on:
       - "examples/rooms/**"
       - "examples/module-ir-two-rooms.json"
       - "tests/test_bmb029_rooms.py"
+      - "tests/test_bmb032_generator.py"
       - "tests/qa/**"
       - "docs/BMB-029-ROOMS-ADAPTER.md"
       - ".github/workflows/bmb029-rooms.yml"
@@ -61,6 +63,8 @@ jobs:
           for t in test_bmb011_assembly test_bmb012_validator test_bmb022_cli test_bmb023_mcp; do
             python -m unittest discover -s tests -p "${t}.py"
           done
+      - name: No integration module reads the environment except the adapter's one feature flag
+        run: python -m unittest tests.test_bmb032_generator.NoLlmNoNetworkTests -v
       - name: The adapter is off by default and on only when asked
         shell: bash
         run: |
@@ -75,6 +79,16 @@ jobs:
           set -e
           test "${code}" = "1"
           python -c "import json; d=json.load(open('merged.json')); assert [x['code'] for x in d['rooms']['diagnostics']]==['ROOM_MERGED'], d"
+      - name: A comparison that compared nothing is not a pass
+        shell: bash
+        run: |
+          python -c "import json; d=json.load(open('examples/rooms/evidence-two-rooms.json')); d['elevationM']=100; [r.update(confidence=0.2) for r in d['rooms']]; json.dump(d, open('elsewhere.json','w'))"
+          set +e
+          python -m integration.rooms check --enable --assembly examples/module-ir-two-rooms.json --evidence elsewhere.json > nothing.json
+          code=$?
+          set -e
+          test "${code}" = "1"
+          python -c "import json; d=json.load(open('nothing.json')); assert d['ok'] is False and 'NO_COMPARABLE_ROOMS' in [x['code'] for x in d['rooms']['diagnostics']], d"
       - name: Record the evidence
         if: always()
         shell: bash

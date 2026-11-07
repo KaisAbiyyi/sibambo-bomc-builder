@@ -19,6 +19,11 @@ MAX_BYTES = 256 * 1024
 MAX_ROOMS = 64
 MAX_VERTICES = 256
 MAX_TOTAL_VERTICES = 4096
+# The vertex limits alone do not bound the work: the core triangulator's output (and time) grows roughly with the square of
+# the vertex count for a star-shaped room (256 vertices give about 4000 triangles, a few tenths of a second each). The
+# triangles of every room in the evidence therefore have a total budget, counted as the rooms are checked; going over it is a
+# typed refusal, so a hostile evidence file cannot make the adapter spend its time triangulating.
+MAX_TOTAL_TRIANGLES = 8000
 MAX_COORD_M = 10_000.0
 MIN_AREA_M2 = 0.01
 SLUG = re.compile(r"[a-z][a-z0-9-]{0,35}\Z")         # \Z, never $: "$" also matches before a final newline
@@ -78,7 +83,7 @@ def validate_evidence(value: object) -> dict:
     detector = _object(data["detector"], {"name", "version"}, set(), "detector")
     rooms_in = data["rooms"]
     _need(isinstance(rooms_in, list) and 1 <= len(rooms_in) <= MAX_ROOMS, f"rooms: expected 1..{MAX_ROOMS} rooms")
-    rooms, seen, total = [], set(), 0
+    rooms, seen, total, total_triangles = [], set(), 0, 0
     for i, raw in enumerate(rooms_in):
         room = _object(raw, {"id", "polygon"}, {"confidence", "label"}, f"rooms[{i}]")
         rid = _slug(room["id"], f"rooms[{i}].id")
@@ -95,9 +100,12 @@ def validate_evidence(value: object) -> dict:
             poly.append([_number(point[0], -MAX_COORD_M, MAX_COORD_M, f"rooms[{i}].polygon[{j}][0]"),
                          _number(point[1], -MAX_COORD_M, MAX_COORD_M, f"rooms[{i}].polygon[{j}][1]")])
         try:
-            triangulate_face([(x, y, 0.0) for x, y in poly])           # rejects self-intersecting / degenerate rings
+            pieces = triangulate_face([(x, y, 0.0) for x, y in poly])  # rejects self-intersecting / degenerate rings
         except TriangulationError as exc:
             raise EvidenceError(f"rooms[{i}].polygon: not a simple polygon ({exc})") from exc
+        total_triangles += len(pieces)
+        _need(total_triangles <= MAX_TOTAL_TRIANGLES,
+              f"evidence is too complex: its rooms need more than {MAX_TOTAL_TRIANGLES} triangles in total")
         _need(_area(poly) >= MIN_AREA_M2, f"rooms[{i}].polygon: area below {MIN_AREA_M2} m2")
         normalized = {"id": rid, "polygon": poly,
                       "confidence": _number(room.get("confidence", 1.0), 0.0, 1.0, f"rooms[{i}].confidence")}
@@ -111,5 +119,10 @@ def validate_evidence(value: object) -> dict:
             "rooms": sorted(rooms, key=lambda r: r["id"])}
 
 
+def digest(normalized: dict) -> str:
+    """SHA-256 of evidence that `validate_evidence` already returned (no second validation, so no second triangulation)."""
+    return hashlib.sha256(canonical(normalized).encode("utf-8")).hexdigest()
+
+
 def evidence_sha256(evidence: dict) -> str:
-    return hashlib.sha256(canonical(validate_evidence(evidence)).encode("utf-8")).hexdigest()
+    return digest(validate_evidence(evidence))

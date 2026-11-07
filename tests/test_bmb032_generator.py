@@ -609,6 +609,38 @@ class NoLlmNoNetworkTests(unittest.TestCase):
     FORBIDDEN = {"socket", "ssl", "http", "urllib", "ftplib", "smtplib", "requests", "httpx", "aiohttp",
                  "anthropic", "openai", "google", "cohere", "mistralai", "ollama", "websockets"}
 
+    # The ONE environment read allowed anywhere under integration/: the optional rooms adapter's feature flag (BMB-029).
+    FLAG_MODULE = ("rooms", "flag.py")
+    FLAG_VARIABLE = "BMB_ROOMS_ADAPTER"
+
+    @classmethod
+    def environment_reads(cls, root: Path) -> list:
+        """'path:line' of every environment read under root/integration, except the exact feature-flag read described above:
+        in integration/rooms/flag.py, `os.environ.get(ENV_FLAG, ...)` while `ENV_FLAG == "BMB_ROOMS_ADAPTER"`. Reading any
+        other variable there, reading that variable from any other file, or importing `environ`/`getenv` directly is reported."""
+        found = []
+        for path in sorted((root / "integration").rglob("*.py")):
+            rel = path.relative_to(root / "integration").parts
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+            flag_name = next((n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
+                              and any(isinstance(t, ast.Name) and t.id == "ENV_FLAG" for t in n.targets)), None)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module == "os" and any(a.name in ("environ", "getenv") for a in node.names):
+                    found.append(f"{'/'.join(rel)}:{node.lineno}")
+                if not (isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv")):
+                    continue
+                get = parents.get(node)
+                call = parents.get(get)
+                is_the_flag_read = (
+                    rel == cls.FLAG_MODULE and flag_name == cls.FLAG_VARIABLE and node.attr == "environ"
+                    and isinstance(node.value, ast.Name) and node.value.id == "os"
+                    and isinstance(get, ast.Attribute) and get.attr == "get" and isinstance(call, ast.Call) and call.func is get
+                    and bool(call.args) and isinstance(call.args[0], ast.Name) and call.args[0].id == "ENV_FLAG")
+                if not is_the_flag_read:
+                    found.append(f"{'/'.join(rel)}:{node.lineno}")
+        return found
+
     def test_the_integration_package_cannot_reach_a_network_or_a_model(self):
         for path in sorted((ROOT / "integration").rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -621,10 +653,38 @@ class NoLlmNoNetworkTests(unittest.TestCase):
                 for name in names:
                     with self.subTest(file=path.name, module=name):
                         self.assertNotIn(name.split(".")[0], self.FORBIDDEN)
-                # Scoped to this package: another integration package may legitimately read ITS OWN feature flag
-                # (integration/rooms does, in flag.py, and its own test pins that); the generator must read nothing.
-                if "generator" in path.parts and isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv"):
-                    self.fail(f"{path.name} reads the environment (credentials or keys)")
+
+    def test_nothing_under_integration_reads_the_environment_except_the_one_feature_flag(self):
+        self.assertEqual(self.environment_reads(ROOT), [], "an integration module reads the environment (credentials or keys)")
+
+    def test_the_environment_check_still_catches_every_other_read(self):
+        legit = 'import os\nENV_FLAG = "BMB_ROOMS_ADAPTER"\n\n\ndef enabled():\n    return os.environ.get(ENV_FLAG, "") == "1"\n'
+        cases = {
+            "another package reads a key": ({"other/x.py": 'import os\nKEY = os.getenv("API_KEY")\n'}, ["other/x.py:2"]),
+            "the generator reads a key": ({"generator/y.py": 'import os\nKEY = os.environ["K"]\n'}, ["generator/y.py:2"]),
+            "another rooms module reads the flag": ({"rooms/flag.py": legit, "rooms/other.py": 'import os\nX = os.environ.get("BMB_ROOMS_ADAPTER")\n'},
+                                                    ["rooms/other.py:2"]),
+            "flag.py reads another variable by name": ({"rooms/flag.py": legit + 'SECRET = os.environ.get("SECRET")\n'}, ["rooms/flag.py:7"]),
+            "flag.py points the flag at another variable": ({"rooms/flag.py": legit.replace("BMB_ROOMS_ADAPTER", "OTHER")}, ["rooms/flag.py:6"]),
+            "flag.py reads the whole environment": ({"rooms/flag.py": legit + "ALL = dict(os.environ)\n"}, ["rooms/flag.py:7"]),
+            "an imported environ": ({"other/z.py": "from os import environ\n"}, ["other/z.py:1"]),
+            "an imported getenv in flag.py": ({"rooms/flag.py": "from os import getenv\n" + legit}, ["rooms/flag.py:1"]),
+        }
+        for label, (files, expected) in cases.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                for name, text in files.items():
+                    target = Path(tmp) / "integration" / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(text, encoding="utf-8")
+                self.assertEqual(self.environment_reads(Path(tmp)), expected)
+
+    def test_the_exact_feature_flag_read_alone_is_allowed(self):
+        legit = 'import os\nENV_FLAG = "BMB_ROOMS_ADAPTER"\n\n\ndef enabled():\n    return os.environ.get(ENV_FLAG, "") == "1"\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "integration" / "rooms" / "flag.py"
+            target.parent.mkdir(parents=True)
+            target.write_text(legit, encoding="utf-8")
+            self.assertEqual(self.environment_reads(Path(tmp)), [])
 
 
 if __name__ == "__main__":

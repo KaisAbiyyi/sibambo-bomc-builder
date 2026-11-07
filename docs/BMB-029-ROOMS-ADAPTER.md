@@ -32,12 +32,15 @@ Coordinates are metres in the **assembly frame** (the same frame the validator u
 |---|---|
 | Evidence size | 256 KiB |
 | Rooms / vertices per polygon / vertices in total | 64 / 256 / 4 096 |
+| Triangles in total (the core triangulator's output for every room) | 8 000 (`MAX_TOTAL_TRIANGLES`) |
 | Identifiers (`evidenceId`, room `id`) | `[a-z][a-z0-9-]{0,35}`, whole string (`\Z` in the validator, `(?![\s\S])` in the schema: a trailing newline is accepted by neither) |
 | Coordinates | finite, within ±10 000 m; booleans and strings are refused |
 | Polygon area | at least 0.01 m² |
 | `confidence` | 0–1, default 1 |
 | `elevationM` | ±1 000 m, default 0 |
 | Nesting | a value nested 200 000 levels deep in any field is a typed `EvidenceError`, never a crash |
+
+**Why a triangle budget as well as vertex limits.** The vertex limits do not bound the work: the core triangulator's output and time grow roughly with the *square* of the vertex count for a star-shaped room (a 256-vertex star gives about 4 000 triangles and took a few tenths of a second locally; sixteen of them are inside every size and vertex limit above and took about 12 s to validate before this budget existed). The triangles of all rooms are therefore counted as the rooms are checked, and going over 8 000 is an `EvidenceError`. One room alone can still need up to the core's own cap before it is counted; the cost of the room that crosses the budget is paid, no more. These are local, descriptive numbers, **not** a latency guarantee.
 
 Every problem is an `EvidenceError` (a `ValueError`). Rooms are normalized to floats and sorted by id, so equal evidence hashes equally and the report does not depend on the order the detector listed rooms.
 
@@ -58,10 +61,16 @@ Pure and deterministic. Intersection areas are computed exactly enough for conca
 | `ROOM_MISSING` | error | an intended room less than 30 % covered by any detection |
 | `ROOM_UNEXPECTED` | error | a detection less than 30 % overlapping any intended room |
 | `ROOM_UNMATCHED` | error | substantial overlap but no one-to-one match (IoU below 0.5) |
+| `NO_COMPARABLE_ROOMS` | error | there is no intended room, or no usable detection, so **nothing was compared**: an empty comparison is never a pass |
+| `COMPLEXITY_LIMIT` | error | the rooms are too complex to compare within the work budget; nothing was clipped or compared |
 | `ASSEMBLY_INVALID` | error | the assembly cannot be placed |
 | `LOW_CONFIDENCE` | warning | detection below `min_confidence` (0.5): ignored, and said so |
 | `DETECTED_OVERLAP` | warning | two detections overlap by more than 5 % of the smaller: the detector contradicts itself |
 | `INTENDED_UNUSABLE` | warning | an intended floor that could not be compared (tilted or unusable) |
+
+**Success needs a comparison.** `RoomsReport.ok` is "no ERROR", and an empty comparison now produces one (`NO_COMPARABLE_ROOMS`): evidence at an elevation with no floor slab, every intended floor skipped as tilted, every detection below `min_confidence`, or any mix that leaves nothing on one side. Tested: wrong elevation with every detection low-confidence, every intended floor unusable, wrong elevation with confident detections, and over 120 randomized cases `ok` always implies at least one matched room. A low-confidence extra beside real matches stays a warning.
+
+**Work budget.** Before any clipping, `compare` adds up the triangle pairs it may have to clip (the triangle counts of two rooms multiplied, for every pair of rooms whose bounding boxes overlap, detected against intended and detected against detected). Above `MAX_PAIR_WORK` (200 000) it clips nothing and reports `COMPLEXITY_LIMIT`; the limit is an exact count, not a timing. Inside it, `intersection_area` skips every triangle pair whose bounding boxes cannot overlap (same area as the brute-force sum, tested on random concave polygons), so the clipping calls never exceed the budget (counted in a test). The intended side's triangulation happens in the core (`build_floor_slab`, bounded by BMB-017) and is already paid by the core validator.
 
 Matching is greedy one-to-one by descending IoU. **Invariant (tested over 80 randomized cases):** every intended room and every usable detection ends up either matched or named by at least one error; nothing is silently dropped. The thresholds are a `Policy` with validated bounds; they are heuristics for synthetic evidence, **not calibrated against any real detector**.
 
@@ -72,7 +81,7 @@ from integration.rooms.check import validate_with_rooms
 report = validate_with_rooms(assembly["modules"], evidence)          # BMB_ROOMS_ADAPTER=1, or enabled=True
 ```
 
-Off (or no evidence): a `ValidationReport`, byte-for-byte the core's. On: an `EnhancedReport` with `.core`, `.rooms` and `.ok` (both must be ok). Invalid evidence raises `EvidenceError` only when the adapter is on.
+Off (or no evidence): a `ValidationReport`, byte-for-byte the core's. On: an `EnhancedReport` with `.core`, `.rooms` and `.ok` (both must be ok). Invalid or too complex evidence raises `EvidenceError` only when the adapter is on.
 
 ```sh
 python -m integration.rooms check --assembly examples/module-ir-two-rooms.json --evidence examples/rooms/evidence-two-rooms.json --enable
@@ -96,6 +105,9 @@ CLI exit status: `0` the adapter is off, or the comparison found no error; `1` a
 | No core / MCP / CLI dependency on the adapter | **PASS** (AST and subprocess tests) |
 | Evidence validated as hostile input | **PASS** (rules, fuzz, 200 000-level nesting, schema agreement) |
 | Typed, complete, deterministic findings | **PASS** (scenarios, accounting invariant, order independence) |
+| An empty comparison is never a pass | **PASS** (`NO_COMPARABLE_ROOMS`, regression and randomized tests) |
+| Hostile evidence cannot cost unbounded work | **PASS** for the counted budgets (triangles, triangle pairs, clipping calls); **NOT_RUN** for any latency claim: nothing is timed |
+| No other integration module can read the environment | **PASS** (`tests/test_bmb032_generator.py` scans all of `integration/` and allows only `os.environ.get(ENV_FLAG, ...)` in `integration/rooms/flag.py` while `ENV_FLAG == "BMB_ROOMS_ADAPTER"`; negative tests prove any other read, in any file, is reported) |
 | A real room detector's output | **NOT_RUN** |
 | Calibration of the thresholds | **NOT_RUN** |
 | Editor / Model-Eval, native Windows security, Notion sync | **NOT_RUN** |

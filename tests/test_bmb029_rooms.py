@@ -6,6 +6,7 @@ import contextlib
 import copy
 import io
 import json
+import math
 import os
 import random
 import subprocess
@@ -22,11 +23,12 @@ from core.assembly import assemble  # noqa: E402
 from core.validator import ValidationReport, validate_assembly  # noqa: E402
 from integration.rooms import ENV_FLAG, __main__ as cli, check as check_module, enabled  # noqa: E402
 from integration.rooms.check import EnhancedReport, validate_with_rooms  # noqa: E402
-from integration.rooms.compare import Policy, compare  # noqa: E402
+from integration.rooms import compare as compare_module, geometry as geometry_module  # noqa: E402
+from integration.rooms.compare import MAX_PAIR_WORK, Policy, compare  # noqa: E402
 from integration.rooms.evidence import (  # noqa: E402
     MAX_BYTES, MAX_ROOMS, MAX_VERTICES, EvidenceError, evidence_sha256, validate_evidence,
 )
-from integration.rooms.geometry import intersection_area, shoelace, triangles  # noqa: E402
+from integration.rooms.geometry import convex_intersection_area, intersection_area, shoelace, triangles  # noqa: E402
 from integration.rooms.intended import intended_rooms  # noqa: E402
 from tests.qa import harness as h  # noqa: E402
 
@@ -57,6 +59,12 @@ def run(ev, policy=None):
 
 def codes(report):
     return sorted(d.code for d in report.diagnostics)
+
+
+def star(vertices, outer, inner, cx=3.0, cy=1.5):
+    """A concave star room: the shape on which the core triangulator produces the most triangles per vertex."""
+    return [[round(cx + (outer if k % 2 == 0 else inner) * math.cos(2 * math.pi * k / vertices), 4),
+             round(cy + (outer if k % 2 == 0 else inner) * math.sin(2 * math.pi * k / vertices), 4)] for k in range(vertices)]
 
 
 def deep(n=200_000):
@@ -407,6 +415,152 @@ class CompareTests(unittest.TestCase):
         ev = evidence(("living", rect(0.1, 0, 4.1, 3), None), ("hall", rect(4, 0, 6, 3), None))
         self.assertTrue(run(ev, Policy(accept_iou=0.9)).ok)
         self.assertFalse(run(ev, Policy(accept_iou=0.99)).ok)
+
+
+class NoComparisonIsNotAPassTests(unittest.TestCase):
+    """Review P1: an enabled adapter that compared nothing must not report success."""
+
+    def tilted(self):
+        tilted = copy.deepcopy(MODULES)
+        for module in tilted:
+            module["localFrame"]["transform"][9] = 0.5
+        return tilted
+
+    def test_wrong_elevation_and_every_detection_below_the_confidence_floor(self):
+        ev = evidence(("a", rect(0, 0, 4, 3), 0.2), ("b", rect(4, 0, 6, 3), 0.1), elevationM=100)
+        report = run(ev)
+        self.assertEqual((report.intended_count, report.detected_count), (0, 0))
+        self.assertFalse(report.ok)
+        self.assertEqual(codes(report), ["LOW_CONFIDENCE", "LOW_CONFIDENCE", "NO_COMPARABLE_ROOMS"])
+        self.assertEqual([d.severity for d in report.diagnostics if d.code == "NO_COMPARABLE_ROOMS"], ["ERROR"])
+
+    def test_the_enabled_adapter_is_not_ok_either(self):
+        ev = {**GOOD, "elevationM": 100, "rooms": [{**r, "confidence": 0.2} for r in GOOD["rooms"]]}
+        result = validate_with_rooms(MODULES, ev, enabled=True)
+        self.assertIsInstance(result, EnhancedReport)
+        self.assertTrue(result.core.ok)
+        self.assertFalse(result.rooms.ok)
+        self.assertFalse(result.ok)
+
+    def test_every_intended_floor_unusable_and_every_detection_low_confidence(self):
+        tilted = self.tilted()
+        rooms, skipped = intended_rooms(tilted, elevation_m=0.0, level_tolerance=5.0)
+        report = compare(rooms, evidence(("a", rect(0, 0, 4, 3), 0.2)), skipped=skipped)
+        self.assertFalse(report.ok)
+        self.assertEqual(codes(report), ["INTENDED_UNUSABLE", "INTENDED_UNUSABLE", "LOW_CONFIDENCE", "NO_COMPARABLE_ROOMS"])
+        result = validate_with_rooms(tilted, {**GOOD, "rooms": [{**r, "confidence": 0.2} for r in GOOD["rooms"]]}, enabled=True)
+        self.assertFalse(result.ok)
+
+    def test_a_wrong_elevation_with_confident_detections_is_also_named(self):
+        report = run(evidence(("a", rect(0, 0, 4, 3), None), elevationM=100))
+        self.assertFalse(report.ok)
+        self.assertEqual(codes(report), ["NO_COMPARABLE_ROOMS", "ROOM_UNEXPECTED"])
+
+    def test_no_usable_detection_at_all_is_named_beside_the_missing_rooms(self):
+        report = run(evidence(("a", rect(0, 0, 4, 3), 0.2)))
+        self.assertFalse(report.ok)
+        self.assertEqual(codes(report), ["LOW_CONFIDENCE", "NO_COMPARABLE_ROOMS", "ROOM_MISSING", "ROOM_MISSING"])
+
+    def test_an_honestly_matched_case_still_passes_and_says_nothing_about_it(self):
+        report = run(evidence(("living", rect(0, 0, 4, 3), 1.0), ("hall", rect(4, 0, 6, 3), 1.0)))
+        self.assertTrue(report.ok)
+        self.assertNotIn("NO_COMPARABLE_ROOMS", codes(report))
+        self.assertEqual(len(report.matches), 2)
+        low = run(evidence(("living", rect(0, 0, 4, 3), 1.0), ("hall", rect(4, 0, 6, 3), 1.0), ("noise", rect(20, 20, 21, 21), 0.1)))
+        self.assertTrue(low.ok, "a low-confidence extra beside real matches is only a warning")
+        self.assertEqual(codes(low), ["LOW_CONFIDENCE"])
+
+    def test_ok_always_means_at_least_one_room_was_matched(self):
+        rng = random.Random(29)
+        passed = 0
+        for case in range(120):
+            rooms = [(f"r{k}", rect(x0, y0, x0 + rng.uniform(0.8, 4.5), y0 + rng.uniform(0.8, 3.5)), rng.choice([None, 0.9, 0.2]))
+                     for k in range(rng.randrange(1, 4)) for x0, y0 in [(rng.uniform(-1, 6), rng.uniform(-1, 3))]]
+            report = run(evidence(*rooms, elevationM=rng.choice([0.0, 0.0, 7.0, 100.0])))
+            passed += report.ok
+            with self.subTest(case=case):
+                if report.ok:
+                    self.assertGreaterEqual(len(report.matches), 1)
+
+    def test_the_command_line_exits_one_for_a_comparison_that_compared_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "elsewhere.json"
+            path.write_text(json.dumps({**GOOD, "elevationM": 100, "rooms": [{**r, "confidence": 0.2} for r in GOOD["rooms"]]}), encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = cli.main(["check", "--enable", "--assembly", str(ROOT / "examples" / "module-ir-two-rooms.json"), "--evidence", str(path)])
+        result = json.loads(out.getvalue())
+        self.assertEqual((code, result["ok"]), (1, False))
+        self.assertIn("NO_COMPARABLE_ROOMS", [d["code"] for d in result["rooms"]["diagnostics"]])
+
+
+class HostileComplexityTests(unittest.TestCase):
+    """Review P2: the evidence limits must also bound the work, not only the size. These tests count work; none of them times it."""
+
+    def test_triangle_pruning_does_not_change_the_area(self):
+        rng = random.Random(5)
+
+        def blob():
+            n = rng.randrange(5, 40)
+            return star(n * 2, rng.uniform(1.5, 4), rng.uniform(0.4, 1.4), rng.uniform(0, 3), rng.uniform(0, 3))
+
+        for case in range(25):
+            a, b = triangles(blob()), triangles(blob())
+            brute = sum(convex_intersection_area(x, y) for x in a for y in b)
+            with self.subTest(case=case):
+                self.assertAlmostEqual(intersection_area(a, b), brute, places=9)
+
+    def test_pruning_really_skips_triangle_pairs_that_cannot_touch(self):
+        a, b = triangles(star(64, 5, 3, 0, 0)), triangles(star(64, 5, 3, 4.5, 0))        # two overlapping stars, mostly apart
+        calls = []
+        real = geometry_module.convex_intersection_area
+        with mock.patch.object(geometry_module, "convex_intersection_area", side_effect=lambda x, y: calls.append(1) or real(x, y)):
+            intersection_area(a, b)
+        self.assertGreater(len(calls), 0)
+        self.assertLess(len(calls), len(a) * len(b), "every triangle pair was clipped: no pruning")
+
+    def test_evidence_that_needs_too_many_triangles_is_refused_before_it_is_compared(self):
+        one = {"schemaVersion": "rooms-evidence-v1", "evidenceId": "star", "detector": {"name": "t", "version": "0"},
+               "rooms": [{"id": "s0", "polygon": star(256, 5, 3)}]}
+        self.assertEqual(len(validate_evidence(one)["rooms"]), 1, "one 256-vertex star (about 4000 triangles) is within the budget")
+        two = {**one, "rooms": [{"id": f"s{k}", "polygon": star(256, 5 + 0.01 * k, 3)} for k in range(16)]}
+        self.assertLess(len(json.dumps(two)), MAX_BYTES, "inside every size and vertex limit, so only the triangle budget stops it")
+        with self.assertRaisesRegex(EvidenceError, "too complex"):
+            validate_evidence(two)
+        with self.assertRaisesRegex(EvidenceError, "too complex"):
+            validate_with_rooms(MODULES, two, enabled=True)
+
+    def test_rooms_too_complex_to_compare_are_refused_without_clipping_anything(self):
+        ev = evidence(("s0", star(128, 5, 3), None), ("s1", star(128, 5.02, 3), None))     # about 1000 triangles each, overlapping
+        self.assertGreater(len(triangles(ev["rooms"][0]["polygon"])) ** 2, MAX_PAIR_WORK)
+        with mock.patch.object(geometry_module, "convex_intersection_area", side_effect=AssertionError("clipping ran over budget")):
+            report = run(ev)
+        self.assertFalse(report.ok)
+        self.assertIn("COMPLEXITY_LIMIT", codes(report))
+        self.assertEqual(report.matches, ())
+        result = validate_with_rooms(MODULES, {"schemaVersion": "rooms-evidence-v1", "evidenceId": "t", "detector": {"name": "t", "version": "0"},
+                                               "rooms": [{"id": r["id"], "polygon": r["polygon"]} for r in ev["rooms"]]}, enabled=True)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.core.ok, True)
+
+    def test_the_work_done_never_exceeds_the_budget(self):
+        ev = evidence(("s0", star(64, 5, 3), None), ("s1", star(64, 5.02, 3), None), ("hall", rect(4, 0, 6, 3), None))
+        calls = []
+        real = geometry_module.convex_intersection_area
+        with mock.patch.object(geometry_module, "convex_intersection_area", side_effect=lambda x, y: calls.append(1) or real(x, y)):
+            report = run(ev)
+        self.assertNotIn("COMPLEXITY_LIMIT", codes(report), "within the budget: it is compared")
+        self.assertGreater(len(calls), 0)
+        self.assertLessEqual(len(calls), MAX_PAIR_WORK)
+
+    def test_the_limit_is_an_exact_count_not_a_timing(self):
+        ev = evidence(("living", rect(0, 0, 4, 3), None), ("hall", rect(4, 0, 6, 3), None))
+        rooms, skipped = intended_rooms(MODULES, elevation_m=0.0, level_tolerance=0.25)
+        work = 8                                  # two rooms against their own slab, 2 x 2 triangles each; touching boxes do not count
+        with mock.patch.object(compare_module, "MAX_PAIR_WORK", work):
+            self.assertTrue(compare(rooms, ev, skipped=skipped).ok)
+        with mock.patch.object(compare_module, "MAX_PAIR_WORK", work - 1):
+            self.assertEqual(codes(compare(rooms, ev, skipped=skipped)), ["COMPLEXITY_LIMIT"])
 
 
 class FeatureFlagBehaviourTests(unittest.TestCase):

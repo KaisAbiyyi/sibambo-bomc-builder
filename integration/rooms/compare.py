@@ -12,6 +12,13 @@ from integration.rooms.geometry import boxes_overlap, intersection_area, bbox, s
 ERROR, WARNING = "ERROR", "WARNING"
 _RANK = {ERROR: 0, WARNING: 1}
 
+# Hostile-input budget. Evidence limits (64 rooms, 256 vertices each, 4096 in total) do not by themselves bound the CPU: the
+# work is in the triangle-pair clipping. Before any clipping, `compare` adds up the number of triangle pairs it MAY have to
+# clip (triangle count of one room times that of the other, for every pair of rooms whose bounding boxes overlap, detected
+# against intended and detected against detected). Above this, nothing is clipped: one COMPLEXITY_LIMIT error says so.
+# The bound is deterministic (a count, not a timing); it is not a measured latency guarantee.
+MAX_PAIR_WORK = 200_000
+
 
 @dataclass(frozen=True)
 class Policy:
@@ -64,18 +71,8 @@ class RoomsReport:
                 "diagnostics": [d.to_dict() for d in self.diagnostics]}
 
 
-def compare(intended: list, evidence: dict, policy: Policy | None = None, *, skipped: list | None = None) -> RoomsReport:
-    policy = policy or Policy()
-    out: list[RoomDiagnostic] = []
-    detected = []
-    for room in evidence["rooms"]:
-        if room["confidence"] < policy.min_confidence:
-            out.append(RoomDiagnostic("LOW_CONFIDENCE", WARNING, f"{room['id']}: confidence {room['confidence']:.2f} is below "
-                                      f"{policy.min_confidence:.2f}; the detection is ignored", (), (room["id"],)))
-            continue
-        poly = [tuple(p) for p in room["polygon"]]
-        detected.append({"id": room["id"], "polygon": poly, "area": shoelace(poly), "tris": triangles(poly), "box": bbox(poly)})
-
+def _account(intended: list, detected: list, policy: Policy, out: list, dd_pairs: list) -> list:
+    """The comparison proper: appends diagnostics to `out`, returns the one-to-one matches."""
     inter: dict = {}
     for d in detected:
         for i in intended:
@@ -145,13 +142,42 @@ def compare(intended: list, evidence: dict, policy: Policy | None = None, *, ski
                                       f"(overlap below 0.5)", (), (d["id"],)))
         flagged_d.add(d["id"])
 
-    for a in range(len(detected)):                                                  # a detector contradicting itself
-        for b in range(a + 1, len(detected)):
-            da, db = detected[a], detected[b]
-            if boxes_overlap(da["box"], db["box"]):
-                x = intersection_area(da["tris"], db["tris"])
-                if x > 0.05 * min(da["area"], db["area"]):
-                    out.append(RoomDiagnostic("DETECTED_OVERLAP", WARNING, f"{da['id']} and {db['id']} overlap by {x:.3f} m2", (), (da["id"], db["id"])))
+    for da, db in dd_pairs:                                                         # a detector contradicting itself
+        x = intersection_area(da["tris"], db["tris"])
+        if x > 0.05 * min(da["area"], db["area"]):
+            out.append(RoomDiagnostic("DETECTED_OVERLAP", WARNING, f"{da['id']} and {db['id']} overlap by {x:.3f} m2", (), (da["id"], db["id"])))
+
+    return matches
+
+
+def compare(intended: list, evidence: dict, policy: Policy | None = None, *, skipped: list | None = None) -> RoomsReport:
+    policy = policy or Policy()
+    out: list[RoomDiagnostic] = []
+    detected = []
+    for room in evidence["rooms"]:
+        if room["confidence"] < policy.min_confidence:
+            out.append(RoomDiagnostic("LOW_CONFIDENCE", WARNING, f"{room['id']}: confidence {room['confidence']:.2f} is below "
+                                      f"{policy.min_confidence:.2f}; the detection is ignored", (), (room["id"],)))
+            continue
+        poly = [tuple(p) for p in room["polygon"]]
+        detected.append({"id": room["id"], "polygon": poly, "area": shoelace(poly), "tris": triangles(poly), "box": bbox(poly)})
+
+    di_work = sum(len(d["tris"]) * len(i["tris"]) for d in detected for i in intended if boxes_overlap(d["box"], i["box"]))
+    dd_pairs = [(a, b) for n, a in enumerate(detected) for b in detected[n + 1:] if boxes_overlap(a["box"], b["box"])]
+    work = di_work + sum(len(a["tris"]) * len(b["tris"]) for a, b in dd_pairs)
+    if work > MAX_PAIR_WORK:
+        out.append(RoomDiagnostic("COMPLEXITY_LIMIT", ERROR, f"the rooms are too complex to compare within the work budget "
+                                  f"({work} triangle pairs, limit {MAX_PAIR_WORK}); nothing was compared"))
+        matches = []
+    else:
+        matches = _account(intended, detected, policy, out, dd_pairs)
+        if not intended or not detected:
+            elevation = evidence.get("elevationM", 0.0)
+            ignored = len(evidence["rooms"]) - len(detected)
+            out.append(RoomDiagnostic("NO_COMPARABLE_ROOMS", ERROR, f"no room could be compared at elevation {elevation:g} m: "
+                                      f"{len(intended)} intended room(s) and {len(detected)} usable detection(s) "
+                                      f"({ignored} ignored for low confidence, {len(skipped or ())} intended floor(s) skipped); "
+                                      f"an empty comparison is not a pass"))
 
     for s in skipped or []:
         out.append(RoomDiagnostic("INTENDED_UNUSABLE", WARNING, f"{s['id']}: {s['reason']}; it was not compared", (s["id"],), ()))

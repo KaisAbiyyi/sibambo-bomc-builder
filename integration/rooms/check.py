@@ -12,7 +12,7 @@ from core.assembly import AssemblyError
 from core.validator import ValidationReport, validate_assembly
 from integration.rooms import flag
 from integration.rooms.compare import ERROR, Policy, RoomDiagnostic, RoomsReport, compare
-from integration.rooms.evidence import evidence_sha256, validate_evidence
+from integration.rooms.evidence import digest, validate_evidence
 from integration.rooms.intended import intended_rooms
 
 
@@ -44,5 +44,5 @@ def validate_with_rooms(modules, evidence=None, *, enabled=None, policy: Policy 
     except AssemblyError as exc:
         empty = RoomsReport((RoomDiagnostic("ASSEMBLY_INVALID", ERROR, f"the assembly cannot be placed, so no room can be compared: {exc}"),),
                             (), policy, 0, len(normalized["rooms"]), dict(normalized["detector"]), normalized["evidenceId"])
-        return EnhancedReport(core, empty, evidence_sha256(normalized))
-    return EnhancedReport(core, compare(rooms, normalized, policy, skipped=skipped), evidence_sha256(normalized))
+        return EnhancedReport(core, empty, digest(normalized))
+    return EnhancedReport(core, compare(rooms, normalized, policy, skipped=skipped), digest(normalized))

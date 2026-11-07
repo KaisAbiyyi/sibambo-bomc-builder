@@ -57,6 +57,21 @@ def convex_intersection_area(t1: Triangle, t2: Triangle) -> float:
     return shoelace(poly)
 
 
+def _tri_box(t: Triangle) -> tuple[float, float, float, float]:
+    return (min(t[0][0], t[1][0], t[2][0]), min(t[0][1], t[1][1], t[2][1]),
+            max(t[0][0], t[1][0], t[2][0]), max(t[0][1], t[1][1], t[2][1]))
+
+
 def intersection_area(tris_a: list, tris_b: list) -> float:
-    """Area of the intersection of two polygons given as triangulations (sum over triangle pairs)."""
-    return sum(convex_intersection_area(a, b) for a in tris_a for b in tris_b)
+    """Area of the intersection of two polygons given as triangulations (sum over triangle pairs).
+
+    A pair of triangles whose bounding boxes do not overlap cannot share area, so it is skipped before any clipping. The
+    clipping calls are therefore at most len(tris_a) * len(tris_b), the bound `compare` budgets against up front."""
+    boxes_b = [(t, _tri_box(t)) for t in tris_b]
+    total = 0.0
+    for a in tris_a:
+        box_a = _tri_box(a)
+        for b, box_b in boxes_b:
+            if boxes_overlap(box_a, box_b):
+                total += convex_intersection_area(a, b)
+    return total
