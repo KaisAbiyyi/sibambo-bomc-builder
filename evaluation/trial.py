@@ -39,6 +39,15 @@ FIXTURE_ID = "bmb025-two-room-local-revision"
 BASELINE_ID = "bmb004-agent-baseline-v0"
 EPS = 1e-6
 
+# Geometric acceptance is only established when EVERY one of these ran and passed. A check that did not run (the
+# independent reader missing, bounds not derivable) leaves the gate open; it never counts as agreement.
+MANDATORY_GEOMETRY_CHECKS = (
+    "assembly_validator", "floor_area_two_calculations_agree", "independent_readback", "faces_match_receipt",
+    "triangles_match_receipt", "nodes_match_receipt", "meshes_match_receipt", "vertices_match_receipt",
+    "materials_match_receipt", "strings_match_receipt", "sections_match_receipt", "size_matches_receipt",
+    "world_bounds", "geometry_semantics_valid_per_compiler",
+)
+
 
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -185,6 +194,16 @@ def geometry_checks(document: dict) -> tuple[list, float]:
     return checks, area_core
 
 
+def geometry_gate(checks: list) -> str:
+    """Fail closed: FAIL if anything failed, NOT_RUN if any mandatory check did not run or was never emitted, else PASS."""
+    if any(c["status"] == "FAIL" for c in checks):
+        return "FAIL"
+    seen = {c["id"]: c["status"] for c in checks}
+    if any(seen.get(check, "NOT_RUN") != "PASS" for check in MANDATORY_GEOMETRY_CHECKS):
+        return "NOT_RUN"
+    return "PASS"
+
+
 def run_trial(trial_id: int) -> dict:
     document = json.loads(ASSEMBLY.read_text(encoding="utf-8"))
     flow = measure_workflow()
@@ -219,8 +238,7 @@ def run_trial(trial_id: int) -> dict:
     checks.append(_check("revision_locality_and_replay", bool(locality), "stale edit rejected, hall unchanged, replay idempotent"))
     model["floorAreaM2"] = round(floor_area, 6)
 
-    executed = [c for c in checks if c["status"] != "NOT_RUN"]
-    geometry_status = "FAIL" if any(c["status"] == "FAIL" for c in executed) else ("PASS" if executed else "NOT_RUN")
+    geometry_status = geometry_gate(checks)
     gates = {
         "security": "NOT_RUN", "geometry": geometry_status,
         "revision_locality": "PASS" if locality else "FAIL",

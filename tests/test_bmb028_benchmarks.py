@@ -413,6 +413,60 @@ class FailureDetectionTests(unittest.TestCase):
         self.assertEqual(result["overall"], "FAIL")
 
 
+class GeometryGateFailClosedTests(unittest.TestCase):
+    """Review P2: the gate used to ignore NOT_RUN checks, so PASS could be reported with the independent reader missing."""
+
+    def all_pass(self):
+        return [{"id": c, "status": "PASS", "detail": ""} for c in trial.MANDATORY_GEOMETRY_CHECKS]
+
+    def test_all_mandatory_checks_passing_is_the_only_way_to_pass(self):
+        self.assertEqual(trial.geometry_gate(self.all_pass()), "PASS")
+
+    def test_any_single_mandatory_check_not_run_makes_the_gate_not_run(self):
+        for missing in trial.MANDATORY_GEOMETRY_CHECKS:
+            with self.subTest(check=missing):
+                checks = [{**c, "status": "NOT_RUN"} if c["id"] == missing else c for c in self.all_pass()]
+                self.assertEqual(trial.geometry_gate(checks), "NOT_RUN")
+
+    def test_a_mandatory_check_that_was_never_emitted_counts_as_not_run(self):
+        for absent in trial.MANDATORY_GEOMETRY_CHECKS:
+            with self.subTest(check=absent):
+                self.assertEqual(trial.geometry_gate([c for c in self.all_pass() if c["id"] != absent]), "NOT_RUN")
+        self.assertEqual(trial.geometry_gate([]), "NOT_RUN")
+
+    def test_a_failure_wins_over_everything_else(self):
+        checks = self.all_pass()
+        checks[0]["status"] = "FAIL"
+        checks[1]["status"] = "NOT_RUN"
+        self.assertEqual(trial.geometry_gate(checks), "FAIL")
+        extra = self.all_pass() + [{"id": "some_other_check", "status": "FAIL", "detail": ""}]
+        self.assertEqual(trial.geometry_gate(extra), "FAIL")
+
+    def test_an_unavailable_independent_reader_leaves_the_gate_open_in_a_real_trial(self):
+        with mock.patch.dict(sys.modules, {"tests.interop.reader": None}):         # importing it now raises ImportError
+            result = trial.run_trial(1)
+        statuses = {c["id"]: c["status"] for c in result["acceptance"]["checks"]}
+        self.assertEqual(statuses["independent_readback"], "NOT_RUN")
+        self.assertEqual(result["gates"]["geometry"], "NOT_RUN", "PASS was reported without the independent reader")
+        self.assertEqual(result["overall"], "INCOMPLETE")
+        self.assertNotIn("FAIL", result["gates"].values())
+
+    def test_bounds_that_cannot_be_derived_leave_the_gate_open_in_a_real_trial(self):
+        with mock.patch.object(trial, "expected_world_bounds", return_value=None):
+            result = trial.run_trial(1)
+        statuses = {c["id"]: c["status"] for c in result["acceptance"]["checks"]}
+        self.assertEqual(statuses["world_bounds"], "NOT_RUN")
+        self.assertEqual(result["gates"]["geometry"], "NOT_RUN")
+        self.assertEqual(result["overall"], "INCOMPLETE")
+
+    def test_the_honest_trial_still_passes_every_mandatory_check(self):
+        result = runner.run_trial_process(1)
+        statuses = {c["id"]: c["status"] for c in result["acceptance"]["checks"]}
+        for check in trial.MANDATORY_GEOMETRY_CHECKS:
+            self.assertEqual(statuses.get(check), "PASS", check)
+        self.assertEqual(result["gates"]["geometry"], "PASS")
+
+
 class AggregationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

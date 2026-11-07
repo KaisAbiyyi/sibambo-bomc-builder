@@ -37,6 +37,8 @@ Every check is `PASS`, `FAIL` or `NOT_RUN`:
 | `geometry_semantics_valid_per_compiler` | the compiler's own semantic receipt |
 | `revision_locality_and_replay` | stale edit rejected, the untouched module's journal hash unchanged, replay idempotent |
 
+The `geometry` gate is **fail-closed**: it is `PASS` only when every check above ran and passed. A check that did not run (the independent reader unavailable, bounds not derivable from the IR) or was never emitted leaves the gate `NOT_RUN`, and any failure makes it `FAIL`; a missing check is never read as agreement.
+
 The reader is a **Builder-side** decoder, not an original consumer; `editor_import` and `model_eval_import` stay `NOT_RUN`. Mutation testing of the file is part of the evidence: flipping **every single byte** of the compiled two-room file is refused by the reader everywhere except the 49 bytes of alignment padding between sections, which no CRC covers (so the SHA-256 over the whole file, not a section CRC, is what the determinism gate relies on).
 
 ## Protocol (from BMB-004)
