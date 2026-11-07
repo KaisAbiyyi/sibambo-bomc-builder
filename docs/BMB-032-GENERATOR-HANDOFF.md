@@ -50,7 +50,7 @@ Machine-readable form: [`generator-handoff-v1.schema.json`](../schemas/generator
 |---|---|
 | Input size | 64 KiB |
 | Rooms | 1–12 |
-| Identifiers (`briefId`, `project`, `floorId`, room `id`) | `^[a-z][a-z0-9-]{0,35}$`, matched with `\Z` (a trailing newline is not accepted) |
+| Identifiers (`briefId`, `project`, `floorId`, room `id`) | `[a-z][a-z0-9-]{0,35}`, whole string, matched with `\Z` in the validator and `(?![\s\S])` in the schema (a trailing newline is not accepted by either) |
 | Room width and `depthM` | 1.5–12 m |
 | `wallHeightM` | 2.4–4.0 m (default 2.8) |
 | Door width / height | 0.81–2.0 m / 1.95 m up to 0.1 m below the wall height |
@@ -70,15 +70,16 @@ For a normalized brief, module ids are `<project>/<floorId>/<roomId>`.
 | Step | Tool | Notes |
 |---|---|---|
 | discover | `server/discover`, `tools/list` | requires protocol `2026-07-28` and the five tools; a read-only server is a clear refusal, not a write attempt |
-| list | `bmb_validate_journals` | which modules exist; a brief that would drop an existing room of its `project/floor` is refused (v1 never deletes) |
-| per room | `bmb_create_module` (if missing), `bmb_inspect_module` with `includeBlocks` | observe the current revision and owned blocks |
+| list | `bmb_validate_journals` | which modules exist |
+| observe (reads only) | `bmb_inspect_module` with `includeBlocks` for every existing module of the brief's `project/floor` | **before any write**: if an existing `room` block carries a different `briefId`, the submission is refused as a collision (`BriefCollision`); a module the brief no longer contains is refused (v1 never deletes). A module with no `room` block is adopted and its other blocks are kept |
+| per room | `bmb_create_module` (if missing) | writes start only after the observation above passed |
 | per room, only if blocks differ | `bmb_edit_module` | `expectedRevision` = the revision just observed, ops = `add`/`replace`/`remove` of owned blocks, `idempotencyKey = "gen-" + digest(module, observed revision, desired blocks)[:32]` |
 | validate | `bmb_validate_assembly` | the lowered Module IR as `document` |
-| confirm | `bmb_validate_journals` | final revisions |
+| confirm | `bmb_validate_journals`, then `bmb_inspect_module` of every module of the brief | **last step**: the owned blocks read back must equal the brief, otherwise `HandoffConflict` (another writer changed them after our write); the reported revisions are the ones just read back |
 
-**Idempotent and local.** Resubmitting the same brief performs **no write** (6 tool calls for three rooms, all reads and the validation); a revision rewrites only the journals whose owned blocks changed. A concurrent writer is handled by the journal's compare-and-swap: a stale revision is rejected by the server and nothing is half-written. An owned block that drifted (someone edited `room` by hand) is converged back to the brief, which is authoritative for the blocks it owns.
+**Idempotent and local.** Resubmitting the same brief performs **no write** (9 tool calls for three rooms, all reads and the validation; 12 for the first submission); a revision rewrites only the journals whose owned blocks changed. A concurrent writer is handled by the journal's compare-and-swap: a stale revision is rejected by the server and nothing is half-written. Success means the owned blocks matched the brief **when read back at the end**; no later instant can be promised, so a change after that is for the next submission to find. A different design reusing the same `project/floor/room` ids is a collision, never an overwrite: `briefId` is the identity of a design, so give a second design its own `project` or `floorId`. An owned block that drifted (someone edited `room` by hand) is converged back to the brief, which is authoritative for the blocks it owns.
 
-The submission result is a small evidence object (`created`, `updated`, `unchanged`, `revisions`, `assemblyModules`, `mcpToolCalls`, `briefSha256`, `moduleIrSha256`, `llmRequired: false`, `networkRequired: false`). Errors are `BriefError` (rejected input), `ControllerError` (unexpected server behaviour) or the server's own typed codes (`REVISION_CONFLICT`, `PERMISSION_DENIED`, `INVALID_ARGUMENT`); they are never retried silently.
+The submission result is a small evidence object (`created`, `updated`, `unchanged`, `revisions`, `assemblyModules`, `mcpToolCalls`, `briefSha256`, `moduleIrSha256`, `llmRequired: false`, `networkRequired: false`). Errors are `BriefError` (rejected input; `BriefCollision` when another design owns the modules), `HandoffConflict` (a post-write mismatch, a `ControllerError`), `ControllerError` (unexpected server behaviour) or the server's own typed codes (`REVISION_CONFLICT`, `PERMISSION_DENIED`, `INVALID_ARGUMENT`); they are never retried silently.
 
 ## Scope of v1 (explicit limits)
 
@@ -100,6 +101,8 @@ python -m unittest discover -s tests -p test_bmb032_generator.py -v
 ## Defects the tests found while building this
 
 Two real ones, both fixed before the first green run: identifiers were matched with `$`, which accepts `"a\n"` (now `\Z`), and the door minimums had been guessed at 0.80 m / 1.80 m although the geometry builder refuses them (now 0.81 m / 1.95 m and pinned to the builder by a test).
+
+Independent review of the first version then found three more, all confirmed and fixed (each with a test that fails without the fix, checked by removing the safeguard): a different `briefId` could silently take over existing module ids; success was reported without reading the owned blocks back after the writes; and the JSON Schema still used `$` (its pattern is now `^[a-z][a-z0-9-]{0,35}(?![\s\S])`, which rejects a final line terminator in Python's regex engine as well as in ECMAScript).
 
 ## Status per gate
 

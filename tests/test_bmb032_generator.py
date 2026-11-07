@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -84,6 +85,39 @@ class SchemaTests(unittest.TestCase):
                 self.assertTrue(list(self.validator.iter_errors(doc)), "the schema accepted it")
                 with self.assertRaises(BriefError):
                     to_brief(doc)
+
+
+    def test_a_trailing_line_terminator_is_rejected_by_the_schema_exactly_like_by_the_validator(self):
+        # Review: the schema kept "$" while the runtime validator uses \\Z; with Python's regex "$" also matches before a
+        # final newline, so producers would have seen a different contract than the one enforced.
+        def walk(doc, path):
+            target = doc
+            for step in path[:-1]:
+                target = target[step]
+            return target
+
+        cases = [
+            (BRIEF, ("briefId",)), (BRIEF, ("project",)), (BRIEF, ("floorId",)), (BRIEF, ("rooms", 0, "id")),
+            (BRIEF, ("doors", 0, "between", 0)), (SURVEY, ("surveyId",)), (FORM, ("formId",)),
+            (FORM, ("project",)), (FORM, ("floorId",)),
+        ]
+        for doc, path in cases:
+            for terminator in ("\n", "\r\n", "\r", "\u2028"):
+                with self.subTest(path=path, terminator=repr(terminator)):
+                    mutated = copy.deepcopy(doc)
+                    holder = walk(mutated, path)
+                    try:
+                        base = holder[path[-1]]
+                    except KeyError:                                  # the form example omits project / floorId
+                        base = "house"
+                    holder[path[-1]] = base + terminator
+                    self.assertTrue(list(self.validator.iter_errors(mutated)), "the schema accepted a trailing line terminator")
+                    with self.assertRaises(BriefError):
+                        to_brief(mutated)
+        for ok in ("a", "a-b", "a" * 36):                         # and the same pattern still accepts honest identifiers
+            mutated = copy.deepcopy(BRIEF)
+            mutated["briefId"] = ok
+            self.assertEqual(list(self.validator.iter_errors(mutated)), [])
 
 
 class ValidationTests(unittest.TestCase):
@@ -313,7 +347,7 @@ class SubmitTests(unittest.TestCase):
         self.assertEqual((result["updated"], result["unchanged"]), ([], []))
         self.assertEqual(set(result["revisions"].values()), {1})
         self.assertEqual(result["assemblyModules"], 3)
-        self.assertEqual(result["mcpToolCalls"], 9)
+        self.assertEqual(result["mcpToolCalls"], 12)
         self.assertEqual((result["llmRequired"], result["networkRequired"], result["transport"]), (False, False, "stdio-mcp"))
         self.assertEqual(len(self.journals()), 3)
 
@@ -324,7 +358,7 @@ class SubmitTests(unittest.TestCase):
         self.assertEqual((again["created"], again["updated"]), ([], []))
         self.assertEqual(len(again["unchanged"]), 3)
         self.assertEqual(self.journals(), before, "a journal file changed")
-        self.assertEqual(again["mcpToolCalls"], 6)
+        self.assertEqual(again["mcpToolCalls"], 9)
 
     def test_a_number_written_as_int_or_float_is_the_same_submission(self):
         submit(self.root, BRIEF)
@@ -353,7 +387,7 @@ class SubmitTests(unittest.TestCase):
                 root = prepare_root(Path(tmp) / "p")
                 result = submit(root, doc)
                 self.assertEqual(result["rooms"], rooms)
-                self.assertEqual(result["mcpToolCalls"], 3 + 2 * rooms)
+                self.assertEqual(result["mcpToolCalls"], 3 + 3 * rooms)
                 self.assertEqual(result["assemblyModules"], rooms)
 
     def test_a_brief_that_drops_a_room_is_refused_and_nothing_changes(self):
@@ -426,6 +460,105 @@ class SubmitTests(unittest.TestCase):
         self.assertIn("raced", seen["blocks"])
         self.assertEqual(seen["blocks"]["door-east"]["widthM"], 0.9, "our stale edit must not have been applied")
         self.assertEqual(submit(self.root, edited)["updated"], [mid], "a fresh submission converges")
+
+    def test_a_different_brief_cannot_take_over_existing_module_ids(self):
+        from integration.generator.handoff import BriefCollision
+        submit(self.root, BRIEF)
+        before = self.journals()
+        other = copy.deepcopy(BRIEF)
+        other["briefId"] = "someone-elses-design"                 # same project/floor/room ids, different design
+        other["rooms"][0]["widthM"] = 6.0
+        with self.assertRaises(BriefCollision) as caught:
+            submit(self.root, other)
+        self.assertIn("demo-three-room", str(caught.exception))
+        self.assertEqual(self.journals(), before, "the first design was overwritten")
+        client = MCPClient(self.root)
+        room = _ok(client.batch([_tool("bmb_inspect_module", {"moduleId": "house/floor-1/living", "includeBlocks": True})])[0], "x")
+        self.assertEqual(room["blocks"]["room"]["briefId"], "demo-three-room")
+        self.assertEqual(room["blocks"]["room"]["widthM"], 4.5)
+
+    def test_a_collision_is_refused_before_any_module_is_created_or_written(self):
+        from integration.generator.handoff import BriefCollision
+        submit(self.root, BRIEF)
+        before = self.journals()
+        other = {"schemaVersion": "room-brief-v1", "briefId": "other", "project": "house", "floorId": "floor-1", "depthM": 3.0,
+                 "rooms": [{"id": "brand-new", "name": "New", "kind": "other", "widthM": 3.0},
+                           {"id": "bedroom-1", "name": "Bedroom 1", "kind": "bedroom", "widthM": 3.0}],   # collides, but second
+                 "doors": [{"between": ["brand-new", "bedroom-1"], "widthM": 0.9}]}
+        with self.assertRaises(BriefCollision):
+            submit(self.root, other)
+        self.assertEqual(self.journals(), before)
+        self.assertFalse((self.root / "modules" / "house__floor-1__brand-new").exists(), "a module was created before the check")
+
+    def test_another_design_in_the_same_namespace_with_other_room_ids_is_named_as_a_collision(self):
+        from integration.generator.handoff import BriefCollision
+        submit(self.root, BRIEF)
+        other = {"schemaVersion": "room-brief-v1", "briefId": "other", "project": "house", "floorId": "floor-1", "depthM": 3.0,
+                 "rooms": [{"id": "garage", "name": "Garage", "kind": "other", "widthM": 3.0}]}
+        with self.assertRaises(BriefCollision):
+            submit(self.root, other)
+
+    def test_a_module_without_a_room_block_is_adopted_and_its_content_kept(self):
+        client = MCPClient(self.root)
+        mid = "house/floor-1/living"
+        _ok(client.batch([_tool("bmb_create_module", {"moduleId": mid})])[0], "create")
+        _ok(client.batch([_tool("bmb_edit_module", {"moduleId": mid, "expectedRevision": 0, "idempotencyKey": "pre-existing",
+                                                    "ops": [{"op": "add", "id": "owner-notes", "data": {"x": 1}}]})])[0], "notes")
+        result = submit(self.root, BRIEF)
+        self.assertIn(mid, result["updated"])
+        blocks = _ok(client.batch([_tool("bmb_inspect_module", {"moduleId": mid, "includeBlocks": True})])[0], "after")["blocks"]
+        self.assertEqual(blocks["owner-notes"], {"x": 1})
+        self.assertEqual(blocks["room"]["briefId"], "demo-three-room")
+
+    def test_a_change_to_an_owned_block_after_our_write_is_reported_not_swallowed(self):
+        import integration.generator.handoff as handoff
+        from integration.generator.handoff import HandoffConflict
+        mid = "house/floor-1/bedroom-1"
+
+        def tamper(root):
+            other = MCPClient(root)
+            seen = _ok(other.batch([_tool("bmb_inspect_module", {"moduleId": mid, "includeBlocks": True})])[0], "inspect")
+            _ok(other.batch([_tool("bmb_edit_module", {"moduleId": mid, "expectedRevision": seen["revision"],
+                                                       "idempotencyKey": "post-write-1",
+                                                       "ops": [{"op": "replace", "id": "room", "data": {**seen["blocks"]["room"], "widthM": 9.0}}]})])[0], "tamper")
+
+        calls = {"n": 0}
+        real_batch = handoff.MCPClient.batch
+
+        class Late(handoff.MCPClient):
+            def batch(self, actions):
+                result = real_batch(self, actions)
+                if any(a[0] == "tools/call" and a[1]["name"] == "bmb_validate_assembly" for a in actions) and not calls["n"]:
+                    calls["n"] = 1
+                    tamper(self.root)
+                return result
+
+        with mock.patch.object(handoff, "MCPClient", Late):
+            with self.assertRaises(HandoffConflict) as caught:
+                submit(self.root, BRIEF)
+        self.assertIn(mid, str(caught.exception))
+        self.assertTrue(issubclass(HandoffConflict, ControllerError))
+
+    def test_a_change_to_a_foreign_block_after_our_write_is_not_a_conflict(self):
+        import integration.generator.handoff as handoff
+        real_batch = handoff.MCPClient.batch
+        done = {"n": 0}
+
+        class Late(handoff.MCPClient):
+            def batch(self, actions):
+                result = real_batch(self, actions)
+                if any(a[0] == "tools/call" and a[1]["name"] == "bmb_validate_assembly" for a in actions) and not done["n"]:
+                    done["n"] = 1
+                    other = MCPClient(self.root)
+                    mid = "house/floor-1/living"
+                    seen = _ok(other.batch([_tool("bmb_inspect_module", {"moduleId": mid})])[0], "inspect")
+                    _ok(other.batch([_tool("bmb_edit_module", {"moduleId": mid, "expectedRevision": seen["revision"],
+                                                               "idempotencyKey": "note-after", "ops": [{"op": "add", "id": "late-note", "data": {}}]})])[0], "note")
+                return result
+
+        with mock.patch.object(handoff, "MCPClient", Late):
+            result = submit(self.root, BRIEF)
+        self.assertEqual(result["revisions"]["house/floor-1/living"], 2, "readback reports the revision it actually saw")
 
     def test_a_read_only_server_is_a_clear_refusal_not_a_write_attempt(self):
         with self.assertRaises(ControllerError) as caught:

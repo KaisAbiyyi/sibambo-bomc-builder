@@ -9,7 +9,7 @@
     {"$ref": "#/$defs/form"}
   ],
   "$defs": {
-    "slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,35}$"},
+    "slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,35}(?![\\s\\S])"},
     "kind": {"enum": ["living", "bedroom", "bath", "hall", "kitchen", "other"]},
     "text": {"type": "string", "minLength": 1, "maxLength": 80},
     "roomSize": {"type": "number", "minimum": 1.5, "maximum": 12.0},

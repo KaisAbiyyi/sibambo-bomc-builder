@@ -18,6 +18,7 @@ from pathlib import Path
 
 from agentctx.budget import canonical, digest
 from agentguide.controller import MCPClient, PROTOCOL, ControllerError, _error_code, _ok, _tool
+from core.textsafe import show
 from integration.generator.brief import (
     BriefError, brief_sha256, journal_blocks, lower, module_id, to_brief,
 )
@@ -30,9 +31,26 @@ REQUIRED_TOOLS = {"bmb_create_module", "bmb_inspect_module", "bmb_edit_module",
                   "bmb_validate_journals", "bmb_validate_assembly"}
 
 
+class BriefCollision(BriefError):
+    """A different brief already owns a module this brief would write. Refused before anything is written."""
+
+
+class HandoffConflict(ControllerError):
+    """After our writes, a generator-owned block no longer matches the brief (another writer got in)."""
+
+
 def _require(ok: bool, why: str) -> None:
     if not ok:
         raise ControllerError(why)
+
+
+def _inspect(client: MCPClient, module_id: str) -> dict:
+    return _ok(client.batch([_tool("bmb_inspect_module", {"moduleId": module_id, "includeBlocks": True})])[0],
+               "inspect " + module_id)
+
+
+def _owned(blocks: dict) -> dict:
+    return {name: value for name, value in blocks.items() if name in OWNED_BLOCKS}
 
 
 def _ops(current: dict, desired: dict) -> list:
@@ -69,16 +87,24 @@ def submit(root: Path, source: object, *, writes: bool = True) -> dict:
 
     existing = _ok(client.batch([_tool("bmb_validate_journals")])[0], "journal listing")
     present = set(existing["moduleIds"])
-    dropped = sorted(m for m in present if m.startswith(prefix) and m not in wanted)
+
+    # Phase 1, reads only: observe every module of this namespace and refuse a collision BEFORE any write, so a
+    # refused submission leaves nothing half-created.
+    observed = {m: _inspect(client, m) for m in sorted(m for m in present if m.startswith(prefix))}
+    for mid, seen in observed.items():
+        owner = seen["blocks"].get("room", {}).get("briefId") if isinstance(seen["blocks"].get("room"), dict) else None
+        if "room" in seen["blocks"] and owner != brief["briefId"]:
+            raise BriefCollision(f"{mid} belongs to brief {show(owner)}, not {show(brief['briefId'])}; handoff v1 never "
+                                 f"takes over another design's modules (use another project or floorId)")
+    dropped = sorted(m for m in observed if m not in wanted)
     if dropped:
         raise BriefError(f"the brief no longer contains {dropped}; handoff v1 never deletes modules")
 
+    # Phase 2: writes.
     created, updated, unchanged = [], [], []
     for mid, blocks in wanted.items():
-        if mid in present:
-            seen = _ok(client.batch([_tool("bmb_inspect_module", {"moduleId": mid, "includeBlocks": True})])[0],
-                       "inspect " + mid)
-            revision, current = seen["revision"], seen["blocks"]
+        if mid in observed:
+            revision, current = observed[mid]["revision"], observed[mid]["blocks"]
         else:
             _ok(client.batch([_tool("bmb_create_module", {"moduleId": mid})])[0], "create " + mid)
             revision, current = 0, {}
@@ -99,13 +125,26 @@ def submit(root: Path, source: object, *, writes: bool = True) -> dict:
     graph = _ok(client.batch([_tool("bmb_validate_assembly", {"document": document})])[0],
                 "assembly validation")
     _require(graph["moduleCount"] == len(wanted), "assembly module count mismatch")
-    final = _ok(client.batch([_tool("bmb_validate_journals")])[0], "final journal validation")
+    _ok(client.batch([_tool("bmb_validate_journals")])[0], "final journal validation")
+
+    # Phase 3, read back what is actually there. Revisions alone say nothing about content: another writer may have
+    # changed an owned block after our compare-and-swap write. This is the LAST step, so a mismatch is reported and
+    # success only ever means "the owned blocks matched the brief when read back" (no later instant can be promised).
+    revisions, differing = {}, []
+    for mid, blocks in wanted.items():
+        seen = _inspect(client, mid)
+        revisions[mid] = seen["revision"]
+        if _owned(seen["blocks"]) != blocks:
+            differing.append(mid)
+    if differing:
+        raise HandoffConflict(f"after writing, the owned blocks of {differing} no longer match the brief "
+                              f"(changed by another writer); nothing further was written, resubmit to converge")
     document_sha = hashlib.sha256(canonical(document).encode("utf-8")).hexdigest()
     return {
         "contract": "bmb032-generator-handoff-v1", "briefId": brief["briefId"], "briefSha256": sha,
         "moduleIrSha256": document_sha, "rooms": len(wanted),
         "created": created, "updated": updated, "unchanged": unchanged,
-        "revisions": {m: r for m, r in final["revisions"].items() if m in wanted},
+        "revisions": revisions,
         "assemblyModules": graph["moduleCount"],
         "mcpToolCalls": sum(t["method"] == "tools/call" for t in client.trace),
         "llmRequired": False, "networkRequired": False, "transport": "stdio-mcp", "protocol": PROTOCOL,
