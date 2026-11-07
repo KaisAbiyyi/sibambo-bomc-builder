@@ -44,6 +44,14 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def text_sha256(path: Path) -> str:
+    """SHA-256 of a TEXT input with CRLF folded to LF.
+
+    A Windows checkout converts line endings, so the raw bytes of the same commit hash differently there and the
+    pins of two runs could never be compared. Binary files (the golden BOMC) are still hashed raw."""
+    return _sha(Path(path).read_bytes().replace(b"\r\n", b"\n"))
+
+
 def implementation_sha() -> str | None:
     value = os.environ.get("EXPECTED_SHA") or os.environ.get("GITHUB_SHA")
     if value:
@@ -218,8 +226,9 @@ def run_trial(trial_id: int) -> dict:
         "baselineStatus": "NOT_RUN", "baselineNote": "the 4-room baseline needs the BMB-026 house, not on main",
         "implementationSha": implementation_sha(), "controller": "deterministic-scripted-no-llm", "trialId": trial_id,
         "environment": environment(),
-        "inputs": {"promptFixtureSha256": _sha(FIXTURE.read_bytes()), "assemblySha256": _sha(ASSEMBLY.read_bytes()),
-                   "compilerSources": {p: _sha((REPO / p).read_bytes()) for p in COMPILER_SOURCES},
+        "inputs": {"promptFixtureSha256": text_sha256(FIXTURE), "assemblySha256": text_sha256(ASSEMBLY),
+                   "textHashing": "CRLF folded to LF (text files); the golden BOMC is hashed raw",
+                   "compilerSources": {p: text_sha256(REPO / p) for p in COMPILER_SOURCES},
                    "goldenSha256": _sha(golden) if golden else None},
         "metrics": {"workflow": workflow, "model": model},
         "acceptance": {"checks": checks},

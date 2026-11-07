@@ -151,6 +151,37 @@ class WorldBoundsTests(unittest.TestCase):
         self.assertIsNone(trial.expected_world_bounds(doc))
 
 
+class InputPinTests(unittest.TestCase):
+    """Found on the first hosted Windows run: raw hashes of text files differ per OS (CRLF checkout), so the pins of
+    two runs of the same commit were not comparable. Text is hashed with CRLF folded to LF."""
+
+    def test_line_endings_do_not_change_a_text_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lf, crlf, mixed = (Path(tmp) / n for n in ("lf.txt", "crlf.txt", "mixed.txt"))
+            lf.write_bytes(b"a\nb\nc\n")
+            crlf.write_bytes(b"a\r\nb\r\nc\r\n")
+            mixed.write_bytes(b"a\r\nb\nc\r\n")
+            self.assertEqual(trial.text_sha256(lf), trial.text_sha256(crlf))
+            self.assertEqual(trial.text_sha256(lf), trial.text_sha256(mixed))
+
+    def test_a_real_content_change_still_changes_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a, b = Path(tmp) / "a.txt", Path(tmp) / "b.txt"
+            a.write_bytes(b"x = 1\n")
+            b.write_bytes(b"x = 2\n")
+            self.assertNotEqual(trial.text_sha256(a), trial.text_sha256(b))
+            b.write_bytes(b"x = 1\n\n")                  # an extra blank line is a change, not a line-ending artefact
+            self.assertNotEqual(trial.text_sha256(a), trial.text_sha256(b))
+
+    def test_the_recorded_pins_use_that_normalization(self):
+        result = runner.run_trial_process(1)
+        want = trial._sha((ROOT / "examples" / "bmb025-prompts.json").read_bytes().replace(b"\r\n", b"\n"))
+        self.assertEqual(result["inputs"]["promptFixtureSha256"], want)
+        self.assertIn("CRLF", result["inputs"]["textHashing"])
+        for path, digest in result["inputs"]["compilerSources"].items():
+            self.assertEqual(digest, trial.text_sha256(ROOT / path))
+
+
 class MemoryTests(unittest.TestCase):
     def test_peak_memory_is_a_positive_integer_or_an_honest_none(self):
         own = metrics.peak_rss_self()

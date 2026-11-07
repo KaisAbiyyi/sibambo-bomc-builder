@@ -19,9 +19,10 @@
     "environment": {"type": "object", "required": ["platform", "python", "cpuCount", "llm", "network"]},
     "inputs": {
       "type": "object", "additionalProperties": false,
-      "required": ["promptFixtureSha256", "assemblySha256", "compilerSources", "goldenSha256"],
+      "required": ["promptFixtureSha256", "assemblySha256", "textHashing", "compilerSources", "goldenSha256"],
       "properties": {
         "promptFixtureSha256": {"$ref": "#/$defs/sha256"},
+        "textHashing": {"type": "string"},
         "assemblySha256": {"$ref": "#/$defs/sha256"},
         "compilerSources": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/sha256"}},
         "goldenSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}

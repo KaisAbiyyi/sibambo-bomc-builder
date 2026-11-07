@@ -65,7 +65,7 @@ python -m evaluation.probe compile --input examples/module-ir-two-rooms.json --o
 python -m unittest discover -s tests -p test_bmb028_benchmarks.py -v
 ```
 
-A result pins what produced it: SHA-256 of the prompt fixture, the assembly and the three compiler sources, the checked-in golden hash, the commit (`EXPECTED_SHA`/`GITHUB_SHA` or `git rev-parse HEAD`), the OS, Python version and CPU count. Exit status is 0 for `PASS`/`INCOMPLETE` and 1 for `FAIL`.
+A result pins what produced it: SHA-256 of the prompt fixture, the assembly and the three compiler sources (**text files are hashed with CRLF folded to LF**: the first hosted Windows run showed that a Windows checkout converts line endings, so raw hashes of the same commit differed per OS and two runs could not be compared; the binary golden is hashed raw), the checked-in golden hash, the commit (`EXPECTED_SHA`/`GITHUB_SHA` or `git rev-parse HEAD`), the OS, Python version and CPU count. Exit status is 0 for `PASS`/`INCOMPLETE` and 1 for `FAIL`.
 
 ## Local sample (orientation only)
 
