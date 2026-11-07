@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/schemas/generator-handoff-v1.schema.json",
+  "title": "BMB-032 generator handoff inputs (room-brief-v1, survey-v1, form-v1)",
+  "description": "Three proposed input shapes for the silabs-generator handoff. Each is normalized by integration.generator to the canonical room-brief-v1 before anything reaches the builder API. The Python validator is authoritative; this schema is a convenience for producers and is checked against it in the test suite.",
+  "oneOf": [
+    {"$ref": "#/$defs/roomBrief"},
+    {"$ref": "#/$defs/survey"},
+    {"$ref": "#/$defs/form"}
+  ],
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,35}(?![\\s\\S])"},
+    "kind": {"enum": ["living", "bedroom", "bath", "hall", "kitchen", "other"]},
+    "text": {"type": "string", "minLength": 1, "maxLength": 80},
+    "roomSize": {"type": "number", "minimum": 1.5, "maximum": 12.0},
+    "doorWidth": {"type": "number", "minimum": 0.81, "maximum": 2.0},
+    "wallHeight": {"type": "number", "minimum": 2.4, "maximum": 4.0},
+    "roomBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "briefId", "project", "floorId", "depthM", "rooms"],
+      "properties": {
+        "schemaVersion": {"const": "room-brief-v1"},
+        "briefId": {"$ref": "#/$defs/slug"},
+        "project": {"$ref": "#/$defs/slug"},
+        "floorId": {"$ref": "#/$defs/slug"},
+        "depthM": {"$ref": "#/$defs/roomSize"},
+        "wallHeightM": {"$ref": "#/$defs/wallHeight"},
+        "rooms": {
+          "type": "array", "minItems": 1, "maxItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "name", "kind", "widthM"],
+            "properties": {
+              "id": {"$ref": "#/$defs/slug"}, "name": {"$ref": "#/$defs/text"},
+              "kind": {"$ref": "#/$defs/kind"}, "widthM": {"$ref": "#/$defs/roomSize"}
+            }
+          }
+        },
+        "doors": {
+          "type": "array", "maxItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["between", "widthM"],
+            "properties": {
+              "between": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/slug"}},
+              "widthM": {"$ref": "#/$defs/doorWidth"},
+              "heightM": {"type": "number", "minimum": 1.95, "maximum": 3.9},
+              "offsetM": {"type": "number", "minimum": 0.1, "maximum": 12.0}
+            }
+          }
+        }
+      }
+    },
+    "survey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "surveyId", "answers"],
+      "properties": {
+        "schemaVersion": {"const": "survey-v1"},
+        "surveyId": {"$ref": "#/$defs/slug"},
+        "answers": {
+          "type": "object", "additionalProperties": false,
+          "required": ["bedrooms", "bathrooms", "size"],
+          "properties": {
+            "bedrooms": {"type": "integer", "minimum": 0, "maximum": 6},
+            "bathrooms": {"type": "integer", "minimum": 0, "maximum": 4},
+            "size": {"enum": ["compact", "standard"]}
+          }
+        }
+      }
+    },
+    "form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "formId", "depthM", "rooms"],
+      "properties": {
+        "schemaVersion": {"const": "form-v1"},
+        "formId": {"$ref": "#/$defs/slug"},
+        "project": {"$ref": "#/$defs/slug"},
+        "floorId": {"$ref": "#/$defs/slug"},
+        "depthM": {"$ref": "#/$defs/roomSize"},
+        "doorWidthM": {"$ref": "#/$defs/doorWidth"},
+        "wallHeightM": {"$ref": "#/$defs/wallHeight"},
+        "rooms": {
+          "type": "array", "minItems": 1, "maxItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["name", "type", "widthM"],
+            "properties": {
+              "name": {"$ref": "#/$defs/text"}, "type": {"$ref": "#/$defs/kind"},
+              "widthM": {"$ref": "#/$defs/roomSize"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

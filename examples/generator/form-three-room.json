@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "form-v1",
+  "formId": "demo-form",
+  "depthM": 3.0,
+  "doorWidthM": 0.9,
+  "rooms": [
+    {"name": "Living room", "type": "living", "widthM": 4.5},
+    {"name": "Bedroom", "type": "bedroom", "widthM": 3.0},
+    {"name": "Bedroom", "type": "bedroom", "widthM": 3.0}
+  ]
+}
