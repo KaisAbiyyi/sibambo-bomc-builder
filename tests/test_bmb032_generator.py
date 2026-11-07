@@ -621,7 +621,9 @@ class NoLlmNoNetworkTests(unittest.TestCase):
                 for name in names:
                     with self.subTest(file=path.name, module=name):
                         self.assertNotIn(name.split(".")[0], self.FORBIDDEN)
-                if isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv"):
+                # Scoped to this package: another integration package may legitimately read ITS OWN feature flag
+                # (integration/rooms does, in flag.py, and its own test pins that); the generator must read nothing.
+                if "generator" in path.parts and isinstance(node, ast.Attribute) and node.attr in ("environ", "getenv"):
                     self.fail(f"{path.name} reads the environment (credentials or keys)")
 
 

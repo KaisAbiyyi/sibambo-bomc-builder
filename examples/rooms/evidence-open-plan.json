@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "rooms-evidence-v1",
+  "evidenceId": "demo-open-plan",
+  "detector": {"name": "synthetic-detector", "version": "0"},
+  "rooms": [
+    {"id": "everything", "polygon": [[0, 0], [6, 0], [6, 3], [0, 3]], "confidence": 0.9}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "rooms-evidence-v1",
+  "evidenceId": "demo-two-rooms",
+  "detector": {"name": "synthetic-detector", "version": "0"},
+  "elevationM": 0.0,
+  "rooms": [
+    {"id": "living", "label": "Living room", "polygon": [[0, 0], [4, 0], [4, 3], [0, 3]], "confidence": 0.98},
+    {"id": "hall", "label": "Hall", "polygon": [[4, 0], [6, 0], [6, 3], [4, 3]], "confidence": 0.95}
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/schemas/rooms-evidence-v1.schema.json",
+  "title": "BMB-029 rooms-evidence-v1 (proposed detector output)",
+  "description": "A PROPOSED interface for what an optional room detector hands the adapter; not any real detector's format. The Python validator is authoritative (it also requires every polygon to be simple); this schema is a convenience for producers and is checked against it in the test suite.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "evidenceId", "detector", "rooms"],
+  "properties": {
+    "schemaVersion": {"const": "rooms-evidence-v1"},
+    "evidenceId": {"$ref": "#/$defs/slug"},
+    "detector": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version"],
+      "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 80}, "version": {"type": "string", "minLength": 1, "maxLength": 40}}
+    },
+    "elevationM": {"type": "number", "minimum": -1000, "maximum": 1000},
+    "rooms": {
+      "type": "array", "minItems": 1, "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "polygon"],
+        "properties": {
+          "id": {"$ref": "#/$defs/slug"},
+          "label": {"type": "string", "minLength": 1, "maxLength": 80},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "polygon": {
+            "type": "array", "minItems": 3, "maxItems": 256,
+            "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "minimum": -10000, "maximum": 10000}}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,35}(?![\\s\\S])"}
+  }
+}
