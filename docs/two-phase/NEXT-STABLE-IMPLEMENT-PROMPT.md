@@ -13,3 +13,10 @@ Use the existing Module IR/geometry/compiler, bounded atomic1–8-module state/r
 Delegation only if explicitly authorized later; then only GPT-6 Luna at maximum supported reasoning, disjoint ownership. No subagent is required merely by this handoff. Write the dated/versioned implementation summary, publish task-owned changes to the intended branch, synchronize actual GitHub/Notion evidence and report remaining manual tests. At a missing decision or material contradiction, stop dependent work and return evidence to REVIEW/PLAN; do not invent a substitute architecture.
 
 Governing [MASTER IMPLEMENTATION PLAN v1.3](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md). The Experimental architecture remains documented as a future roadmap; no Experimental execution is authorized now.
+
+
+---
+
+## v1.4 addendum — applies only after the owner accepts v1.4 (until then this file's v1.3 instruction governs unchanged)
+
+Everything above stays in force. When v1.4 is CURRENT, the Stable-only run additionally completes the **Required** sub-increments SE-03.A (remote construction guide + agent-grade tool descriptions), SE-03.B (typed error catalogue) and SE-11.A (bilingual owner acceptance checklist), plus only those **Owner-selectable** items (SE-03.C/04.A/05.A inbox, SE-06.A timeline, SE-06.B follow camera, SE-07.A Save receipt) that the owner selected at SE-00. The Stable critical path is unchanged. The prohibition on all Batch 2 / Experimental work (XB-00…XB-18 and every increment, including `.0` discovery increments beyond planning-document maintenance) is unchanged. Governing: [MASTER IMPLEMENTATION PLAN v1.4](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.4.md).

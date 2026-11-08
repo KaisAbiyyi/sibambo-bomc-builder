@@ -72,3 +72,35 @@
 | XB-09 | https://app.notion.com/p/412c4a6aaf73812696bedb0e1892424e?pvs=204 | https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/85 |
 | XB-10 | https://app.notion.com/p/412c4a6aaf738168b5b5da251a0dfa61?pvs=204 | https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/86 |
 | XB-11 | https://app.notion.com/p/412c4a6aaf73814d8ea8f55f69de1363?pvs=204 | https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/87 |
+
+
+## v1.4 PROPOSED additions (additive; no Notion rows or GitHub issues created yet — see v1.4 Part 3, D4)
+
+Batch 1 sub-increments add acceptance inside existing parents; no new dependency edge into SE-11.
+
+| ID | Parent | Class | Repository | Lock (inherits parent) |
+|---|---|---|---|---|
+| SE-03.A · Remote construction guide + agent-grade tool descriptions | SE-03 | Required | builder | stable/mcp |
+| SE-03.B · Typed error catalogue | SE-03 | Required | builder | stable/mcp |
+| SE-03.C · `read_owner_requests` + RAM request store (TP-020) | SE-03 | Owner-selectable | builder | stable/mcp |
+| SE-04.A · Owner request compose UI + BFF route (TP-020) | SE-04 | Owner-selectable | editor | stable/editor-onboarding |
+| SE-05.A · Request-status WebSocket message (TP-020) | SE-05 | Owner-selectable | editor + builder `service/draft_ws.py` | stable/editor-sync |
+| SE-06.A · Activity timeline + changed-module highlight | SE-06 | Owner-selectable | editor | stable/editor-render |
+| SE-06.B · Follow-agent camera, default OFF | SE-06 | Owner-selectable | editor | stable/editor-render |
+| SE-07.A · Opt-in Save receipt sidecar | SE-07 | Owner-selectable | editor | stable/save |
+| SE-11.A · Bilingual owner acceptance checklist | SE-11 | Required | editor | stable/product-acceptance |
+| SE-12 · Post-acceptance parking lot | — | Not scheduled | — | — |
+
+New Batch 2 epics (phase gate: SE-11 accepted → XB-00 → all):
+
+| Epic | AND dependencies | Priority | Lock |
+|---|---|---|---|
+| XB-12 · Multi-storey (lantai) research contract | XB-06, XB-07 | P2 | experimental/multistorey |
+| XB-13 · Denah — 2D plan drawings from the canonical plan | XB-07 | P2 | experimental/plan-drawing |
+| XB-14 · Indonesia locale and regulation context pack | XB-00 | P2 | experimental/locale |
+| XB-15 · Privacy, consent and retention | XB-00 | P2 | experimental/privacy |
+| XB-16 · Live build view and waiting experience | XB-05, XB-07 | P2 | experimental/live-view |
+| XB-17 · Brand, naming, repository and licence decision | XB-00 | P2 | experimental/brand |
+| XB-18 · Architect handoff package and meeting mode | XB-10, XB-13 | P2 | experimental/handoff |
+
+Additional AND edges on existing epics (additive): XB-03.11 += XB-15; XB-09 += XB-14, XB-15, XB-16, XB-17; XB-11 += XB-13, XB-18. Each existing epic XB-00…XB-11 is also split into increments `XB-NN.k` listed in v1.4 §1.6–§1.14.
