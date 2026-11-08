@@ -5,8 +5,9 @@
 ## Merged source-of-truth baseline
 
 - **SE-00: DONE, issue #70 CLOSED.** Owner approved and merged all predecessor PRs.
-- Builder main: `8b3d7024838bb3dd64e6530becc1e33da77799b1` — [#90](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/90) then [#89](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/89), both merged.
-- Editor main: `555aeafeafbb25599150f8fafa43644e6111cf21` — [#12](https://github.com/KaisAbiyyi/sibambo-editor/pull/12) then [#13](https://github.com/KaisAbiyyi/sibambo-editor/pull/13), both merged. Editor main tree equals #13's qualified tree, and #14 was already incorporated in #13.
+- **Qualified merged Builder baseline (source-level CP0):** `8b3d7024838bb3dd64e6530becc1e33da77799b1` — [#90](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/90) then [#89](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/89), both merged.
+- **Qualified merged Editor baseline:** `555aeafeafbb25599150f8fafa43644e6111cf21` — [#12](https://github.com/KaisAbiyyi/sibambo-editor/pull/12) then [#13](https://github.com/KaisAbiyyi/sibambo-editor/pull/13), both merged. Editor main tree equals #13's qualified tree, and #14 was already incorporated in #13.
+- **Important:** Builder `main` may advance after this qualified baseline because of documentation-only status corrections. The stated SHA is the **exact tested CP0 baseline**, not a promise of the live `main` branch tip. Every implementing agent must run `git rev-parse origin/main` and inspect any intervening commits before claiming or branching. The exact generated/corpus/production source at the tested baseline remains untouched by these documentation updates.
 - **Post-merge acceptance proof:** [GitHub Actions run 42466457352](https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42466457352), SUCCESS: exact-source Builder-main → original Editor-main corpus check and 24 independent checker regressions. Proof artifact ID `13611961832`. [Editor main consumer run 42465787702](https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42465787702) attempt 2 SUCCESS; initial Bun download 504 was external/transient.
 - This is **CP0 source-level acceptance only**; Windows-native ACL, real Auth0, tunnel, WebSocket, remote MCP, owner Save and SE-11 are still downstream, not SE-00 blockers.
 
@@ -19,7 +20,7 @@
 | SE-04 | **Ready (unclaimed)** | Now | [Editor #15](https://github.com/KaisAbiyyi/sibambo-editor/issues/15) |
 | SE-02 | Blocked by SE-01 | Up Next | its existing task issue |
 
-**Readiness vs execution authority:** Owner approved the four SE-00 merges and the **D12 delivery method** for SE-01 and SE-04. D12 instructs HOW assigned agents must deliver; it should not be confused with evidence that a **separate explicit IMPLEMENT authorization** has already been recorded. If the initiating owner's current prompt explicitly authorizes “IMPLEMENT SE-01 and SE-04,” that is the required scope gate. Otherwise reply "Ready, awaiting explicit IMPLEMENT instruction" rather than incorrectly asserting SE-00 is unmerged or blocked. Do not reopen CP0 audits.
+**Readiness vs execution authority:** Owner approved the four SE-00 merges and the **D12 delivery method** for SE-01 and SE-04. D12 instructs HOW assigned agents must deliver; it should not be confused with evidence that a **separate explicit IMPLEMENT authorization** has already been recorded. If the initiating owner's current prompt explicitly authorizes “IMPLEMENT SE-01 and SE-04,” that is the required scope gate; a new agent may then claim only its own task/locks and create a task-owned PR. Otherwise reply "Ready, awaiting explicit IMPLEMENT instruction" rather than incorrectly asserting SE-00 is unmerged or blocked. Do not reopen CP0 audits.
 
 ## D12 — cloud agent finishes; owner follows a procedural SOP
 
