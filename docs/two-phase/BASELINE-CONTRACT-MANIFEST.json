@@ -1,0 +1,396 @@
+{
+  "formatVersion": 1,
+  "task": "SE-00",
+  "status": "Blocked / Owner Gate",
+  "observedDateJakarta": "2026-11-08",
+  "execution": "managed Codex cloud only",
+  "baseline": {
+    "builder": {
+      "repository": "KaisAbiyyi/sibambo-bomc-builder",
+      "sha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+      "refAtObservation": "main"
+    },
+    "editor": {
+      "repository": "KaisAbiyyi/sibambo-editor",
+      "sha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "refAtObservation": "feature/bmb026-original-editor-consumer-20261106",
+      "mainAtObservation": "04e4c1d1656e7c65b093d1667f556c3fdb4b5130",
+      "integratedIntoMain": false
+    },
+    "houseCorpusSource": {
+      "repository": "KaisAbiyyi/sibambo-bomc-builder",
+      "sha": "8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00",
+      "role": "read-only corpus generator; not replacement execution base"
+    },
+    "bmb021InteropSource": "0e3ec262e98762969da66088d412f8beebb63523",
+    "futureIntegratedSha": null,
+    "ownerApproved": false
+  },
+  "compiler": {
+    "entryPoint": "bomc.compiler.graph_to_bomc.compile_document",
+    "sourceSha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+    "coreAndBomcFiles": [
+      {
+        "path": "bomc/adapter/writer_v12.py",
+        "gitBlob": "eb7bdf725589c7d3c32835788fe39c5e310991e2",
+        "sha256": "5306686f57c84d7109d1e01684b7a2fc1b744bd8660cd300aec8942b54e2abe0",
+        "bytes": 10389
+      },
+      {
+        "path": "bomc/compiler/__init__.py",
+        "gitBlob": "ea958a8acfd4835f0feb73ed8f0baee3607a5fe5",
+        "sha256": "3aa14360bfb826a1b3f8651e890bc442c1f0a26ffe3b143b19bf2e7deabdad78",
+        "bytes": 50
+      },
+      {
+        "path": "bomc/compiler/graph_to_bomc.py",
+        "gitBlob": "465b22b5f54fa1b907ac1507243ff3ae712b311d",
+        "sha256": "306e6ee6aeed10c69eb62dd08f351078ef9148154aa344236190fc896cd495d8",
+        "bytes": 13224
+      },
+      {
+        "path": "bomc/compiler/semantic_v12.py",
+        "gitBlob": "d4621279829e2164cd468840459c7db6a4d47ec9",
+        "sha256": "37c700de869696642b46e03d7beb17c670cf87fd586ac40ae742848eba3a152e",
+        "bytes": 21684
+      },
+      {
+        "path": "core/__init__.py",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "path": "core/assembly/__init__.py",
+        "gitBlob": "65ffbfcacd015ff35d2c58173129df58d89bf55f",
+        "sha256": "6a7c82117cdde52e58140d5e4c5b9f8cd5c2145cc2c1dbca3fb6505b228796de",
+        "bytes": 123
+      },
+      {
+        "path": "core/assembly/merge.py",
+        "gitBlob": "e02fe7f58dbaa7ee609fe3e23ac87ad1a6fec698",
+        "sha256": "90647d35d67efc02058bc355fde9b8c6180bed593f094e96a34ea9759d0b3721",
+        "bytes": 15739
+      },
+      {
+        "path": "core/geometry/__init__.py",
+        "gitBlob": "c84cbb363f6bd27055e647b00ee6eed6eca57b61",
+        "sha256": "7ed461e4fec4f770a7144855d7852967da5ddec8d9900964d0d651c99c0328b8",
+        "bytes": 314
+      },
+      {
+        "path": "core/geometry/floor.py",
+        "gitBlob": "3096768c8dcc5a0d56a003f95b88be680279cc82",
+        "sha256": "511d416d628782a293b6b8f82a636c7a97fb15e0cb4089ad2a5da05c1a1845ec",
+        "bytes": 7094
+      },
+      {
+        "path": "core/geometry/openings.py",
+        "gitBlob": "51a6537ea4e423d9214ea06bfdfe7024b32943c1",
+        "sha256": "79ca235641bf16645057fd9e5dd3e547650b2b544beac219ed47c6d6aae0c001",
+        "bytes": 10534
+      },
+      {
+        "path": "core/geometry/roof.py",
+        "gitBlob": "38de706faaed38cde4e89de1eeab27f8f1539905",
+        "sha256": "680a519324fcca801f7ebe017cade56e335af72724e894d2088a898aec8839e5",
+        "bytes": 14674
+      },
+      {
+        "path": "core/geometry/semantics.py",
+        "gitBlob": "8298cb202816ede2e4724acb534b86ff8afd986a",
+        "sha256": "c4bcf2654d8e8883a9a7690af698d05035a3347a2d2aff6dbe44e25f124662e4",
+        "bytes": 7116
+      },
+      {
+        "path": "core/geometry/triangulation.py",
+        "gitBlob": "38b56805467f52cfcb9b3fa01b1cf68cec9b0ace",
+        "sha256": "cdd42825abbbe8d4201196d72028992e8bace73f383ee0524328e72afdb16681",
+        "bytes": 12586
+      },
+      {
+        "path": "core/geometry/wall.py",
+        "gitBlob": "dd78294fb527eca917d4cb79138194069f9ccea7",
+        "sha256": "ff037613130603033a1121d7e86095b1bd74eb4199e477ed5a3dda6d48473dae",
+        "bytes": 10855
+      },
+      {
+        "path": "core/graph/__init__.py",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "path": "core/graph/dag.py",
+        "gitBlob": "d97b2f55c683999a90c32923c48a988917b707c2",
+        "sha256": "82c247080e9f5ae56c3bd440bd92f306e59faf66dc729e50e39941143db90fe5",
+        "bytes": 11297
+      },
+      {
+        "path": "core/identity/__init__.py",
+        "gitBlob": "15c41e18aef03c67e15ee61d7d5b2ceeb4f1a9cb",
+        "sha256": "bc68d5713367b894140129e4090f75ae17d2721f0fde20f84a6f060559c9a1fd",
+        "bytes": 152
+      },
+      {
+        "path": "core/identity/store.py",
+        "gitBlob": "4fa830643aa343736dfe84214fc42d9bef9fd804",
+        "sha256": "2d75db3fa2e82760779d1d271e00397a6b501730b5c0caa878a34a226d9a5e66",
+        "bytes": 8027
+      },
+      {
+        "path": "core/storage/__init__.py",
+        "gitBlob": "d8a807e1b121a0c79a3dc9316ddd69592e07fd77",
+        "sha256": "f288215327a040392927e6b644bab624022798c5655aa3f4e5c9f31db015c38c",
+        "bytes": 138
+      },
+      {
+        "path": "core/storage/journal.py",
+        "gitBlob": "d9b54ff9aaa1a0874ba92f90c75a77eb625ded3b",
+        "sha256": "7b9cc326c47d7eefff10ed6ccb078473ce7c51b6bc83d4831897b4b938c32b25",
+        "bytes": 19061
+      },
+      {
+        "path": "core/textsafe.py",
+        "gitBlob": "d8683c1e1cd6a81919bb4ff92d91e22a1b7bc8d0",
+        "sha256": "0db0aa0f9a874a86e2b39667954be81e28cfffaba6bb8e45b41042f4636118d1",
+        "bytes": 1005
+      },
+      {
+        "path": "core/validator/__init__.py",
+        "gitBlob": "91f6e73e9562026af2fc3f5f7c4ea0f66f4a1d5d",
+        "sha256": "89e9b808fa82dbc797155bc0335357c1b7ca3e0c76506c3c00be4fbb2e1a8c2d",
+        "bytes": 72
+      },
+      {
+        "path": "core/validator/validation.py",
+        "gitBlob": "ee531a22610359a65bbe2eab77f02d2bc9063f2f",
+        "sha256": "5067845fd86c0b583e7890308f0c09a0bec0cc9c9303dffb20fead45be6ceada",
+        "bytes": 16559
+      }
+    ],
+    "inventorySha256": "5c067aae01a4f34b3179df3411f7f47678e481f541bf7dea0f56134f2c595053",
+    "inventoryAlgorithm": "UTF-8 concatenation of sha256 + two ASCII spaces + repository path + LF, path sorted; all tracked .py under core/ and bomc/"
+  },
+  "schemas": [
+    {
+      "path": "schemas/module-ir-v1.schema.json",
+      "gitBlob": "2172e0ca5f0bcae0c6da7d6c74c58b4746beb190",
+      "sha256": "3ca89523ff3239e1cb52e716ca3aebc8a30a9bbddbb512d4c3111188b57a66a5",
+      "bytes": 14169
+    },
+    {
+      "path": "schemas/generator-handoff-v1.schema.json",
+      "gitBlob": "43cee97531622c9d06ef9ad3ff8b28bfae36c6c0",
+      "sha256": "257e71233ad4827d2c891027dfd80f03a0016fc4d57cae71b8d99a59cd0fd566",
+      "bytes": 4242
+    },
+    {
+      "path": "schemas/rooms-evidence-v1.schema.json",
+      "gitBlob": "38fbe910c8ac0b77144270d3df757bcdad2c3511",
+      "sha256": "abc765f587c11d5461e1799d86447b7c4753195d3be51d23c1d4ecb979bfd351",
+      "bytes": 1841
+    }
+  ],
+  "futureSchemas": {
+    "draft-operation-v1": null,
+    "draft-view-v1": null,
+    "draft-errors-v1": null
+  },
+  "consumerIdentity": [
+    {
+      "path": "packages/e4-import/src/bomc-loader.ts",
+      "gitBlob": "f6acc2af4dd545c0ce3a73ce6f2ec6b7c4fb2f9d",
+      "sha256": "9dbb8fe8e2f898da669e985c9c6ad70eeb1845f1c7e01efced0a2641bc98cc01",
+      "bytes": 131465
+    },
+    {
+      "path": "apps/editor/src/routes/+page.svelte",
+      "gitBlob": "ec0cdfc779ab0a327f4bcb3c3892540a7fe722af",
+      "sha256": "9356d7f6f0c1ec3bdec8eb90bf736a874afe42e246741f2b966b22c5153acbe9",
+      "bytes": 96643
+    },
+    {
+      "path": "packages/viewport/src/prepared-scene-viewport.ts",
+      "gitBlob": "26410ccd79f1a1249c56a1fbf6743975c5cc269f",
+      "sha256": "7e594a5bdaeec47f067211048db0fdd5f68ab5c067ef0b369b3acd97eabb3047",
+      "bytes": 61021
+    },
+    {
+      "path": "bun.lock",
+      "gitBlob": "9eace6b18707de79a77b41854bb8629dad5e1fe3",
+      "sha256": "e8fc49a1ac8716835e01f9e3655c415b3cee8cf1ec60bdf8c8b26fcf8e08c16e",
+      "bytes": 63759
+    }
+  ],
+  "governingDocuments": [
+    {
+      "path": "docs/two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.5.md",
+      "gitBlob": "3f68c1485455bd9f1a2b107cc42e8ef7e17f9521",
+      "sha256": "30aaf1a7069cb0d9ffee4eb8c94782f863549bfa40668d50bcee2b10d7b303b0",
+      "bytes": 257304,
+      "repository": "KaisAbiyyi/sibambo-editor",
+      "sourceSha": "d744f779befaa028dc84ed0d1c9241c7b4900f2d"
+    },
+    {
+      "path": "docs/two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.5-public.md",
+      "gitBlob": "8c4a2c211d0208237cc0d980885ba5962b09a8f9",
+      "sha256": "d018723427371520df2e6bccbc4dd553a730a13d0cf299a68b565b9a911ce78b",
+      "bytes": 2379,
+      "repository": "KaisAbiyyi/sibambo-bomc-builder",
+      "sourceSha": "ed61b3e55cbab306e1756e3c95e6bfae54cf6699"
+    }
+  ],
+  "houseCorpus": {
+    "builderSha": "8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00",
+    "editorBaseSha": "b5f46a761d1763241b60375cbb5f7110d62d99d2",
+    "originalRun": 42036423066,
+    "originalArchives": {
+      "ubuntu": {
+        "artifactId": 13417954261,
+        "sha256": "48d843fd03abb10cc736ca213667b638692b2b1f4d99c149276e69e0d0108757"
+      },
+      "windows": {
+        "artifactId": 13417673986,
+        "sha256": "e862c56bcc90c66d24c513478985380f49de9c0e35e14b378eefa54e18f2949a"
+      }
+    },
+    "fixtureOrigin": "Original Ubuntu hosted artifacts, byte-preserved; Windows binary SHA256 identical",
+    "files": {
+      "baseline.bomc": {
+        "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+        "bytes": 32660
+      },
+      "baseline.json": {
+        "sha256": "68279b5d0e83ace43ec81e15bd4d0461c8178351653dbe4cffc3bf91756cad6b",
+        "bytes": 40158
+      },
+      "receipt.json": {
+        "sha256": "462c2fac84755bc3b05af21db5a953fdc5af945a7e36673e3d3f7bc0ece875fc",
+        "bytes": 4028
+      },
+      "revised.bomc": {
+        "sha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+        "bytes": 32660
+      },
+      "revised.json": {
+        "sha256": "b776634dbe5ea22c9c81c548a81ee94d15ef7ea5b3ffb7277b3b2086542a1b86",
+        "bytes": 40158
+      }
+    }
+  },
+  "currentMainCompile": [
+    {
+      "label": "baseline",
+      "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+      "receipt": {
+        "profile": "bomc-1.2-semantic-solid-subset",
+        "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+        "sizeBytes": 32660,
+        "nodeCount": 7,
+        "stringCount": 219,
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "coverage": [
+          278,
+          278,
+          0,
+          0,
+          0,
+          0
+        ],
+        "geometrySemanticsValid": true,
+        "modelCounts": [
+          9,
+          0,
+          5,
+          278,
+          7,
+          7,
+          7,
+          0,
+          0
+        ],
+        "vertexCount": 292,
+        "faceCount": 278,
+        "triangleCount": 556,
+        "materialCount": 9,
+        "meshCount": 5
+      },
+      "independentReader": {
+        "faces": 278,
+        "triangles": 556
+      },
+      "maxCanonicalModuleBytes": 5329
+    },
+    {
+      "label": "revised",
+      "sha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+      "receipt": {
+        "profile": "bomc-1.2-semantic-solid-subset",
+        "sha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+        "sizeBytes": 32660,
+        "nodeCount": 7,
+        "stringCount": 219,
+        "sections": [
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          17,
+          20
+        ],
+        "coverage": [
+          278,
+          278,
+          0,
+          0,
+          0,
+          0
+        ],
+        "geometrySemanticsValid": true,
+        "modelCounts": [
+          9,
+          0,
+          5,
+          278,
+          7,
+          7,
+          7,
+          0,
+          0
+        ],
+        "vertexCount": 292,
+        "faceCount": 278,
+        "triangleCount": 556,
+        "materialCount": 9,
+        "meshCount": 5
+      },
+      "independentReader": {
+        "faces": 278,
+        "triangles": 556
+      },
+      "maxCanonicalModuleBytes": 5329
+    }
+  ]
+}

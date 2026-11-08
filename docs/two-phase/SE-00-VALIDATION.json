@@ -1,0 +1,415 @@
+{
+  "formatVersion": 1,
+  "task": "SE-00",
+  "dateJakarta": "2026-11-08",
+  "status": "Blocked / Owner Gate",
+  "execution": "Codex managed cloud Linux; single writer; no delegates",
+  "runtime": {
+    "python": "3.12.14",
+    "jsonschema": "4.23.0",
+    "mcp": "2.3.0",
+    "bun": "1.3.0",
+    "chromium": "154.0.8037.57",
+    "networkPolicy": "enforced",
+    "observationsCurrent": true,
+    "configuredSecretBindings": 0,
+    "configuredRuntimeVariables": 0,
+    "configuredOutboundIdentities": 0,
+    "credentialValuesPublished": false
+  },
+  "checks": [
+    {
+      "id": "builder-full-suite",
+      "sourceSha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+      "command": "python -m unittest discover -s tests -v",
+      "result": "PASS",
+      "tests": 620,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 224.835,
+      "log": {
+        "name": "builder-main-tests.log",
+        "sha256": "90d39f9f26f3e832595760d93bb19778a6882021fe325478a7554d724aee719c",
+        "bytes": 86321,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "original-house-tests",
+      "sourceSha": "8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00",
+      "command": "python -m unittest discover -s tests -p test_bmb026_house.py -v",
+      "result": "PASS",
+      "tests": 14,
+      "failures": 0,
+      "log": {
+        "name": "builder-house-tests.log",
+        "sha256": "c99496fffbad499b0cf7cb6c49a9c4bd1f0d06ff2bd44b599b1f2a6b9c9babcf",
+        "bytes": 2141,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "original-house-provenance",
+      "sourceSha": {
+        "builder": "8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00",
+        "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+      },
+      "command": "python scripts/bmb026-verify-provenance.py /workspace/se00-builder-house",
+      "result": "PASS",
+      "assertions": [
+        "Exact producer SHA",
+        "All five original fixture file digests",
+        "Canonical module hashes",
+        "Both original binaries regenerated identically"
+      ]
+    },
+    {
+      "id": "current-main-house-compile-readback",
+      "sourceSha": {
+        "builder": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+        "editorFixtureSource": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+      },
+      "command": "compile_document(baseline/revised.json), exact payload equality with original binaries, tests.interop.reader.read(payload)",
+      "result": "PASS",
+      "cases": 2,
+      "faces": 278,
+      "frontTriangles": 556,
+      "materials": 9,
+      "log": {
+        "name": "main-four-room.json",
+        "sha256": "38996b25e44af243ceab655e7b8595bb1d038388871dae5626964d9b9153ff08",
+        "bytes": 2064,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "original-editor-consumers",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "BMB021_BUILDER_DIR=/workspace/se00-builder-interop BMB021_RUBY_FIXTURE_DIR=/workspace/se00-editor-consumer/packages/e4-import/src/bmb021-fixtures/ruby-original bun test --preload ./packages/e4-import/src/bmb021-browser-test-stream.ts packages/e4-import/src/bmb026-house-consumer.test.ts packages/e4-import/src/bmb021-original-consumer.test.ts packages/e4-import/src/bmb021-compatibility.test.ts packages/e4-import/src/bmb021-geometry.test.ts packages/e4-import/src/bomc-materials-v2.test.ts packages/e4-import/src/resource-limits.test.ts packages/bomc-document/src/bmb021-strict-editable.test.ts packages/bomc-document/src/roundtrip.test.ts",
+      "result": "PASS",
+      "tests": 80,
+      "failures": 0,
+      "assertionCalls": 23965,
+      "log": {
+        "name": "editor-consumer-tests.log",
+        "sha256": "91fb15ea189aec093887f140ff906f25fbabd2702ed32168a4bf369e99bba5c5",
+        "bytes": 20384,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "editor-check",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "bun run check",
+      "result": "PASS",
+      "errors": 0,
+      "warnings": 0,
+      "log": {
+        "name": "editor-check.log",
+        "sha256": "408053e315bf056de4138a180dee3f44ea8b0077d3d745affc3be7eb9fb9077a",
+        "bytes": 248,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "editor-package-types",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "bun x tsc --project packages/tsconfig.json",
+      "result": "PASS",
+      "log": {
+        "name": "editor-types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "editor-build",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "bun run build",
+      "result": "PASS",
+      "warnings": [
+        "Ineffective dynamic import",
+        "Client chunk exceeds 500 kB",
+        "Plugin timings advisory"
+      ],
+      "adapter": "Node; no deployment",
+      "log": {
+        "name": "editor-build.log",
+        "sha256": "c013fb03e6ab95d75287f166f63b671a372ec0f024a4c2e17fbb37873c08b147",
+        "bytes": 5959,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "editor-existing-preview-browser",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "bun x playwright test --config=/workspace/se00-evidence/playwright.config.ts",
+      "result": "PASS",
+      "tests": 2,
+      "failures": 0,
+      "browser": "Chromium 154.0.8037.57 Linux",
+      "configuration": "External temporary config: unchanged bmb027-builder-preview.spec.ts; Node build on 127.0.0.1:5175; system Chromium executable; no product source changes",
+      "log": {
+        "name": "editor-preview-browser.log",
+        "sha256": "da4a3bef7e3d3011e07f00e64610893f51ea2f2f6c4f18ed683d2fc7c2504e03",
+        "bytes": 699,
+        "retention": "Cloud workspace only; digest retained here. Reproduce commands if workspace unavailable."
+      }
+    },
+    {
+      "id": "current-remote-product-source-completeness",
+      "sourceSha": {
+        "builder": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+        "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+      },
+      "command": "Inspect service/, core/project/, draft schemas, BFF/API routes and draft socket paths",
+      "result": "FAIL",
+      "limitation": "Readiness finding: required remote product mechanisms are absent. No runtime auth/remote negative test was executed; future SE implementation remains NOT_STARTED."
+    },
+    {
+      "id": "integrated-predecessor-source-qualification",
+      "sourceSha": null,
+      "command": "Re-run required suites after owner-approved predecessor integration and record resulting SHAs",
+      "result": "NOT_RUN",
+      "limitation": "No merge/cherry-pick/rebase performed; resulting source does not yet exist"
+    },
+    {
+      "id": "remote-sdk-tls-oauth-client-probe",
+      "sourceSha": null,
+      "command": "Real pinned SDK and Claude Code/Codex against authenticated staging TLS endpoint",
+      "result": "NOT_RUN",
+      "limitation": "No authorized staging endpoint or IdP/client inputs supplied"
+    },
+    {
+      "id": "remote-save-websocket-reconnect-security-performance-owner-gate",
+      "sourceSha": null,
+      "command": "SE-07/08/09/10/11 acceptance on integrated source",
+      "result": "NOT_RUN",
+      "limitation": "Out of audit implementation scope; no real clients, owner Save, 100-revision timing, staging isolation or owner acceptance run"
+    },
+    {
+      "id": "complete-editor-historical-suite",
+      "sourceSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "command": "bun run test",
+      "result": "NOT_RUN",
+      "limitation": "Targeted affected suites run. Existing receipt records missing exact historical inputs; none replaced."
+    },
+    {
+      "id": "windows-native",
+      "sourceSha": null,
+      "command": "Owner/native Windows/SketchUp execution",
+      "result": "NOT_RUN",
+      "limitation": "Strict cloud-only. Existing hosted Windows CI and owner receipts remain historical, separately scoped."
+    },
+    {
+      "id": "baseline-ancestry-and-tree",
+      "sourceSha": {
+        "builder": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+        "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+      },
+      "result": "PASS",
+      "command": "git merge-base --is-ancestor for Editor #12\u2192#13 and Builder #66 merge\u2192main; git diff --stat Editor #14 original head vs #13 squash; git ls-remote exact selected main/consumer refs",
+      "limitation": "#14 is squash-merged; tree equality, not original-head ancestry. No conflict-producing integration was performed."
+    },
+    {
+      "id": "audit-static-validation",
+      "sourceSha": "documentation commit named in PR/issue handoff",
+      "result": "PASS",
+      "command": "Parse JSON; recompute all core/bomc/schema manifest SHA256 values from exact git blobs; resolve relative Markdown links; staged docs-only path assertion; git diff --cached --check; credential-pattern screen",
+      "limitation": "Credential regex screen is bounded self-review, not a repository-wide security audit."
+    }
+  ],
+  "providerPrTriggeredWorkflowLookup": {
+    "b62": {
+      "workflow_runs": [
+        {
+          "id": 42036422903,
+          "name": "BMB-021 Builder-side interop certification",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 12,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42036422903/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42036422903/logs",
+          "workflow_id": 405633615
+        },
+        {
+          "id": 42036423066,
+          "name": "BMB-026 four-room synthetic house E2E",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 9,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42036423066/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42036423066/logs",
+          "workflow_id": 408177531
+        }
+      ]
+    },
+    "b69": {
+      "workflow_runs": [
+        {
+          "id": 42438706764,
+          "name": "BMB-031 Foundation Beta packaging and readiness",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 4,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42438706764/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42438706764/logs",
+          "workflow_id": 410820308
+        }
+      ]
+    },
+    "bmain": {
+      "workflow_runs": []
+    },
+    "e12": {
+      "workflow_runs": [
+        {
+          "id": 41948209540,
+          "name": "BMB-005-007 true-consumer acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 15,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/41948209540/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/41948209540/logs",
+          "workflow_id": 394837471
+        },
+        {
+          "id": 41948209524,
+          "name": "BMB-021 original Editor acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 22,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/41948209524/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/41948209524/logs",
+          "workflow_id": 406452788
+        }
+      ]
+    },
+    "e13": {
+      "workflow_runs": [
+        {
+          "id": 42417192641,
+          "name": "BMB-005-007 true-consumer acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 20,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192641/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192641/logs",
+          "workflow_id": 394837471
+        },
+        {
+          "id": 42417192633,
+          "name": "BMB-021 original Editor acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 27,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192633/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192633/logs",
+          "workflow_id": 406452788
+        },
+        {
+          "id": 42417192657,
+          "name": "BMB-026 original Editor E4 consumer",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 11,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192657/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42417192657/logs",
+          "workflow_id": 409393717
+        }
+      ]
+    },
+    "e14": {
+      "workflow_runs": [
+        {
+          "id": 42360761963,
+          "name": "BMB-027 Builder preview seam",
+          "status": "completed",
+          "conclusion": "success",
+          "run_number": 2,
+          "jobs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42360761963/jobs",
+          "logs_url": "https://api.github.com/repos/KaisAbiyyi/sibambo-editor/actions/runs/42360761963/logs",
+          "workflow_id": 410219144
+        }
+      ]
+    }
+  },
+  "providerJobMetadata": {
+    "b62": [
+      {
+        "id": 127275658538,
+        "name": "synthetic-house (windows-latest)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42036423066
+      },
+      {
+        "id": 127275659322,
+        "name": "synthetic-house (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42036423066
+      }
+    ],
+    "b69": [
+      {
+        "id": 128603114837,
+        "name": "packaging (ubuntu-24.04)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42438706764
+      },
+      {
+        "id": 128603114985,
+        "name": "packaging (windows-2022)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42438706764
+      },
+      {
+        "id": 128603970435,
+        "name": "Compare exact-Git-source archives (Ubuntu vs Windows)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42438706764
+      }
+    ],
+    "e13": [
+      {
+        "id": 128537733437,
+        "name": "original-consumer (windows-latest)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42417192657
+      },
+      {
+        "id": 128537733557,
+        "name": "original-consumer (ubuntu-latest)",
+        "status": "completed",
+        "conclusion": "success",
+        "runId": 42417192657
+      }
+    ]
+  },
+  "providerLimitations": [
+    "Workflow lookup returns PR-triggered runs, first page only",
+    "Metadata readback is not a rerun of historical jobs",
+    "No newly executed Windows tests",
+    "No new hosted CI asserted for this documentation-only audit"
+  ],
+  "scope": {
+    "productCodeChanged": false,
+    "testsChanged": false,
+    "workflowsChanged": false,
+    "merged": false,
+    "deployed": false,
+    "released": false
+  },
+  "selfReview": {
+    "type": "Direct implementor self-review",
+    "executor": "Codex Cloud primary",
+    "independentReview": false,
+    "boundary": "Only docs/two-phase audit artifacts; source identities, current-vs-historical evidence, secret/private-source boundary and absent runtime claims checked. Exact documentation commit is named in PR/issue handoff to avoid self-referential SHA."
+  }
+}
