@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata as package_metadata
 import json
 import re
 import subprocess
@@ -29,6 +30,27 @@ PRIVATE_PATHS = (re.compile(rb"[A-Za-z]:\\Users\\[^\\\s]+", re.I),
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def installed_license_metadata(spec: dict, *, optional: bool = False) -> dict:
+    name, version = spec["name"], spec["version"]
+    try:
+        package = package_metadata.distribution(name)
+    except package_metadata.PackageNotFoundError:
+        if optional:
+            return {"name": name, "expectedVersion": version, "status": "OPTIONAL_NOT_INSTALLED"}
+        raise ValueError("pinned runtime dependency not installed: " + name)
+    if package.version != version:
+        raise ValueError("dependency version mismatch: {} expected {}, observed {}".format(
+            name, version, package.version))
+    info = package.metadata
+    return {"name": name, "version": package.version,
+            "licenseExpression": info.get("License-Expression"),
+            "license": info.get("License"),
+            "licenseClassifiers": [str(v) for v in info.get_all("Classifier", [])
+                                   if str(v).startswith("License ::")],
+            "requires": package.requires or [],
+            "status": "INSTALLED_METADATA_OBSERVED_NOT_TRANSITIVE_CERTIFICATION"}
 
 
 def git(*args: str) -> str:
@@ -67,9 +89,6 @@ def build(out: Path) -> dict:
         raise ValueError("invalid HEAD")
     if subprocess.run(["git", "diff", "--quiet", "--"], cwd=ROOT, check=False).returncode != 0:
         raise ValueError("modified tracked files: refuse to package uncommitted content")
-    if git("merge-base", "--is-ancestor", plan["source"]["baseline_main_sha"], "HEAD") != "":
-        # Git returns empty stdout for both true/false; the check is performed below.
-        raise ValueError("unexpected ancestor output")
     if subprocess.run(["git", "merge-base", "--is-ancestor", plan["source"]["baseline_main_sha"], "HEAD"],
                       cwd=ROOT, check=False).returncode != 0:
         raise ValueError("verified baseline main is not an ancestor")
@@ -119,8 +138,11 @@ def build(out: Path) -> dict:
         "source_sha": source_sha,
         "license": "GPL-3.0-only",
         "policy": "docs/LICENSE-IP-FIXTURE-POLICY.md",
-        "runtime_packages": plan["runtime"]["packages"],
-        "optional_validation_packages": plan["runtime"]["optional_validation"],
+        "runtime_packages": [installed_license_metadata(spec) for spec in plan["runtime"]["packages"]],
+        "optional_validation_packages": [
+            installed_license_metadata(spec, optional=True) for spec in plan["runtime"]["optional_validation"]
+        ],
+        "metadata_review": "METADATA_ONLY; runtime and transitive wheel notices/SBOM still unverified",
         "unresolved": ["independent IP chain of title", "transitive dependency licenses and source notices",
                        "historical repository and third-party asset provenance",
                        "original consumer and native Windows release certification"],

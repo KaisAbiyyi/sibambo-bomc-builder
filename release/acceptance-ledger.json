@@ -180,5 +180,6 @@
     "version_and_tag": false,
     "publication": false
   },
-  "authorized_exclusions": []
+  "authorized_exclusions": [],
+  "owner_authorization": null
 }

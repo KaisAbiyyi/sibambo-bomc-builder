@@ -52,6 +52,7 @@ Perform original Editor E4 import/preview and subjective appearance checks for *
 - Authorize (or deny) individual integration merges of Builder #62 and Editor #12/#13.
 - Sign off on native-security and visual acceptance based on actual evidence, not a hosted runner.
 - Approve exact release version, tag/contents, dependency/license inventory and publishing location.
+- Record the exact HEAD-specific owner authorization as an authenticated GitHub Issue #31 comment, retain its URL and actor in `owner_authorization`, and independently inspect it. Boolean approval flags alone are not sufficient evidence; historical CI SHA values require current-head requalification before release approval.
 - Re-run final exact-head acceptance and update the ledger/validator only after these decisions. No fabricated FAIL/NOT_RUN → PASS, and no automatic tag, GitHub Release or publication.
 
 **Foundation Beta packaging readiness** means a reproducible, inspectable, GPL-policy-aligned Builder source candidate with bounded synthetic smoke and exact-SHA cloud checks. **Full integration/production readiness** additionally needs original consumers, real agents/provider accounting, real Rooms/generator integration, native security, security/privacy provenance, operational support and owner authorization. They are **not synonyms**.

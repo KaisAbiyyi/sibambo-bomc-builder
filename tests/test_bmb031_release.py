@@ -102,6 +102,18 @@ class ReadinessTests(unittest.TestCase):
         self.manifest["source_sha"] = "b" * 40
         self.assertFalse(self.check()["packagingReady"])
 
+    def test_source_tree_mismatch_is_blocking(self):
+        self.manifest["source_tree_sha"] = "b" * 40
+        result = audit(self.plan, self.ledger, self.manifest, self.root, self.root, HEAD, HEAD)
+        self.assertFalse(result["packagingReady"])
+        self.assertTrue(any("tree SHA" in issue for issue in result["packagingErrors"]))
+
+    def test_approval_flags_without_owner_proof_are_not_authorization(self):
+        self.ledger["owner_approvals"] = {key: True for key in self.ledger["owner_approvals"]}
+        result = self.check()
+        self.assertFalse(result["releaseApproved"])
+        self.assertTrue(any("authorization evidence absent" in x for x in result["releaseBlockers"]))
+
     def test_incomplete_owner_approval(self):
         self.ledger["owner_approvals"]["publication"] = True
         result = self.check()

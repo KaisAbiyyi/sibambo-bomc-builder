@@ -46,7 +46,7 @@ def read_json(path: Path) -> dict:
 
 
 def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Path,
-          current_sha: str) -> dict:
+          current_sha: str, current_tree_sha: str | None = None) -> dict:
     errors: list[str] = []
     blockers: list[str] = []
     checked: list[str] = []
@@ -65,11 +65,10 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
     require(plan.get("publication", {}).get("approved") is False, "plan publication must be withheld")
     require(plan.get("publication", {}).get("published") is False, "package marked published")
     require(plan.get("runtime", {}).get("python") == "3.12", "Python 3.12 version pin missing")
-    require({"jsonschema": "4.23.0"} <= {
-        d.get("name"): d.get("version") for d in plan.get("runtime", {}).get("packages", []) if isinstance(d, dict)
-    }.items() if False else any(d.get("name") == "jsonschema" and d.get("version") == "4.23.0"
-                            and d.get("license") for d in plan.get("runtime", {}).get("packages", [])
-                            if isinstance(d, dict)), "pinned jsonschema runtime dependency/license missing")
+    require(any(isinstance(d, dict) and d.get("name") == "jsonschema"
+                and d.get("version") == "4.23.0" and bool(d.get("license"))
+                for d in plan.get("runtime", {}).get("packages", [])),
+            "pinned jsonschema runtime dependency/license missing")
     require(plan.get("license", {}).get("project_spdx") == "GPL-3.0-only", "GPL-3.0-only declaration missing")
     require(plan.get("license", {}).get("fixtures") == "SYNTHETIC_ONLY", "synthetic-only declaration missing")
     require(plan.get("license", {}).get("clean_room") == "POLICY_ONLY_NOT_INDEPENDENTLY_CERTIFIED",
@@ -81,6 +80,9 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
     require(manifest.get("baseline_main_sha") == plan.get("source", {}).get("baseline_main_sha"),
             "baseline source SHA mismatch")
     require(bool(SHA.fullmatch(str(manifest.get("source_tree_sha", "")))), "invalid source tree SHA")
+    if current_tree_sha is not None:
+        require(manifest.get("source_tree_sha") == current_tree_sha,
+                "manifest source tree SHA differs from exact checkout tree")
 
     for rel in plan.get("required_documents", []):
         path = root / rel
@@ -125,6 +127,7 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
                 require(bool(evidence.get("scope")), "PASS lacks evidenced scope: " + str(gate_id))
                 if sha != current_sha:
                     checked.append(gate_id + ": historical " + sha + " (not current-head acceptance)")
+                    blockers.append(gate_id + ": historical PASS needs current-head requalification")
         elif evidence is not None:
             require(False, "non-PASS gate has misleading evidence object: " + str(gate_id))
         if status != "PASS":
@@ -145,6 +148,15 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
     owner_approved = isinstance(owner, dict) and set(owner) == APPROVAL_KEYS and all(v is True for v in owner.values())
     if not owner_approved:
         blockers.append("owner approvals incomplete (scope, merges, native, version/tag, publication)")
+    # This is declaration-shape validation only. Reviewers must verify the linked
+    # comment and its author on GitHub; this script does not authenticate identities.
+    proof = ledger.get("owner_authorization")
+    owner_proof_supplied = isinstance(proof, dict) and proof.get("owner_login") == "KaisAbiyyi" and (
+        proof.get("source_sha") == current_sha) and bool(re.fullmatch(
+            r"https://github\.com/KaisAbiyyi/sibambo-bomc-builder/issues/31#issuecomment-\d+",
+            str(proof.get("owner_comment_url", ""))))
+    if not owner_proof_supplied:
+        blockers.append("owner source-SHA-specific authorization evidence absent/unverified")
     if plan.get("license", {}).get("transitive_dependency_audit") != "PASS":
         blockers.append("third-party transitive dependency licensing NOT independently verified")
     if plan.get("license", {}).get("historical_source_ip_audit") != "PASS":
@@ -205,7 +217,7 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
         errors.append("artifact missing in generated output directory")
 
     packaging_ready = not errors
-    release_approved = packaging_ready and not blockers and owner_approved and all(
+    release_approved = packaging_ready and not blockers and owner_approved and owner_proof_supplied and all(
         item.get("status") in ("PASS", "OUT_OF_SCOPE") for item in gates if isinstance(item, dict)
     )
     return {
@@ -229,8 +241,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
+        tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT).decode().strip()
         outcome = audit(read_json(args.plan), read_json(args.ledger), read_json(args.manifest),
-                        ROOT, args.manifest.parent, source)
+                        ROOT, args.manifest.parent, source, tree)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
         outcome = {"sourceSha": None, "packagingReady": False, "releaseApproved": False,
                    "packagingErrors": ["readiness input error: " + str(exc)], "releaseBlockers": []}

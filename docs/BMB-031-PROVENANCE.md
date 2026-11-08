@@ -33,4 +33,4 @@ Pinning runtime versions does **not** pin the full transitive wheel hashes; depe
 4. Original Editor/Model-Eval consumer integration and native Windows acceptance; these are **not** license conclusions.
 5. Owner acceptance of exact archive/version/feature exclusions; no approved tag or publication.
 
-See `dist/provenance-report.json` for source-SHA-specific file inventory counts and declared exceptions. A reviewer must inspect the actual archive and independent source/third-party evidence before setting provenance gates to PASS.
+See `dist/provenance-report.json` for source-SHA-specific file inventory counts, observed installed `jsonschema`/optional `mcp` distribution version and license metadata, their declared dependency requirements and unresolved exceptions. These are package metadata observations, not a transitive license audit. A reviewer must inspect the actual archive and independent source/third-party evidence before setting provenance gates to PASS.
