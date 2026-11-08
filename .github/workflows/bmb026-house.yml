@@ -1,0 +1,79 @@
+name: BMB-026 four-room synthetic house E2E
+on:
+  push:
+    paths:
+      - 'examples/bmb026_house.py'
+      - 'tests/test_bmb026_house.py'
+      - 'docs/BMB-026-HOUSE-E2E.md'
+      - '.github/workflows/bmb026-house.yml'
+      - 'bomc/**'
+      - 'core/**'
+  pull_request:
+    paths:
+      - 'examples/bmb026_house.py'
+      - 'tests/test_bmb026_house.py'
+      - 'docs/BMB-026-HOUSE-E2E.md'
+      - '.github/workflows/bmb026-house.yml'
+      - 'bomc/**'
+      - 'core/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-house:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact tested candidate SHA
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo "Exact HEAD: $EXPECTED_SHA"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned JSON Schema validator
+        run: python -m pip install jsonschema==4.23.0
+      - name: Four-room topology, localized revision, compiler, independent Builder readback and cold builds
+        run: python -m unittest discover -s tests -p test_bmb026_house.py -v
+      - name: Predecessor geometry and semantic BOMC regressions
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -p 'test_bmb01*.py'
+          python -m unittest discover -s tests -p 'test_bmb020_*.py'
+          python -m unittest discover -s tests -p test_bmb021_interop.py
+      - name: Predecessor scripted agent controller regressions
+        run: python -m unittest discover -s tests -p test_bmb025_agent.py
+      - name: Emit immutable synthetic Builder BOMC output with scoped gate receipt
+        shell: bash
+        run: |
+          python -m examples.bmb026_house --out-dir bmb026-evidence > bmb026-stdout.json
+          python -c "import hashlib,json,pathlib; p=pathlib.Path('bmb026-evidence'); r=json.loads((p/'receipt.json').read_text()); assert r['gates']['builder_source_assembly_compiler_reader']=='PASS'; assert r['gates']['native_editor_e4_import']=='NOT_RUN'; assert len(r['preservedModuleHashes'])==4; assert all(hashlib.sha256((p/(s+'.bomc')).read_bytes()).hexdigest()==r['outputs'][s]['sha256'] for s in ('baseline','revised'))"
+          {
+            echo "### BMB-026 cloud Builder E2E (${{ matrix.os }})"
+            echo "Exact source SHA: $EXPECTED_SHA"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Four-room synthetic assembly, doorway cutouts, revisions, BOMC compile and independent Builder reader only."
+            echo "Original Editor E4 import, native visual acceptance, live LLM and broad security: NOT_RUN."
+            echo '~~~json'
+            cat bmb026-evidence/receipt.json
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload source and real BOMC evidence (not original consumer proof)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bmb026-builder-${{ matrix.os }}
+          path: bmb026-evidence/*
+          if-no-files-found: error
+          retention-days: 14
