@@ -463,7 +463,7 @@ class SharedProjection(unittest.TestCase):
         for path in list((ROOT / "core").rglob("*.py")) + list((ROOT / "bomc").rglob("*.py")):
             text = path.read_text(encoding="utf-8")
             if re.search(r"\btriangulate_face\b", text) and path.name not in ("triangulation.py",):
-                users.append(str(path.relative_to(ROOT)))
+                users.append(path.relative_to(ROOT).as_posix())
         self.assertEqual(sorted(users), ["core/project/projection.py"])
         source = (ROOT / "core/project/operations.py").read_text(encoding="utf-8")
         for banned in ("eval(", "exec(", "subprocess", "os.system", "__import__", "pickle"):
