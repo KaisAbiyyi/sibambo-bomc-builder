@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/blob/main/schemas/draft-view-v1.schema.json",
+  "title": "BOMC Builder draft render view v1 (SE-01)",
+  "description": "Live render projection. Positions are module-local Float64 metres, +Z up; consumer applies each module's row-major worldTransform exactly once. Triangle indices address that module's own positions. GPU conversion belongs to the Editor. Hashes cover exact canonical UTF-8 bytes (sorted keys, compact, no NaN) of the Module IR document and of the projection object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectRevision", "moduleRevisions", "canonicalIrSha256", "projectionSha256", "projection"],
+  "properties": {
+    "schemaVersion": {"const": "draft-view-v1"},
+    "projectRevision": {"type": "integer", "minimum": 0},
+    "moduleRevisions": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "canonicalIrSha256": {"$ref": "#/$defs/sha"},
+    "projectionSha256": {"$ref": "#/$defs/sha"},
+    "projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "units", "upAxis", "transformConvention", "modules"],
+      "properties": {
+        "schemaVersion": {"const": "1.0.0"},
+        "units": {"const": "m"},
+        "upAxis": {"const": "+Z"},
+        "transformConvention": {"type": "string"},
+        "modules": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/module"}}
+      }
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "vec3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "module": {
+      "type": "object", "additionalProperties": false,
+      "required": ["moduleId", "revision", "worldTransform", "positions", "materials", "faces"],
+      "properties": {
+        "moduleId": {"type": "string"},
+        "revision": {"type": "integer", "minimum": 0},
+        "worldTransform": {"type": "array", "minItems": 16, "maxItems": 16, "items": {"type": "number"}},
+        "positions": {"type": "array", "maxItems": 8192, "items": {"$ref": "#/$defs/vec3"}},
+        "materials": {"type": "array", "maxItems": 254, "items": {
+          "type": "object", "additionalProperties": false, "required": ["materialId", "rgba", "opacity"],
+          "properties": {"materialId": {"type": "string"},
+                         "rgba": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "integer", "minimum": 0, "maximum": 255}},
+                         "opacity": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        "faces": {"type": "array", "maxItems": 4096, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["faceId", "opId", "faceKey", "role", "label", "frontMaterialId", "backMaterialId", "normal", "triangles"],
+          "properties": {
+            "faceId": {"type": "string", "minLength": 1},
+            "opId": {"type": "string"}, "faceKey": {"type": "string"},
+            "role": {"enum": ["wall", "floor", "ceiling", "roof", "opening", "window", "door"]},
+            "label": {"type": "string", "minLength": 1, "maxLength": 240},
+            "frontMaterialId": {"type": ["string", "null"]},
+            "backMaterialId": {"type": ["string", "null"]},
+            "normal": {"$ref": "#/$defs/vec3"},
+            "triangles": {"type": "array", "minItems": 1, "items": {
+              "type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0}}}}}}
+      }
+    }
+  }
+}

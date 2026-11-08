@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "bomcBytes": 32660,
+    "bomcSha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+    "canonicalIrSha256": "62fe1f947aa61070307bf72892c745449c836c47b54c112e685179d21e9ff7e0",
+    "faceCount": 278,
+    "moduleCount": 5,
+    "projectRevision": 1,
+    "projectionSha256": "8ac853a5b489a768911be85c0133ae13c1eea1215ba6af301c8a16a809576cfd",
+    "triangleCount": 556
+  },
+  "revised": {
+    "bomcBytes": 32660,
+    "bomcSha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+    "canonicalIrSha256": "2f47590a039d811621e80b8bd16de6d24ced93ce57241dbd9a700ba7428b6695",
+    "faceCount": 278,
+    "moduleCount": 5,
+    "projectRevision": 2,
+    "projectionSha256": "6ded7af33cde3a65c54b4a2e9ba797eb08146fd7052fe402acf5babff4f41ce9",
+    "triangleCount": 556
+  }
+}
