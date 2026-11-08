@@ -30,6 +30,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0 # baseline ancestry proof requires full history
       - name: Assert exact tested HEAD
         shell: bash
         run: |
@@ -87,7 +88,7 @@ jobs:
         run: |
           {
             echo '### BMB-031 Foundation Beta (provisional)'
-            echo "- exact source: `${EXPECTED_SHA}`"
+            echo "- exact source: ${EXPECTED_SHA}"
             echo "- runner: ${{ matrix.os }}; Python: $(python --version)"
             echo '- Cloud packaging source and BMB-031 regression only; see job logs for test counts.'
             echo '- Release Approved remains BLOCKED by unresolved owner/security/integration/provenance gates.'
