@@ -70,6 +70,22 @@ jobs:
           assert (Path('dist') / a['artifact']['name']).read_bytes() == (Path('dist/repeat') / b['artifact']['name']).read_bytes(), 'nondeterministic artifact'
           print('Reproducible SHA256:', a['artifact']['sha256'])
           PY
+      - name: Clean unpack candidate install smoke
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys, tempfile, zipfile
+          from pathlib import Path
+          manifest = json.loads(Path('dist/release-manifest.json').read_text())
+          with tempfile.TemporaryDirectory(prefix='bmb031-installed-') as temp:
+              installed = Path(temp) / 'package'
+              installed.mkdir()
+              with zipfile.ZipFile(Path('dist') / manifest['artifact']['name']) as archive:
+                  archive.extractall(installed)
+              subprocess.run([sys.executable, 'scripts/bmb031_smoke.py'], cwd=installed,
+                             check=True, timeout=90)
+          print('Clean extracted source candidate smoke PASS')
+          PY
       - name: Packaging Ready must pass
         run: python scripts/release_readiness.py --gate packaging --report-dir dist/readiness
       - name: Release Approved must remain blocked until owner authorization
@@ -106,3 +122,45 @@ jobs:
             dist/release-manifest.json
             dist/provenance-report.json
             dist/smoke.json
+
+  cross_platform_reproducibility:
+    name: Compare exact-Git-source archives (Ubuntu vs Windows)
+    needs: packaging
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Download Ubuntu manifest/verification reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: bmb031-readiness-ubuntu-24.04
+          path: compare/ubuntu
+      - name: Download Windows manifest/verification reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: bmb031-readiness-windows-2022
+          path: compare/windows
+      - name: Check both platforms produce identical source/artifact SHA256 and inventory
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          linux = json.loads(Path('compare/ubuntu/release-manifest.json').read_text())
+          windows = json.loads(Path('compare/windows/release-manifest.json').read_text())
+          assert linux['source_sha'] == windows['source_sha'] == os.environ['EXPECTED_SHA'], 'source mismatch'
+          assert linux['source_tree_sha'] == windows['source_tree_sha'], 'source tree mismatch'
+          assert linux['artifact'] == windows['artifact'], 'cross-platform archive SHA256/size mismatch'
+          assert linux['files'] == windows['files'], 'cross-platform member hashes/inventory mismatch'
+          for platform in ('ubuntu', 'windows'):
+              verdict = json.loads(Path('compare', platform, 'readiness/readiness.json').read_text())
+              assert verdict['sourceSha'] == os.environ['EXPECTED_SHA'], 'report source mismatch'
+              assert verdict['packagingReady'] is True, 'packaging not ready'
+              assert verdict['releaseApproved'] is False, 'release unexpectedly approved'
+          print('Cross-platform canonical archive and per-member SHA256 PASS: ' +
+                linux['artifact']['sha256'])
+          PY
+          echo '### Cross-platform source bundle SHA256 equality PASS' >> "$GITHUB_STEP_SUMMARY"

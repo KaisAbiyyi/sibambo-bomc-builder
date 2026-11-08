@@ -100,7 +100,9 @@ def build(out: Path) -> dict:
     archive = out / archive_name
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_STORED, allowZip64=False) as output:
         for rel in files:
-            body = (ROOT / rel).read_bytes()
+            # Use Git object bytes, not checkout bytes: Windows autocrlf must not
+            # change the release inventory or artifact SHA for the same commit.
+            body = subprocess.check_output(["git", "show", "HEAD:" + rel], cwd=ROOT)
             for pattern in (*HIGH_CONFIDENCE_SECRETS, *PRIVATE_PATHS):
                 if pattern.search(body):
                     raise ValueError("potential secret or private path in release source: " + rel)

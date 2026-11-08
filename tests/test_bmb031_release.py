@@ -98,6 +98,28 @@ class ReadinessTests(unittest.TestCase):
         self.manifest["artifact"]["sha256"] = "f" * 64
         self.assertFalse(self.check()["packagingReady"])
 
+    def test_committed_git_bytes_not_platform_checkout_lines(self):
+        # Windows autocrlf may change checkout bytes, but archive and audit
+        # must use the exact Git blob bytes of the reviewed source SHA.
+        rel = "test.txt"
+        git_bytes = (self.root / rel).read_bytes()
+        (self.root / rel).write_bytes(git_bytes + b"\r\n")
+        expected = self.manifest["files"][0]["sha256"]
+        self.assertEqual(expected, digest(git_bytes))
+        fallback = self.check()
+        self.assertFalse(fallback["packagingReady"])
+        verified = audit(self.plan, self.ledger, self.manifest, self.root,
+                         self.root, HEAD,
+                         committed_source=lambda name: git_bytes if name == rel
+                         else (self.root / name).read_bytes())
+        self.assertTrue(verified["packagingReady"], verified["packagingErrors"])
+
+    def test_incorrect_git_blob_bytes_fail_closed(self):
+        verified = audit(self.plan, self.ledger, self.manifest, self.root,
+                         self.root, HEAD, committed_source=lambda name: b"tampered")
+        self.assertFalse(verified["packagingReady"])
+        self.assertTrue(any("source checkout" in e for e in verified["packagingErrors"]))
+
     def test_source_sha_mismatch_is_blocking(self):
         self.manifest["source_sha"] = "b" * 40
         self.assertFalse(self.check()["packagingReady"])

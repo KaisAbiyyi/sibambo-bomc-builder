@@ -10,7 +10,7 @@
 - **License:** GNU **GPL-3.0-only**; preserve root LICENSE and [BMB-003 decision](LICENSE-IP-FIXTURE-POLICY.md). This does not certify all third-party IP/attribution.
 - **Source boundary:** separately authored Builder only; no Editor, Ruby producer, private client models, SKP exports, live AI keys, screenshots or original consumer code bundled.
 
-The package script selects only committed paths declared in `release/foundation-beta.json`, rejects symlinks, large files and high-confidence embedded credentials/private paths, and writes a deterministic ZIP using fixed metadata and stored compression. This is bounded screening, **not historical git/secret provenance certification**. The archive deliberately excludes the PR #62 four-room implementation because it is not on main. Source SHA, tree SHA, every member SHA-256, ZIP SHA-256 and runtime dependencies are in `dist/release-manifest.json`. The ZIP is an ephemeral *candidate*, not a published distribution.
+The package script selects only committed paths declared in `release/foundation-beta.json`, takes **canonical Git blob bytes** (not Windows-autocrlf worktree bytes), rejects symlinks, large files and high-confidence embedded credentials/private paths, and writes a deterministic ZIP using fixed metadata and stored compression. This is bounded screening, **not historical git/secret provenance certification**. The archive deliberately excludes the PR #62 four-room implementation because it is not on main. Source SHA, tree SHA, every member SHA-256, ZIP SHA-256 and runtime dependencies are in `dist/release-manifest.json`. The ZIP is an ephemeral *candidate*, not a published distribution.
 
 ## Clean build on Linux (from an exact checked-out Git commit)
 

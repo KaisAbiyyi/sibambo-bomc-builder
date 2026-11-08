@@ -15,6 +15,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUSES = frozenset({"PASS", "FAIL", "NOT_RUN", "BLOCKED", "OUT_OF_SCOPE"})
@@ -46,7 +47,12 @@ def read_json(path: Path) -> dict:
 
 
 def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Path,
-          current_sha: str, current_tree_sha: str | None = None) -> dict:
+          current_sha: str, current_tree_sha: str | None = None,
+          committed_source: Callable[[str], bytes] | None = None) -> dict:
+    # Production passes a git-blob reader, avoiding Windows checkout CRLF
+    # conversions; offline test cases inject controlled fixture file bytes.
+    if committed_source is None:
+        committed_source = lambda rel: (root / rel).read_bytes()
     errors: list[str] = []
     blockers: list[str] = []
     checked: list[str] = []
@@ -209,7 +215,8 @@ def audit(plan: dict, ledger: dict, manifest: dict, root: Path, archive_dir: Pat
                     require(sha256(data) == row.get("sha256") and len(data) == row.get("bytes"),
                             "ZIP member SHA/size mismatch: " + rel)
                     path = root / rel
-                    require(path.is_file() and not path.is_symlink() and sha256(path.read_bytes()) == row.get("sha256"),
+                    require(path.is_file() and not path.is_symlink() and
+                            sha256(committed_source(rel)) == row.get("sha256"),
                             "source checkout no longer matches packaged file: " + rel)
         except (zipfile.BadZipFile, OSError, ValueError) as exc:
             errors.append("unreadable artifact archive: " + str(exc))
@@ -243,7 +250,9 @@ def main() -> int:
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
         tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT).decode().strip()
         outcome = audit(read_json(args.plan), read_json(args.ledger), read_json(args.manifest),
-                        ROOT, args.manifest.parent, source, tree)
+                        ROOT, args.manifest.parent, source, tree,
+                        committed_source=lambda rel: subprocess.check_output(
+                            ["git", "show", "HEAD:" + rel], cwd=ROOT, stderr=subprocess.PIPE))
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
         outcome = {"sourceSha": None, "packagingReady": False, "releaseApproved": False,
                    "packagingErrors": ["readiness input error: " + str(exc)], "releaseBlockers": []}

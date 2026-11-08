@@ -5,7 +5,7 @@
 ## Packaging and evidence
 
 1. Open BMB-031 draft PR, inspect its exact HEAD, Builder workflow jobs/logs, `dist/readiness/readiness.json`, and the scoped diff. Confirm source SHA in the generated manifest equals the tested PR HEAD.
-2. Reproduce in a **clean** Linux/Windows checkout at that commit using commands in [release instructions](BMB-031-FOUNDATION-BETA.md). Verify ZIP SHA256 and each manifest-listed file. The CI archive is deliberately **not** uploaded/published.
+2. Reproduce in a **clean** Linux/Windows checkout at that commit using commands in [release instructions](BMB-031-FOUNDATION-BETA.md). Verify ZIP SHA256 and each manifest-listed file. CI now compares both OS manifests for **identical archive SHA256, size, exact Git tree and member hashes**, and executes synthetic smoke from a clean extracted archive. Do not accept a per-platform PASS with differing archive hashes. The CI archive is deliberately **not** uploaded/published.
 3. Review [provenance](BMB-031-PROVENANCE.md) and BMB-003 GPL-only/clean-room/synthetic decisions. Obtain actual third-party license/notice, asset ownership, source history and dependency SBOM proof where required.
 4. Check the [machine ledger](../release/acceptance-ledger.json): only narrow exact-SHA historical Builder tests are PASS. Issue/PR completion is not equivalent to consumer acceptance. `releaseApproved=false` is expected.
 
