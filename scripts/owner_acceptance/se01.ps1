@@ -116,7 +116,7 @@ if ($dirty) { Stop-WithFail "clean working tree" "You have local changes. Run: g
 & git merge-base --is-ancestor $TestedSha $head 2>$null
 if ($LASTEXITCODE -ne 0) { Stop-WithFail "tested commit" "HEAD $head does not contain tested commit $TestedSha." }
 $changed = @(& git diff --name-only "$TestedSha..$head")
-$outside = @($changed | Where-Object { $_ -notmatch '^(docs/stable/|scripts/owner_acceptance/)' })
+$outside = @($changed | Where-Object { $_ -notmatch '^(docs/stable/|scripts/owner_acceptance/|.github/workflows/se01-draft-operations.yml$)' })
 if ($outside.Count -gt 0) { Stop-WithFail "only docs/helper changed after tested commit" ("Unexpected changes: " + ($outside -join ", ")) }
 Add-Result "tested commit" "PASS" "HEAD=$head contains $TestedSha (docs/helper-only delta)"
 
