@@ -1,4 +1,4 @@
-# Resource and dependency registry — SIB-TWO-PHASE-001 v1.2
+# Resource and dependency registry — SIB-TWO-PHASE-001 v1.3
 
 | Task | Repository | AND dependencies | Priority | Resource locks |
 |---|---|---|---|---|
@@ -14,7 +14,7 @@
 | [SE-09](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/75) · Cross-application security and bounded remote execution | builder | SE-03, SE-04, SE-05, SE-07 | P1 | stable/auth-resource; stable/security |
 | [SE-10](https://github.com/KaisAbiyyi/sibambo-editor/issues/19) · Measured live rendering performance and onboarding usability | editor | SE-06, SE-08, SE-09 | P1 | stable/editor-performance; stable/ux-evidence |
 | [SE-11](https://github.com/KaisAbiyyi/sibambo-editor/issues/20) · Real remote AI construction → live owner view → Save → reopen gate | editor | SE-07, SE-08, SE-09, SE-10 | P0 | stable/product-acceptance |
-| [XB-00](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/76) · EXPERIMENTAL charter, future repository split and evaluation protocol | builder | owner gate | P2 | experimental/charter |
+| [XB-00](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/76) · EXPERIMENTAL charter, future repository split and evaluation protocol | builder | SE-11 | P2 | experimental/charter |
 | [XB-01](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/77) · Exact-location map and evidence provenance experiment | builder | XB-00 | P2 | experimental/site |
 | [XB-02](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/78) · Room-program onboarding and constraint interpretation | builder | XB-00 | P2 | experimental/room-program |
 | [XB-03](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/79) · Client interview and desired-feeling research | builder | XB-00 | P2 | experimental/client-interview |
@@ -29,10 +29,10 @@
 
 ## Publication resources
 
-- notionMaster: https://app.notion.com/p/412c4a6aaf7381f79521c8c88e738381?pvs=204
+- notionMaster: https://app.notion.com/p/412c4a6aaf7381a5b944eb9523a54833?pvs=204
 - notionStable: https://app.notion.com/p/412c4a6aaf7381c5b063dc52002c89b9?pvs=204
 - notionExperimental: https://app.notion.com/p/412c4a6aaf738120b069f2d7a9944f60?pvs=204
-- notionADRs: https://app.notion.com/p/412c4a6aaf73818eadebd5ec456263f4?pvs=204
+- notionADRs: https://app.notion.com/p/412c4a6aaf7381fd8f9ad1bca08fd21c?pvs=204
 - notionGapAudit: https://app.notion.com/p/412c4a6aaf73815d8c86ce5d508a82a7?pvs=204
 - notionExperimentalArchitecture: https://app.notion.com/p/412c4a6aaf73812e8e22fefc8d88d7df?pvs=204
 - builderDraftPR: https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/88
@@ -41,6 +41,8 @@
 - notionADRsV10: https://app.notion.com/p/412c4a6aaf738184ab96fa6335ba4429?pvs=204
 - notionMasterV11: https://app.notion.com/p/412c4a6aaf7381219f69d83de8989878?pvs=204
 - notionADRsV11: https://app.notion.com/p/412c4a6aaf7381bd833cff378b078a0f?pvs=204
+- notionMasterV12: https://app.notion.com/p/412c4a6aaf7381f79521c8c88e738381?pvs=204
+- notionADRsV12: https://app.notion.com/p/412c4a6aaf73818eadebd5ec456263f4?pvs=204
 
 ## Task source-of-truth mapping
 

@@ -1,6 +1,8 @@
 # BMB execution task index — detailed 32-task WBS
 
-> **Product architecture update — 2026-11-08:** the [two-phase MASTER IMPLEMENTATION PLAN v1.2](two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.2.md) governs new Stable Editor remote MCP/live draft/owner Save delivery and the separate **EXPERIMENTAL** native agentic application. This older document is retained as foundation/history; its task/component completion is not product readiness. [Gap audit](two-phase/GAP-AUDIT.md) · [ADRs](two-phase/ADR-LEDGER.md) · [task contracts](two-phase/TASK-CONTRACTS.md) · [Notion/GitHub resource map](two-phase/RESOURCE-MAP.md). No product implementation/deployment/release is performed by this documentation update.
+> **Phase order correction — 2026-11-08:** Stable SE-00…11 only now. All Experimental XB tasks are LOCKED until accepted SE-11 and a subsequent owner Phase2 instruction. [Stable-only IMPLEMENT handoff](two-phase/NEXT-STABLE-IMPLEMENT-PROMPT.md).
+
+> **Product architecture update — 2026-11-08:** the [two-phase MASTER IMPLEMENTATION PLAN v1.3](two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md) governs new Stable Editor remote MCP/live draft/owner Save delivery and the separate **EXPERIMENTAL** native agentic application. This older document is retained as foundation/history; its task/component completion is not product readiness. [Gap audit](two-phase/GAP-AUDIT.md) · [ADRs](two-phase/ADR-LEDGER.md) · [task contracts](two-phase/TASK-CONTRACTS.md) · [Notion/GitHub resource map](two-phase/RESOURCE-MAP.md). No product implementation/deployment/release is performed by this documentation update.
 
 
 [Notion standalone project hub](https://app.notion.com/p/402c4a6aaf738181adf0eb95320ff947) | [Notion task database](https://app.notion.com/p/2e112a1b046641b6a5cb35589ed14b8f) | [Roadmap](ROADMAP.md).

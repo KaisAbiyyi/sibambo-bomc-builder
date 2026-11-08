@@ -1,12 +1,12 @@
-# Two-product ADR ledger — SIB-TWO-PHASE-001 v1.2
+# Two-product ADR ledger — SIB-TWO-PHASE-001 v1.3
 
-Date:2026-11-08 Asia/Jakarta. Decisions preserved from v1.0; v1.2 locks cross-runtime byte hashing and credential-principal identity. Implementation NOT_STARTED.
+Date:2026-11-08 Asia/Jakarta. Decisions preserved from v1.0; v1.3 locks cross-runtime byte hashing and credential-principal identity. Implementation NOT_STARTED.
 
 
 
 | ADR | Decision and alternatives rejected | Consequence / owner |
 |---|---|---|
-| TP-001 | Two products, Stable first; future Experimental repo/brand TBD. Reject embedding an autonomous planner in Editor. | Separate budgets/backlogs/processes; Builder shared core owner. |
+| TP-001 | Two products in strict sequence: Phase1 Stable accepted through SE-11, then Phase2 Experimental; future Experimental repo/brand TBD. Reject embedding an autonomous planner in Editor. | Separate budgets/backlogs/processes; Builder shared core owner. XB-00 depends on accepted SE-11; no Experimental execution/claim before that gate. |
 | TP-002 | Remote MCP Streamable HTTP over TLS; fixed researched protocol 2026-07-28, compatibility probe for actual clients. Reject stdio tunnelling/localhost listener/browser extension as primary product transport. | MCP clients do not need access to owner filesystem. No deploy occurs in this planning session. |
 | TP-003 | Browser live feed is application WebSocket, independent of MCP notifications/sessions. Reject full BOMC reload each edit and assuming MCP GET/SSE session semantics persist in 2026. | Browser sees exact ordered revisions even when agent client has no subscription support. |
 | TP-004 | Volatile drafts only before Save. Reject default automatic journal/IndexedDB/server model persistence. | Unsaved draft lost if both service and page disappear. RAM state/revisions/replay retained within TTL; recovery is explicit. |
@@ -21,4 +21,4 @@ Date:2026-11-08 Asia/Jakarta. Decisions preserved from v1.0; v1.2 locks cross-ru
 
 
 
-Normative detailed protocol, invariants and patch contracts: [MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.2.md](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.2.md).
+Normative detailed protocol, invariants and patch contracts: [MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md).
