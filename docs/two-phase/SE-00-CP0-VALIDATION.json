@@ -20,6 +20,12 @@
       "command": "bun test --preload bmb021-browser-test-stream.ts <8 files>",
       "result": "80 pass 0 fail",
       "sha256": "9209b5e1b5c96a435d4d8b4d4668f584502c221171691a6361f01cacfd1b588e"
+    },
+    {
+      "name": "checker-negative-tests.log",
+      "command": "python -m unittest test_se00_cross_repo_check -v (docs/two-phase)",
+      "result": "Ran 24 tests OK",
+      "sha256": "c0887c2137444670fde0b312f4d98ab0e6afff0a95973f1e512aaebff8d6f9c4"
     }
   ],
   "localSubsets": {
@@ -31,6 +37,10 @@
   "crossRepo": {
     "builderSha": "f1503748216b8778d2e11e6e73674bd64e295450",
     "editorSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+    "expectedShaVerified": true,
+    "cleanTrees": true,
+    "generatedFromGitArchive": true,
+    "deterministicAcrossHashSeeds": true,
     "files": {
       "baseline.bomc": {
         "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
@@ -80,7 +90,7 @@
     "integration",
     "compatibility"
   ],
-  "checkerScriptSha256": "65dfd03a09e74ef3d9ca1739ddfcc406624e4704d88f19aaa45c34b0228b87c2",
+  "checkerScriptSha256": "5f72ae9a3ca8e9440739d1d86dbf44c44d423cf16ca47cd3579d54f9775c0e14",
   "notRun": [
     "Windows-native local execution",
     "hosted BMB-027 on 98b01dc",
@@ -90,5 +100,43 @@
   "selfReview": {
     "independentReview": false,
     "scope": "docs/two-phase only in this commit; candidate source SHAs untouched; no PASS claimed beyond logs and runs listed"
+  },
+  "revision": 2,
+  "revisionNote": "Rev 2: fail-closed checker v2, negative tests, D11 re-pin, corrected Windows counts. Rev 1 values superseded where they differ.",
+  "crossRepoReceiptSha256": "4e78f00734530a1ec01d9968d5cc7cf7466bc92c9abbb15fec224ecc5432c8e4",
+  "checkerTestsSha256": "dc80afd3c58c4311292aee21cd1667228ed27c2e3f8dcb09a4495fc0c3b0466f",
+  "hostedTestCounts": {
+    "builderFullSuite": {
+      "ubuntu-latest": {
+        "ran": 634,
+        "passed": 634,
+        "skipped": 0
+      },
+      "windows-latest": {
+        "ran": 634,
+        "passed": 629,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "note": "rev 1 mis-stated as 634/634"
+      }
+    },
+    "editorOriginalConsumer": {
+      "ubuntu-latest": {
+        "pass": 80,
+        "fail": 0
+      },
+      "windows-latest": {
+        "pass": 80,
+        "fail": 0
+      }
+    }
+  },
+  "governingPlanPin": {
+    "D11Master": {
+      "repository": "KaisAbiyyi/sibambo-editor",
+      "commit": "cc75bd1b0ec9b8800f588d0b907ac31c0d7e5e05",
+      "sha256": "67105d23f3576f2a3d78b2aa8d11c38014d9f4e0b9043fdab7e2e4a6d5fb3965"
+    }
   }
 }

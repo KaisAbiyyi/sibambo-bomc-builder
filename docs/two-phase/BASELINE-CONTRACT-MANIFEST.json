@@ -247,11 +247,23 @@
   "governingDocuments": [
     {
       "path": "docs/two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.5.md",
-      "gitBlob": "3f68c1485455bd9f1a2b107cc42e8ef7e17f9521",
-      "sha256": "30aaf1a7069cb0d9ffee4eb8c94782f863549bfa40668d50bcee2b10d7b303b0",
-      "bytes": 257304,
       "repository": "KaisAbiyyi/sibambo-editor",
-      "sourceSha": "d744f779befaa028dc84ed0d1c9241c7b4900f2d"
+      "sourceSha": "cc75bd1b0ec9b8800f588d0b907ac31c0d7e5e05",
+      "gitBlob": "3479da07f7d7471a4229a09367db17002bd40c2d",
+      "sha256": "67105d23f3576f2a3d78b2aa8d11c38014d9f4e0b9043fdab7e2e4a6d5fb3965",
+      "bytes": 265227,
+      "includes": [
+        "D10",
+        "D11"
+      ],
+      "branch": "claude/jolly-feynman-99ow6q",
+      "supersedesPin": {
+        "sourceSha": "d744f779befaa028dc84ed0d1c9241c7b4900f2d",
+        "gitBlob": "3f68c1485455bd9f1a2b107cc42e8ef7e17f9521",
+        "sha256": "30aaf1a7069cb0d9ffee4eb8c94782f863549bfa40668d50bcee2b10d7b303b0",
+        "bytes": 257304,
+        "reason": "pre-D10/D11 text; D10 added at 96e50b33, D11 at cc75bd1b"
+      }
     },
     {
       "path": "docs/two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.5-public.md",
@@ -259,7 +271,8 @@
       "sha256": "d018723427371520df2e6bccbc4dd553a730a13d0cf299a68b565b9a911ce78b",
       "bytes": 2379,
       "repository": "KaisAbiyyi/sibambo-bomc-builder",
-      "sourceSha": "ed61b3e55cbab306e1756e3c95e6bfae54cf6699"
+      "sourceSha": "ed61b3e55cbab306e1756e3c95e6bfae54cf6699",
+      "note": "unchanged public Stable edition; carries no D10/D11 text (verified: 0 matches). D10/D11 are pinned through the private master above and the disposition document at Builder docs commit a7f05893."
     }
   ],
   "houseCorpus": {
@@ -450,7 +463,23 @@
     "fullRemoteLane": "Streamable HTTP + OAuth PKCE to the same actor; downstream acceptance (SE-11)",
     "renderFree": "fallback only; not a CP0 prerequisite",
     "cp0Requires": "none of: Auth0, Render, WebSocket, tunnel, remote MCP (source-level CP0 only)",
-    "preserved": "security, atomic transactions, project isolation, owner-only Save, no demo-only auth bypass"
+    "preserved": "security, atomic transactions, project isolation, owner-only Save, no demo-only auth bypass",
+    "pinnedTo": {
+      "repository": "KaisAbiyyi/sibambo-editor",
+      "commit": "cc75bd1b0ec9b8800f588d0b907ac31c0d7e5e05",
+      "blob": "3479da07f7d7471a4229a09367db17002bd40c2d",
+      "sha256": "67105d23f3576f2a3d78b2aa8d11c38014d9f4e0b9043fdab7e2e4a6d5fb3965"
+    },
+    "owner_laptop_demo_requires_for_CP0": "nothing beyond source-level qualification",
+    "d10RenderFreeStatus": "fallback only (pinned at 96e50b33 in the same master); not a CP0 prerequisite",
+    "notClaimed": [
+      "tunnel activation",
+      "Tailscale Funnel behaviour",
+      "Auth0 tenant",
+      "Render service",
+      "canonical shared actor",
+      "Streamable HTTP/OAuth"
+    ]
   },
   "cp0Qualification": {
     "sourceCandidates": {
@@ -464,31 +493,60 @@
       "mcp": "2.3.0",
       "localCloudPython": "3.13.18",
       "localCloudBun": "1.4.4",
-      "localCloudChromium": "pre-installed /opt/pw-browsers, Playwright 1.61.1"
+      "localCloudChromium": "pre-installed /opt/pw-browsers, Playwright 1.61.1",
+      "negativeTestRunner": "python -m unittest test_se00_cross_repo_check (run from docs/two-phase; outside tests/ so the inherited Builder test count is unchanged)"
     },
     "results": [
       {
         "id": "builder-full-suite-local",
         "result": "PASS",
-        "detail": "634 tests OK = 620 inherited + 14 BMB-026 house tests; 0 failures",
+        "detail": "Ran 634, passed 634, skipped 0, failures 0, errors 0 (620 inherited + 14 BMB-026 house)",
         "links": [
           "receipt log sha256 8c574eeb1c2338a29eb15b8fd5b461ec8b88e523d0f544c816119645cf5619f0"
-        ]
+        ],
+        "counts": {
+          "ran": 634,
+          "passed": 634,
+          "skipped": 0,
+          "failures": 0,
+          "errors": 0
+        }
       },
       {
         "id": "builder-full-suite-hosted-ubuntu",
         "result": "PASS",
-        "detail": "634 tests OK in 151.7 s",
+        "detail": "Ran 634 in 151.7 s, passed 634, skipped 0, failures 0, errors 0",
         "links": [
           "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462743933"
-        ]
+        ],
+        "counts": {
+          "ran": 634,
+          "passed": 634,
+          "skipped": 0,
+          "failures": 0,
+          "errors": 0
+        }
       },
       {
         "id": "builder-full-suite-hosted-windows",
-        "result": "PASS",
-        "detail": "634 tests OK (skipped=5: POSIX permission bits / ACL-not-validated x4, child peak memory x1); Windows ACLs NOT validated",
+        "result": "PASS (629 passed, 5 skipped; skips are not passes)",
+        "detail": "Ran 634 in 236.4 s: passed 629, skipped 5, failures 0, errors 0 (log: \"OK (skipped=5)\"). Skips: 1x test_bmb023_mcp private-root mode (POSIX only), 3x test_bmb024_context permission bits/symlink (Windows ACLs not validated), 1x test_bmb028_benchmarks child peak memory (no stdlib support on Windows). Rev 1 of this manifest wrongly said 634/634.",
         "links": [
           "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462743933"
+        ],
+        "counts": {
+          "ran": 634,
+          "passed": 629,
+          "skipped": 5,
+          "failures": 0,
+          "errors": 0
+        },
+        "skippedTests": [
+          "test_bmb023_mcp.MCPTests.test_world_readable_project_root_is_rejected",
+          "test_bmb024_context.PermissionTests.test_files_and_directory_are_owner_only_even_with_a_permissive_umask",
+          "test_bmb024_context.PermissionTests.test_loose_existing_permissions_are_tightened",
+          "test_bmb024_context.PermissionTests.test_symlinked_session_file_or_directory_is_refused",
+          "test_bmb028_benchmarks.MemoryTests.test_a_child_that_allocates_is_visible_in_the_children_peak"
         ]
       },
       {
@@ -538,7 +596,11 @@
         "detail": "80 tests / 0 fail: BMB-026 house consumer (11), BMB-021 original consumer/compat/geometry/strict-editable, materials v2, resource limits, roundtrip; provenance script PASS",
         "links": [
           "receipt log sha256 9209b5e1b5c96a435d4d8b4d4668f584502c221171691a6361f01cacfd1b588e"
-        ]
+        ],
+        "counts": {
+          "pass": 80,
+          "fail": 0
+        }
       },
       {
         "id": "editor-check-types-build-local",
@@ -549,10 +611,20 @@
       {
         "id": "editor-original-consumer-hosted-ubuntu-windows",
         "result": "PASS",
-        "detail": "80 tests per OS, provenance reproduction, check, types, build",
+        "detail": "80 pass / 0 fail per OS (Ubuntu and Windows logs), provenance reproduction, check 0/0, shared types, build",
         "links": [
           "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42462771023"
-        ]
+        ],
+        "counts": {
+          "ubuntu": {
+            "pass": 80,
+            "fail": 0
+          },
+          "windows": {
+            "pass": 80,
+            "fail": 0
+          }
+        }
       },
       {
         "id": "editor-bmb021-hosted-ubuntu-windows",
@@ -585,10 +657,23 @@
       {
         "id": "cross-repo-builder-to-original-editor",
         "result": "PASS",
-        "detail": "Builder f1503748 generated corpus (twice, identical) byte-equals Editor pinned fixtures; real BomcLoader.load import of the generated bytes: 11/11, five modules/four rooms, 278 source faces vs 66 analytical, 556 triangles, nine materials; hosted Ubuntu+Windows Builder artifacts byte-equal to the same fixtures",
+        "detail": "Fail-closed checker (explicit validation, mandatory expected Builder/Editor SHAs, clean trees, generation from git archive of the expected commit, two runs under different PYTHONHASHSEED must be identical, bytes equal Editor fixtures and independent pins) PASS on f1503748 + 98b01dc; real BomcLoader.load import of the generated bytes 11/11 (5 modules/4 rooms, 278 source faces vs 66 analytical, 556 triangles, 9 materials); hosted Ubuntu and Windows Builder artifacts byte-equal to the same fixtures",
         "links": [
           "docs/two-phase/se00_cross_repo_check.py",
-          "receipt sha256 see SE-00-CP0-VALIDATION.json"
+          "docs/two-phase/SE-00-CP0-VALIDATION.json"
+        ]
+      },
+      {
+        "id": "cross-repo-checker-negative-tests",
+        "result": "PASS",
+        "detail": "24 tests, 0 failures: wrong/malformed/moved expected SHA, dirty or untracked tree, non-top-level path, tampered fixture, consistently tampered fixture+manifest (rejected by independent pin), missing/invalid/malformed manifest, differing/non-deterministic/failing/incomplete generator output, receipt gate not PASS, ignored-file injection, no assert statements, CLI exit codes under -O and -OO, unexpected internal error fails closed. Mutation check: removing the HEAD, clean-tree, manifest-pin or determinism checks makes tests fail.",
+        "counts": {
+          "ran": 24,
+          "failures": 0,
+          "errors": 0
+        },
+        "links": [
+          "docs/two-phase/test_se00_cross_repo_check.py"
         ]
       },
       {
@@ -611,16 +696,18 @@
       }
     ],
     "defectsFound": "none in the integration candidates; no source fix needed; no production, test, workflow or fixture byte changed by CP0",
-    "historicalEvidencePreserved": true
+    "historicalEvidencePreserved": true,
+    "checkerVersion": 2
   },
   "remainingRisks": [
     "Candidates are unmerged draft heads; merging in a different order or onto a moved base invalidates these SHAs and requires re-qualification.",
-    "Windows-native execution and Windows ACL/private-root semantics are not validated (5 hosted skips); relevant to the D11 laptop actor.",
+    "Windows-native execution is not validated and Windows ACL/private-root semantics are untested: 4 of the 5 hosted Windows skips are POSIX-permission/ACL tests (the 5th is child peak memory); relevant to the D11 Windows-laptop actor.",
     "Existing stdio MCP uses spawn-per-call workers with filesystem journals; it cannot share an in-memory draft with a separate server. The canonical single actor is SE-01/SE-03 scope.",
     "Editor viewing of Builder BOMC is not strict section-241 editability; no native SketchUp certification; full historical Editor suite remains partial.",
     "Hosted Builder to Editor cross-repo workflow does not exist (Editor repo is private; Builder cannot check it out without a token). Evidence is local plus byte-identity chain.",
     "Local qualification used Python 3.13 / Bun 1.4.4; pinned versions (3.12 / Bun 1.3.0) were covered by hosted CI.",
-    "Tailscale Funnel, Auth0, Render Free memory/CPU, WebSocket and OAuth client compatibility are unverified."
+    "Tailscale Funnel, Auth0, Render Free memory/CPU, WebSocket and OAuth client compatibility are unverified.",
+    "The independent BOMC pins compiled into the checker are valid only for the BMB-026 house corpus; a deliberate corpus change requires an explicit owner-approved pin update and a new manifest revision."
   ],
   "ownerGates": [
     "Review and approve Builder #90 and Editor #12/#13 merge order (recommended below); no merge was performed.",
@@ -634,5 +721,31 @@
     "3. Editor #12 (b5f46a7) onto main 04e4c1d.",
     "4. Editor #13 (98b01dc) after #12; it already contains #12 and the #14 squash, so GitHub will show only the remaining delta; fresh checks required if base changed. Never merge #14 separately.",
     "5. Re-pin: record resulting Builder/Editor main SHAs and re-run cross-repo checker before SE-01/SE-04 start."
-  ]
+  ],
+  "manifestRevision": 2,
+  "manifestRevisionNote": "Rev 2 (2026-11-08): re-pinned governing plan to D11; fail-closed checker with expected-SHA verification and negative tests; Windows test counts corrected (rev 1 mis-stated Windows as 634/634; actual 634 run, 629 passed, 5 skipped, 0 failed).",
+  "governingPlan": {
+    "id": "SIB-TWO-PHASE-001",
+    "version": "1.5",
+    "authoritativeDecision": "D11",
+    "decisionsIncluded": [
+      "D1-D9",
+      "E1-E3",
+      "D10",
+      "D11"
+    ],
+    "notionMaster": "https://app.notion.com/p/412c4a6aaf738117ac36c5101c01fae2",
+    "notionPageContentHashable": false,
+    "privateMaster": {
+      "repository": "KaisAbiyyi/sibambo-editor",
+      "commit": "cc75bd1b0ec9b8800f588d0b907ac31c0d7e5e05",
+      "blob": "3479da07f7d7471a4229a09367db17002bd40c2d",
+      "sha256": "67105d23f3576f2a3d78b2aa8d11c38014d9f4e0b9043fdab7e2e4a6d5fb3965"
+    },
+    "publicDisposition": {
+      "repository": "KaisAbiyyi/sibambo-bomc-builder",
+      "commit": "a7f05893eb516dbf03fe8b873655605367e050be",
+      "path": "docs/two-phase/BASELINE-DISPOSITION.md"
+    }
+  }
 }
