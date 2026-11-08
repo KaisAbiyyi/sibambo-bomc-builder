@@ -1,6 +1,6 @@
-# Execution task contracts — SIB-TWO-PHASE-001 v1.0
+# Execution task contracts — SIB-TWO-PHASE-001 v1.1
 
-No product implementation was performed by publication of this ledger.
+No product implementation was performed by publication of this ledger. Historical v1.0 master is retained.
 
 | Task | Repository | AND dependencies | Priority | Resource locks |
 |---|---|---|---|---|
@@ -44,7 +44,7 @@ READ ONLY: Builder #62 at 8fc6ebb; Editor #12 b5f46a7, #13 at current 98b01dc (c
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Record owner disposition for existing unmerged predecessors; do not merge them in this planning session. For future IMPLEMENT, integrate their task-owned necessary fixes through explicit owner-approved PRs, preserving original receipts and attribution. Compare both source bases before touching production. Freeze cross-repo schema hashes, compiler source hashes, exact consumer SHA and supported four-room corpus. Resolve accepted Notion BMB-026 Done versus draft/unmerged code as accepted bounded evidence, not main readiness. Authorize the named Stable implementation batch and nonproduction live-agent test environment; no deployment authority follows.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -62,6 +62,8 @@ Owner: approve exact baseline integration disposition and Stable IMPLEMENT scope
 ## CHECKPOINT SE-00
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73817a95c4f924aeb464ab?pvs=204
 
@@ -82,7 +84,7 @@ MUST NEW: core/project/operations.py, core/project/projection.py, schemas/draft-
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Define v1 replace_module and remove_module with full validated Module IR for exactly one module; typed helper tools add_floor/add_wall/add_opening/update_operation lower to replace_module through existing geometry builders. No arbitrary Python/shell/code evaluation. Render projection and compiler both consume the same canonical face/triangle intermediate, using stable module/operation/face IDs. Preserve encode_semantic bytes for the pinned corpus. Deletion rejects live dependent/seam references. Preview carries metre/+Z Float64 source positions and triangle indices; GPU conversion belongs to Editor. Reserve module revision, project revision and idempotency fields per master contract.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -100,6 +102,8 @@ Developer: inspect operation list and matching rendered semantic face IDs in a n
 ## CHECKPOINT SE-01
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf738116964dc411de6377b0?pvs=204
 
@@ -120,7 +124,7 @@ MUST NEW: core/project/actor.py, core/project/state.py, tests/test_project_actor
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. One in-memory actor per tenant/project/epoch; use ModuleStore CAS/idempotency in a staged copy and canonical typed IR map, never JournalStore for unsaved designs. Project-global revision starts 0. Under actor mutex validate grant, owner heartbeat, lease fence, expectedProjectRevision and touched dependency revisions; validate and project candidate before swapping all actor state once. Cache operationId+request hash+outcome atomically with swap. Same key/hash returns prior outcome before stale-revision check; different hash conflicts. One agent writer lease at a time; readers concurrent. Owner pause takes priority at next operation boundary and increments fence. No multi-module atomic mutation in v1.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -138,6 +142,8 @@ Developer: two clients contend; expected named writer, explicit conflict, owner 
 ## CHECKPOINT SE-02
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73815db620eb541ab93435?pvs=204
 
@@ -158,7 +164,7 @@ MUST NEW: service/app.py, service/mcp_http.py, service/auth.py, service/requirem
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Use official Python MCP SDK mcp==2.3.0 as inspected baseline, ASGI deployment process, exact dependency lock. Verify SDK supports the researched 2026-07-28 HTTP profile before adapter implementation; failing compatibility probe blocks to REVIEW/PLAN, no handwritten protocol replacement. Implement project-scoped resource endpoint POST /mcp; current per-request metadata and request-scoped response streams, plus explicitly tested 2025-11-25 compatibility only if actual client requires it. Tools read_project, inspect_module, apply_operation, operation_status, acquire_writer, release_writer and validate_draft call actor directly, not CLI/subprocess stdin. No MCP save/export tool. OAuth protected-resource metadata, external managed authorization server, PKCE S256, audience/issuer/signature/expiry validation, subject/tenant+project grants; clientInfo is display data only.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -176,6 +182,8 @@ Owner/developer: real Claude Code and Codex connect to nonproduction remote URL 
 ## CHECKPOINT SE-03
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf7381049e91cd47e4924c37?pvs=204
 
@@ -196,7 +204,7 @@ MUST MODIFY: apps/editor/src/routes/+page.svelte::EditorMode, requestTransition,
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Add in-app Extensions → MCP Extension, not an OS/browser addon dependency. States disconnected→signing-in→project-selected→pairing→awaiting-owner-grant→connected/read-only→writer-active, plus paused/reconnecting/expired/error. Owner login via same-origin BFF HttpOnly Secure SameSite=Lax cookie, CSRF token on mutations; no access token in localStorage. Remote agent OAuth obtains pending grant; owner approves exact agent subject/client/project/scopes in Editor. Pair code is human comparison only (8 chars, 5min, 5 attempts); OAuth + explicit grant required. Display actual capabilities, current writer, seen/rendered revision and pause/revoke/remove. Show client-specific setup instructions from official docs; never put credentials in command text, URLs or telemetry.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -214,6 +222,8 @@ Owner: fresh onboarding in actual supported agent clients; expected identity, pr
 ## CHECKPOINT SE-04
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73813e9ae3e4172ec00e55?pvs=204
 
@@ -234,7 +244,7 @@ MUST NEW: apps/editor/src/lib/mcp/draft-client.ts, draft-protocol.ts, draft-stor
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Browser-only WebSocket /draft attaches after same-origin BFF produces a single-use 30s ticket via authenticated POST; send ticket in first message within 5s, never query string. Check Origin allowlist and tenant/project grant on upgrade/attachment. HELLO(epoch,lastAppliedRevision,lastRenderedRevision) → bounded snapshot or contiguous events. Event envelope and ordered handling fixed in master. Parse/validate off main thread; stage canonical module replacements; apply only contiguous revision; stale duplicate ignore by hash, hash mismatch pause. Gap triggers resync; retain last good visible draft until complete replacement validated. Heartbeat every5s with 15s TTL. Generation token fences stale socket callbacks; closing page closes socket and revokes presence, not saved file.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -252,6 +262,8 @@ Developer: disconnect browser network then restore; expected visible paused stat
 ## CHECKPOINT SE-05
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf7381e29bd5d6be758b2303?pvs=204
 
@@ -272,7 +284,7 @@ MUST NEW: apps/editor/src/lib/mcp/draft-scene.ts, draft-projection.worker.ts, te
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Dedicated builder-draft mode owns external disposable Group and moduleId→GPU-resource map. Add the two named external-draft methods as wrappers over setDomainOverlay with dedicated builder/module/<moduleId> keys, plus external source-face picking/observation records. Viewport owns attached Group geometry/material disposal; wrappers must never dispose a Group a second time. Unchanged groups stay attached; imported scene picking remains unchanged. Stage changed modules offscreen and swap affected groups atomically; delete old resources once, retain unchanged module objects/material cache references. Map canonical +Z to Three +Y by one root rotation -PI/2 about X; no per-module double conversion. Preserve camera/selection for surviving IDs; never auto-fit on each operation. Render a frame then send renderAck(projectRevision,digest); server permits next write only after ACK. Invalid projection keeps previous frame and pauses further writes.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -290,6 +302,8 @@ Owner: observe sequential construction and request a window revision while orbit
 ## CHECKPOINT SE-06
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf738141b140f7f4f4750290?pvs=204
 
@@ -310,7 +324,7 @@ MUST MODIFY: +page.svelte Save handler (existing saveBomc/write acknowledgment p
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Only owner browser Save click issues CSRF-protected POST /projects/{id}/save-intents with epoch+expectedProjectRevision+digest. Atomically freeze draft at r, pause agent writer; compile same canonical IR with Builder compiler in RAM, independently validate exact bytes, return one-use owner-only binary response with sha256 and revision. Agents cannot mint intents or export. Browser verifies bytes/hash, downloads filename project-r.bomc (File System Access optional only with user choice); acknowledge save dispatch only after successful browser dispatch or file writer close. Set savedRevision=r only; any later draft revision stays dirty. Failure/cancel leaves dirty and lease resumable; Blob URLs revoked. Discard confirms unsaved loss. Reopen via existing file picker/admitE4File/loadE4InWorker, not a new parser. Reopened output is valid inspectable BOMC; arbitrary imported BOMC→typed Module IR editing is not claimed.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -328,6 +342,8 @@ Owner: click Save, retain downloaded BOMC, close/reopen in Editor, compare model
 ## CHECKPOINT SE-07
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73817897a4c6751980037a?pvs=204
 
@@ -348,7 +364,7 @@ MUST MODIFY: core/project/actor.py, service/draft_ws.py, service/mcp_http.py. NE
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. No owner presence→stop new writes; in-flight operation already swapped remains accepted but renderPending, queried by operationId. Cancellation before swap rejects, after swap is outcome-known, client disconnect never implies rollback. Keep 128 events or8MiB in RAM, whichever first; 30min disconnected TTL then purge actor and grants, no draft content in logs/swap/core dumps/backups. Server restart creates new epoch; writes blocked until owner explicitly restores last browser-held canonical snapshot after reauth+validation (clear unsaved/recovery notice). If browser is also gone, recover only last user-saved BOMC for inspection; unsaved draft loss disclosed. One writer lease30s, refreshed10s, fence increments on pause/revoke/transfer; second agent BUSY, no auto-steal. Owner operation wins boundary, invalidates prior lease.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -366,6 +382,8 @@ Owner/developer: restart staging service with browser open, approve recovery; ex
 ## CHECKPOINT SE-08
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf738147ac4dfe112b3f7523?pvs=204
 
@@ -386,7 +404,7 @@ MUST NEW: tests/test_remote_security.py, docs/two-phase/THREAT-TESTS.md. MODIFY 
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Threat matrix tenant isolation, CSRF, malicious Origin, token audience, OAuth redirect/PKCE state, grant revocation, replay, pairing brute-force, malicious geometry, memory/CPU peaks and leaked logging. Auth metadata/refresh tokens may use encrypted managed storage; model payloads never do before Save. Use managed OIDC/OAuth authorization service contract rather than home-built password storage. Server runtime single actor per project, sticky route; 20 active projects per worker, admission rejects at cap. Geometry worker isolated process with30s CPU/wall deadline and512MiB RSS, input2MiB maximum and existing stricter operation/module/face/compiler caps. No arbitrary outbound URLs; credentials and geometry scrubbed from logs. No experimental credential can access Stable service.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -404,6 +422,8 @@ Developer security owner: test actual staging IdP/client redirect flows and revo
 ## CHECKPOINT SE-09
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf7381ea8d73eb2e09de33ea?pvs=204
 
@@ -424,7 +444,7 @@ MUST NEW: tooling/testing/run-remote-draft-performance.ts, apps/editor/tests/dra
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Pinned four-room/five-module scene within current compiler caps, plus 100 repeated valid revisions and failed stress inputs retained. Record browser/device/network/compiler/agent SHAs; emulate100ms RTT+10Mbps and separate real-network timing. Measure actor accepted→browser render ACK P95≤500ms, all accepted operations rendered≤2s; post-render camera input P95 frame≤33ms; no main-thread task>100ms from geometry decode; Save≤5s for bounded fixture. Histograms include failures/timeouts. 320/768/1440 layout keyboard/screen reader status checks; owner usability separate. These are targets, not current measurements. Above supported caps reject visibly; do not expand limits to pass.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -442,6 +462,8 @@ Owner: complete fresh setup/pause/revise/Save task without developer assistance;
 ## CHECKPOINT SE-10
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73812c8805eeb230180589?pvs=204
 
@@ -462,7 +484,7 @@ MUST NEW: apps/editor/tests/remote-agent-acceptance.spec.ts, docs/two-phase/LIVE
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Run actual authenticated external Claude Code first, Codex second, recorded version/model/endpoint with credentials redacted. Agent receives four-room 8×6m brief, creates floor/walls/shared seams/door/window incrementally through remote typed tools, owner observes each frame; owner pauses, requests private window1.0→1.2m, resumes; stale second agent conflicts; disconnect/reconnect once. Owner clicks Save twice at named revisions; real downloaded bytes open through original Editor file path. Automated replay client is supporting proof only; a real AI agent must select and invoke geometry tools. Require receipts for agent calls, actor revisions, frame ACKs, save hashes, original importer semantic comparison and owner observation. Public repo gets sanitized synthetic records; no API keys/client data.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -480,6 +502,8 @@ Owner: personally observe live construction, intervention, Save and reopened fil
 ## CHECKPOINT SE-11
 
 The listed artifact/mechanism and acceptance evidence must exist on the recorded SHA; dependent product claims must not appear before the named manual/live gate. Diff must remain in the named boundary. A missing symbol, changed baseline/lock, failing invariant, unsupported real input, missing credential/consent/budget, or architecture contradiction means **STOP dependent work → record evidence → REVIEW/PLAN**. Independent authorized work can continue. Do not weaken acceptance or select a substitute architecture. Return source/base SHAs, changed paths, test links/verdicts/limits, all failures, owner evidence and next action.
+
+Normative v1.1 wire/hash boundary: canonicalIrJson is the exact Python-canonical UTF-8 JSON string, hashed before browser parsing; content digest is never reconstructed by JavaScript number formatting. Project digest uses the sorted [moduleId,moduleRevision,contentSha256] manifest. Agent identity denotes issuer/subject/client credential principal, not an independently authenticated process. See master v1.1 for exact serialization, recovery and fence rules.
 
 Notion source of task state: https://app.notion.com/p/412c4a6aaf73810885c3cfe999051754?pvs=204
 
@@ -500,7 +524,7 @@ MUST: docs/two-phase/EXPERIMENTAL-CHARTER.md and experiments/protocol/manifest.j
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Owner approves independent research budget/capacity and later repository creation; Stable has first call on shared owners/locks. New app will own UI, client brief, research, providers and native orchestration in a future separate repository. Builder retains core/IR/compiler; consume version-pinned public Python package via direct in-process API, not MCP internally. Until split, code experiments isolated under experiments/ with separate lock and no production imports. Publish dataset/participant consent, source licensing, frozen evaluation split and research questions before trials.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -538,7 +562,7 @@ MUST NEW: experiments/site/{schema.json,normalize.py,fixtures/README.md}, tests/
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. SiteBrief v1 stores WGS84 lon/lat, user-confirmed site polygon, source CRS, uncertainty metres, source/retrievedAt/license, true north and local ENU metre transform. Use MapLibre map UI prototype with licensed tiles; initial online context candidates OSM roads/buildings and Open-Meteo reanalysis, user-provided survey/terrain authoritative only when documented. Separate point precision from survey accuracy. Every road/access/terrain/climate/setback statement has evidence status verified-source/user-stated/inferred/unverified/missing and resolution/time. Missing or contradictory critical site boundary/setback blocks feasible layout claims; mark assumptions, never invent code requirements.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -576,7 +600,7 @@ MUST NEW experiments/brief/program.schema.json, normalize_program.py, tests/test
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Program rooms have stable IDs/type/count/floor, min/target/max area m², optional width/depth m, occupancy/accessibility needs, priority must/should/could and adjacency/privacy edges require/prefer/avoid. User confirms inferred values with per-field source. Multi-floor request may be captured now but solver reports unsupported until XB-07 extension gate. Calculate area budget and circulation reserve explicitly; contradictions (min>max, summed minimum>usable area, impossible adjacency) produce actionable conflict list and require owner choice. Use Drafted room-list usability as reference only, original interaction design and no proprietary asset copy.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -614,7 +638,7 @@ MUST NEW experiments/interview/{question-bank.md,preference.schema.json,study-pr
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Interview daily routines, household changes, work/guests/privacy, sensory light/noise/temperature, movement/accessibility, social/secluded choices, materials and desired atmosphere with examples/tradeoffs. Optional skip/unknown and private household answers; no diagnosis/personality/mental-health inference or psychometric score. Each design implication links user quotation/answer→interpreted need→proposed spatial constraint→user confirmation. Literature-backed constructs guide questions, not clinical validity. Pilot5–8 consenting clients and≥2 architects, separate recruitment/demographics/limitations; deidentify research, raw answers private and deletable.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -652,7 +676,7 @@ MUST NEW experiments/providers/{base.py,anthropic_adapter.py,openai_compatible.p
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Provider request accepts messages/schema/model/limits/cancellation; response normalized validated JSON, usage input/output/cache tokens nullable, cost metadata/date/currency, latency/finish/error and raw response digest. Claude API candidate primary only after comparative gate; Qwen3.5-27B pinned model revision+license+quantization candidate on interactive Colab notebook. No free Colab capacity promise or always-on public tunnel. 27B theoretical weights54GB BF16 or13.5GB 4-bit before KV/runtime; inspect allocated VRAM and actual peak, skip as OOM rather than pretending it ran. User keys kept in per-run process memory by default, never browser storage/log/URL/repo; explicitly authorized vault retention later is separate design. Server proxy accepts only supported provider endpoints to prevent SSRF. No silent provider fallback (possible cost/data transfer).
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -690,7 +714,7 @@ MUST NEW experiments/orchestrator/{state.py,runner.py,tools.py}, tests/test_expe
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Fixed state machine brief-confirmed→research→constraints→zoning→layout→geometry→validate→evaluate→human-review, with bounded repair transitions. One coordinator calls role-specific functions, not autonomous agent swarm; native typed calls, no MCP subprocess/client for internal work. Per iteration immutable state+constraint revision+candidate provenance; max3 candidates and2 repair rounds per stage, max60 model calls/run, max30min and user spend cap defaultUSD2 test-run. Stop on budget, infeasible hard constraints, missing critical evidence, stale brief or provider failure; return best valid candidate only with explicit incomplete label. Model output is untrusted; deterministic validators decide geometry feasibility, never model self-score.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -728,7 +752,7 @@ MUST NEW experiments/planning/{baseline.py,solver.py,metrics.py,fixtures/manifes
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. First deterministic baseline: single-storey orthogonal room rectangles on100mm grid, fixed footprint, enumerated adjacency and corridor graph; positive dimensions, no overlaps, exterior envelope, single owned seams, doors/connectivity. Compare CP-SAT discrete candidate placement against LLM zoning+same deterministic solver; pin OR-Tools only for experiment. Lexicographic objectives: hard feasibility→required adjacency/access→area deviation→circulation fraction→orientation/preference soft score. Stable seed and tie-break by ordered room IDs/placement tuples. Time limit30s/candidate; infeasible/time-limit distinguished. Nonrectangular/sloped/multi-storey are explicit later research branches with contract freeze, no guessed fallback.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -766,7 +790,7 @@ MUST NEW experiments/geometry/lower_plan.py, tests/test_experimental_lowering.py
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Lower verified plan using one shared wall per room boundary owner=min lexical roomId, canonical metre/+Z transforms, explicit floor slab/wall/opening ops, exact port adjacency and labels. Use shared projection/compiler. Start single-floor flat-roof supported subset; windows require documented constraints and real wall cutouts. Preserve plan-room/face/module mapping, localized revision changes only affected private modules and invalidated seam dependents. Unsupported materials/string/face/output budgets return compiler typed errors, no geometry deletion. Multi-storey/stairs/sloped terrain await separate evidence contracts after one-floor gate.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -804,7 +828,7 @@ MUST NEW experiments/evaluation/{rubric.md,score.py,report.py}, tests/test_exper
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Separate deterministic hard constraints (boundary/overlap/area/room count/connectivity) from preference satisfaction and environmental approximations. Orientation/sun-path computations have reproducible inputs; daylight/thermal/wind are heuristic unless validated simulator/test evidence exists. Local regulations require jurisdiction/source/version and architect confirmation; absent evidence means unknown, no permit-ready claim. Use held-out briefs and≥2 independent architect assessors, randomized blind order and original client-confirmed rubric; record agreement, revisions, errors, cost, diversity and all invalid outputs. Model evaluator may propose critique but cannot accept its own design.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -842,7 +866,7 @@ MUST NEW docs/two-phase/FUTURE-REPO-HANDOFF.md with exact package/version hashes
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Create standalone app after explicit future repo approval; brand remains TBD. Three stages map→room program→lifestyle/feeling, back/forward retains explicit draft, per-field evidence badges and conflict review, keyboard/mobile accessible. Native backend job loop calls shared Builder API directly. Shared compiler/IR stays published from Builder, version locked; research code transferred with attribution/history references, no private Editor package copy. App shows EXPERIMENTAL throughout onboarding/review/export and supports configurable provider with per-run spend/usage.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -880,7 +904,7 @@ MUST future app app/review and backend/feedback; current planning handoff docs o
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Feedback typed constraints reference room/module IDs and brief revision; preserve accepted layout regions unless explicitly unlocked. Re-run affected planning subproblem then shared geometry validation, compare candidate diff, user accepts/rejects proposed revision before replacing prior accepted candidate. Pause/cancel prevents subsequent state transition; checkpoint at stage boundaries to explicit user project save only under future app retention policy. Export valid BOMC through same compiler after user Save; no duplicate writer. User can reopen in Editor for inspection; reopening into experimental editable plan requires separate plan project artifact, never reverse-engineer arbitrary BOMC silently.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.
@@ -918,7 +942,7 @@ MUST docs/two-phase/EXPERIMENTAL-PILOT-RECEIPT.md and future app pilot evidence 
 
 ## Ordered patch contract
 
-1. Read governing master SIB-TWO-PHASE-001 v1.0 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
+1. Read governing master SIB-TWO-PHASE-001 v1.1 and live prerequisite evidence; verify exact baseline, ownership and scope authority. If incomplete, stop dependent edits.
 2. Run10 consented briefs (including difficult/infeasible sites) through3-stage onboarding, research, native loop, plan,3D, human feedback, Save and Editor reopen; compare Qwen27B Colab experiments with configured Claude API where available and same prompt/schema caps. Promotion target≥80% feasible briefs yield valid owner-reviewed candidate within budget;0 accepted hard violations;100% saved BOMC reopen;≥90% explicit provenance coverage; all client requirements user-confirmed. Publish actual cost/usage/latency/retries/structured-output reliability, failed denominators and uncertainty. Decide continue/revise/stop each intelligence track; app remains EXPERIMENTAL even if pilot passes.
 3. Add the prescribed regression/proof, inspect final diff versus named surface, run affected existing checks on exact source. Preserve old fixture thresholds/claims. Record failures and NOT_RUN honestly.
 4. Publish task-owned branch/draft PR and exact-source receipt; sync this Notion task and matching GitHub issue. Do not merge/deploy/release under planning authorization.

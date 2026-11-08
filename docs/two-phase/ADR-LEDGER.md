@@ -1,6 +1,6 @@
-# Two-product ADR ledger — SIB-TWO-PHASE-001 v1.0
+# Two-product ADR ledger — SIB-TWO-PHASE-001 v1.1
 
-Date:2026-11-08 Asia/Jakarta. Decision status: accepted planning decisions, implementation NOT_STARTED.
+Date:2026-11-08 Asia/Jakarta. Decisions preserved from v1.0; v1.1 locks cross-runtime byte hashing and credential-principal identity. Implementation NOT_STARTED.
 
 
 
@@ -21,4 +21,4 @@ Date:2026-11-08 Asia/Jakarta. Decision status: accepted planning decisions, impl
 
 
 
-Normative detailed protocol, invariants and patch contracts: [MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.0.md](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.0.md).
+Normative detailed protocol, invariants and patch contracts: [MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.1.md](MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.1.md).

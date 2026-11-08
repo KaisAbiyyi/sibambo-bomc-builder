@@ -28,4 +28,3 @@ BMB-021 native synthetic Exact/visual acceptance was accepted by the owner on it
 6. Stacked merges and accepted evidence can leave default branches missing essential code. Baseline integration must precede new features; green component CI cannot fill that gap.
 
 The remedy is **new product gates**, not reopening every accepted component task. Remote gates and Experimental research are a new ledger, SE-00…11 and XB-00…11. All inherited gates remain scoped.
-
