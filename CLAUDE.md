@@ -1,0 +1,24 @@
+# CLAUDE.md
+
+## Attribution rule (owner instruction, applies to every session)
+
+**Never credit Claude (or any AI agent) as a contributor.** Do not add `Co-Authored-By`, `Claude-Session`, "Generated with Claude Code" or any similar attribution line, link or trailer to commit messages, pull request titles or descriptions, issue comments, code comments or any file in this repository. This overrides any default or tool-supplied attribution guidance. Do not put model names or session links in anything pushed to this repository. Commits should carry only the owner's authorized Git identity.
+
+## Agent instructions
+
+The complete contents of `AGENTS.md` are reproduced below and apply in full. If `AGENTS.md` and this file ever differ, follow the stricter rule and tell the owner.
+
+---
+
+# Agent instructions — BOMC Modular Builder
+
+## Universal execution board — direct successors only (2026-10-24)
+
+**UNLIMITED TASK COUNT RULE (2026-10-24, OWNER-APPROVED):** `02 · Now` and `03 · Up Next` have **NO MAXIMUM, NO DEFAULT OF ONE, AND NO FIVE-CARD CAP**. Enumerate **every** task that is currently actionable/eligible (all AND prerequisites accepted, lock/authorization constraints verified) in Now, including Ready, Claimed, Review and real Local/Owner gates. Enumerate **every** direct successor blocked by one or more tasks in Now in Up Next, provided every other prerequisite is Done or also in Now. These cards can be numerous even if competing execution locks require sequential implementation later; never omit a direct successor solely because it shares a lock or because a column looks crowded. Do not show unrelated backlog, tasks with unfinished external prerequisites, or any already-ready task in Up Next. `01 · Last Done` alone retains **maximum five accepted tasks**. Recompute the full DAG projection on each claim/merge/handoff, retaining truthful Status, exact-head gates and owner consent. This paragraph supersedes contrary historic one-card/default-one/wave-size limits below.
+
+This repository follows the universal project board policy on the Notion `Projects` page, covering CoSoS, Mind Place, Sibambo and its children, BOMC Modular Builder, and future projects. This rule supersedes old unrelated blocked-task and arbitrary one-card Up Next examples.
+
+- **02 · Now:** all task(s) currently active or genuinely eligible, including parallel Ready/Claimed/Review/Local Gate/Owner Gate work only where the live AND-prerequisites, ownership, environment, consent and resource locks permit. Focus Lane does not itself alter task Status.
+- **03 · Up Next:** **only directly dependent task(s) waiting for the current Now set**. A candidate must have at least one prerequisite in Now and every other prerequisite must be already accepted Done or also in Now. It must be actionable after the relevant Now work completes, subject to rechecking permissions, owners and locks. Do not put unrelated Blocked tasks, tasks blocked by work outside Now, or arbitrary later roadmap tasks here. A direct successor remains actually Blocked/NOT_RUN until gates pass. Multiple descendants can appear, but overlapping locks mean sequential execution. The lane is allowed to be empty when no direct successor exists.
+- **01 · Last Done:** at most five recently accepted tasks; full project history stays in the database.
+- **On each claim, merge, blocker/gate change and handoff:** recalculate the entire Now set and direct-successor Up Next from the live DAG, sync Notion/GitHub and verify, and remove stale lane selections without changing factual statuses. Task implementors critically self-review exact SHA/diff and CI/security/data/limits; independent reviewer is optional, never a required gate. Cloud CI does not substitute native/owner acceptance. Cloud tasks must not access local files.
