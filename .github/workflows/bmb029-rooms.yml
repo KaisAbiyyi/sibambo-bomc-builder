@@ -1,0 +1,100 @@
+name: BMB-029 optional rooms adapter
+on:
+  push:
+    paths:
+      - "integration/rooms/**"
+      - "core/**"
+      - "schemas/rooms-evidence-v1.schema.json"
+      - "examples/rooms/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb029_rooms.py"
+      - "tests/test_bmb032_generator.py"
+      - "tests/qa/**"
+      - "docs/BMB-029-ROOMS-ADAPTER.md"
+      - ".github/workflows/bmb029-rooms.yml"
+  pull_request:
+    paths:
+      - "integration/rooms/**"
+      - "core/**"
+      - "schemas/rooms-evidence-v1.schema.json"
+      - "examples/rooms/**"
+      - "examples/module-ir-two-rooms.json"
+      - "tests/test_bmb029_rooms.py"
+      - "tests/test_bmb032_generator.py"
+      - "tests/qa/**"
+      - "docs/BMB-029-ROOMS-ADAPTER.md"
+      - ".github/workflows/bmb029-rooms.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rooms-adapter:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert the checked-out commit is the one under test
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          echo "checked out ${actual}; expected ${EXPECTED_SHA}"
+          test "${actual}" = "${EXPECTED_SHA}"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install the pinned schema validator
+        run: python -m pip install jsonschema==4.23.0
+      - name: Rooms adapter tests (no network, no model, no core dependency)
+        run: python -m unittest discover -s tests -p test_bmb029_rooms.py -v
+      - name: Regressions for what the adapter sits beside (validator, assembly, MCP, CLI)
+        shell: bash
+        run: |
+          for t in test_bmb011_assembly test_bmb012_validator test_bmb022_cli test_bmb023_mcp; do
+            python -m unittest discover -s tests -p "${t}.py"
+          done
+      - name: No integration module reads the environment except the adapter's one feature flag
+        run: python -m unittest tests.test_bmb032_generator.NoLlmNoNetworkTests -v
+      - name: The adapter is off by default and on only when asked
+        shell: bash
+        run: |
+          unset BMB_ROOMS_ADAPTER
+          python -m integration.rooms check --assembly examples/module-ir-two-rooms.json --evidence examples/rooms/evidence-two-rooms.json > off.json
+          python -c "import json; d=json.load(open('off.json')); assert d['enabled'] is False and 'rooms' not in d, d"
+          python -m integration.rooms check --enable --assembly examples/module-ir-two-rooms.json --evidence examples/rooms/evidence-two-rooms.json > on.json
+          python -c "import json; d=json.load(open('on.json')); assert d['enabled'] is True and d['ok'] is True and len(d['rooms']['matches'])==2, d"
+          set +e
+          python -m integration.rooms check --enable --assembly examples/module-ir-two-rooms.json --evidence examples/rooms/evidence-open-plan.json > merged.json
+          code=$?
+          set -e
+          test "${code}" = "1"
+          python -c "import json; d=json.load(open('merged.json')); assert [x['code'] for x in d['rooms']['diagnostics']]==['ROOM_MERGED'], d"
+      - name: A comparison that compared nothing is not a pass
+        shell: bash
+        run: |
+          python -c "import json; d=json.load(open('examples/rooms/evidence-two-rooms.json')); d['elevationM']=100; [r.update(confidence=0.2) for r in d['rooms']]; json.dump(d, open('elsewhere.json','w'))"
+          set +e
+          python -m integration.rooms check --enable --assembly examples/module-ir-two-rooms.json --evidence elsewhere.json > nothing.json
+          code=$?
+          set -e
+          test "${code}" = "1"
+          python -c "import json; d=json.load(open('nothing.json')); assert d['ok'] is False and 'NO_COMPARABLE_ROOMS' in [x['code'] for x in d['rooms']['diagnostics']], d"
+      - name: Record the evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### BMB-029 optional rooms adapter (${{ matrix.os }})"
+            echo "- commit: \`${EXPECTED_SHA}\`, run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- feature-flagged, off by default; the evidence format is proposed here. NOT_RUN: a real room detector's output, threshold calibration"
+          } >> "$GITHUB_STEP_SUMMARY"
