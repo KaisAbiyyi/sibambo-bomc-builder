@@ -1,0 +1,184 @@
+{
+  "schema_version": "bmb-release-evidence-v1",
+  "record_as_of": "2026-11-08",
+  "basis_sha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+  "note": "Historical exact-SHA evidence pertains only to named scopes; existing PR evidence is not a new exact-head acceptance. Unmerged changes are excluded from main and release archive.",
+  "statuses": [
+    "PASS",
+    "FAIL",
+    "NOT_RUN",
+    "BLOCKED",
+    "OUT_OF_SCOPE"
+  ],
+  "gates": [
+    {
+      "id": "deterministic_compile",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Builder BOMC 1.2 subset only",
+      "evidence": {
+        "source_sha": "7c004900d3ef958d7493091d361823b5d942f842",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/55",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41619667298",
+        "scope": "Builder-owned deterministic supported subset"
+      }
+    },
+    {
+      "id": "builder_independent_reader",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Builder independent reader, not original consumer",
+      "evidence": {
+        "source_sha": "8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/62",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42036423066",
+        "scope": "29 interop regression tests on Builder draft head; not main acceptance"
+      }
+    },
+    {
+      "id": "bmb021_original_consumers",
+      "status": "BLOCKED",
+      "mandatory": true,
+      "limitation": "Editor E4 #12/#13 pending; original Model-Eval not certified",
+      "evidence": null
+    },
+    {
+      "id": "bmb023_mcp_protocol",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Hosted modern stdio MCP subset only",
+      "evidence": {
+        "source_sha": "4e6798249188b00a5529e0bf4ac33e31ad3cd8c7",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/59",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/41947976935",
+        "scope": "Hosted protocol/SDK tests, not hostile native host"
+      }
+    },
+    {
+      "id": "bmb026_four_room_house",
+      "status": "BLOCKED",
+      "mandatory": true,
+      "limitation": "Builder PR #62 draft/unmerged; four-room binary smoke is PR-scoped",
+      "evidence": null
+    },
+    {
+      "id": "bmb027_editor_consumer",
+      "status": "BLOCKED",
+      "mandatory": true,
+      "limitation": "Original Editor PR #12 and #13 draft/unmerged, owner visual gate outstanding",
+      "evidence": null
+    },
+    {
+      "id": "bmb028_synthetic_benchmark",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Two-room scripted MCP benchmark; providerTokens null",
+      "evidence": {
+        "source_sha": "ca58ec8038b71ed7626c185f9e98f7cbe8e6ce73",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/67",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42392672881",
+        "scope": "Synthetic 3/3 scripted trials, 54 harness tests per OS"
+      }
+    },
+    {
+      "id": "bmb028_four_room_baseline",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "BMB-026 four-room content absent from Builder main",
+      "evidence": null
+    },
+    {
+      "id": "bmb029_optional_rooms_adapter",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Synthetic opt-in diagnostics only",
+      "evidence": {
+        "source_sha": "56df4d62f5b973912a457dc56219f2239d2b39bb",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/68",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42418164081",
+        "scope": "Hosted BMB-029 bounded synthetic adapter tests only"
+      }
+    },
+    {
+      "id": "bmb030_adversarial_qa",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Bounded hosted adversarial suite, not native hostile environment",
+      "evidence": {
+        "source_sha": "c7c25e15c5244d5b9a7cd36737dcae52ea72ee05",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/63",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42236522073",
+        "scope": "Hosted seeded QA with previous owner-accepted merge"
+      }
+    },
+    {
+      "id": "bmb032_generator_contract",
+      "status": "PASS",
+      "mandatory": true,
+      "limitation": "Deterministic proposed API handoff only",
+      "evidence": {
+        "source_sha": "437277e549da0fbaef89214803d0ded5a2cd5ea7",
+        "pr_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/66",
+        "workflow_run_url": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42380405750",
+        "scope": "No actual generator deployment"
+      }
+    },
+    {
+      "id": "original_model_eval",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "Original Model-Eval BOMC 1.2 validation outstanding",
+      "evidence": null
+    },
+    {
+      "id": "windows_native_security",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "Owner ACL/DACL, Job Object, reparse/TOCTOU native checks outstanding",
+      "evidence": null
+    },
+    {
+      "id": "live_provider_tokens",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "No real LLM, native provider usage or token API validation",
+      "evidence": null
+    },
+    {
+      "id": "real_rooms_detector",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "No calibrated real detector integration",
+      "evidence": null
+    },
+    {
+      "id": "real_generator_adoption",
+      "status": "NOT_RUN",
+      "mandatory": true,
+      "limitation": "No production silabs-generator consumer adoption",
+      "evidence": null
+    },
+    {
+      "id": "license_chain_of_title",
+      "status": "BLOCKED",
+      "mandatory": true,
+      "limitation": "GPL policy recorded, third-party transitive and historical IP audit incomplete",
+      "evidence": null
+    },
+    {
+      "id": "owner_release_acceptance",
+      "status": "BLOCKED",
+      "mandatory": true,
+      "limitation": "Owner has not authorized scope, native results, merges, version or publication",
+      "evidence": null
+    }
+  ],
+  "owner_approvals": {
+    "scope_and_exclusions": false,
+    "integration_merges": false,
+    "native_acceptance": false,
+    "version_and_tag": false,
+    "publication": false
+  },
+  "authorized_exclusions": []
+}
