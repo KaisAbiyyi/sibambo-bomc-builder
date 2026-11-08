@@ -1,5 +1,8 @@
 # Modular BOMC Construction Architecture
 
+> **Product architecture update — 2026-11-08:** the [two-phase MASTER IMPLEMENTATION PLAN](two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.0.md) governs new Stable Editor remote MCP/live draft/owner Save delivery and the separate **EXPERIMENTAL** native agentic application. This older document is retained as foundation/history; its task/component completion is not product readiness. [Gap audit](two-phase/GAP-AUDIT.md) · [ADRs](two-phase/ADR-LEDGER.md) · [task contracts](two-phase/TASK-CONTRACTS.md) · [Notion/GitHub resource map](two-phase/RESOURCE-MAP.md). No product implementation/deployment/release is performed by this documentation update.
+
+
 ## Headless first, agent as consumer
 Manual brief / future silabs-generator forms → external Codex/ChatGPT/local agent → typed CLI/MCP → **headless construction core** → module manifest/graph → validation + seam ownership → deterministic BOMC writer → Sibambo Editor/Model-Eval.
 
