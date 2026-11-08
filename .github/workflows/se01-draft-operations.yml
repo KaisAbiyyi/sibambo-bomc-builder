@@ -56,7 +56,9 @@ jobs:
         shell: bash
         run: |
           python -m unittest discover -s tests -p 'test_bmb01*.py'
-          python -m unittest discover -s tests -p 'test_bmb02*.py'
+          python -m unittest discover -s tests -p 'test_bmb020_*.py'
+          python -m unittest discover -s tests -p test_bmb021_interop.py
+          python -m unittest discover -s tests -p test_bmb026_house.py
           python -m unittest discover -s tests -p 'test_bmb03*.py'
       - name: Owner PowerShell helper end-to-end on a clean checkout (Windows)
         if: always() && runner.os == 'Windows'
