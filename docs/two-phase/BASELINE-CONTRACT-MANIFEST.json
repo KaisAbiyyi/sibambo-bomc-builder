@@ -1,21 +1,29 @@
 {
   "formatVersion": 1,
   "task": "SE-00",
-  "status": "Blocked / Owner Gate",
+  "status": "Review / Owner Acceptance (CP0 source-level qualification PASS; owner gates open)",
   "observedDateJakarta": "2026-11-08",
-  "execution": "managed Codex cloud only",
+  "execution": "managed cloud only (Codex audit v1; Claude Code cloud CP0 closure v2)",
   "baseline": {
     "builder": {
       "repository": "KaisAbiyyi/sibambo-bomc-builder",
       "sha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
-      "refAtObservation": "main"
+      "refAtObservation": "main",
+      "mainAtObservation": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+      "cp0CandidateSha": "f1503748216b8778d2e11e6e73674bd64e295450",
+      "cp0CandidatePr": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/90",
+      "cp0CandidateBase": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+      "cp0CandidateDelta": "exactly four added files, byte/blob-identical to #62 8fc6ebbeb1996889983bd6fff0958d1f9a7aaf00; no other path differs from main"
     },
     "editor": {
       "repository": "KaisAbiyyi/sibambo-editor",
       "sha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
       "refAtObservation": "feature/bmb026-original-editor-consumer-20261106",
       "mainAtObservation": "04e4c1d1656e7c65b093d1667f556c3fdb4b5130",
-      "integratedIntoMain": false
+      "integratedIntoMain": false,
+      "cp0CandidateSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "cp0CandidatePr": "https://github.com/KaisAbiyyi/sibambo-editor/pull/13",
+      "cp0CandidateStack": "main 04e4c1d -> #12 b5f46a7 (exact ancestor) -> #13 content -> squash of #14 (98b01dc, tree-identical to #14 head 7d03a40). #12 and #14 are not applied twice; no new Editor commits were created."
     },
     "houseCorpusSource": {
       "repository": "KaisAbiyyi/sibambo-bomc-builder",
@@ -23,12 +31,16 @@
       "role": "read-only corpus generator; not replacement execution base"
     },
     "bmb021InteropSource": "0e3ec262e98762969da66088d412f8beebb63523",
-    "futureIntegratedSha": null,
-    "ownerApproved": false
+    "futureIntegratedSha": {
+      "builder": "f1503748216b8778d2e11e6e73674bd64e295450",
+      "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+      "note": "Candidate heads, NOT main. If either owner merge changes a base, re-qualify and re-pin."
+    },
+    "ownerApproved": "predecessor integration preparation and exact-source CP0 qualification approved 2026-11-08 (issue #70); merge, release, deployment, SE-01/04 IMPLEMENT NOT approved"
   },
   "compiler": {
     "entryPoint": "bomc.compiler.graph_to_bomc.compile_document",
-    "sourceSha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+    "sourceSha": "f1503748216b8778d2e11e6e73674bd64e295450",
     "coreAndBomcFiles": [
       {
         "path": "bomc/adapter/writer_v12.py",
@@ -170,7 +182,8 @@
       }
     ],
     "inventorySha256": "5c067aae01a4f34b3179df3411f7f47678e481f541bf7dea0f56134f2c595053",
-    "inventoryAlgorithm": "UTF-8 concatenation of sha256 + two ASCII spaces + repository path + LF, path sorted; all tracked .py under core/ and bomc/"
+    "inventoryAlgorithm": "UTF-8 concatenation of sha256 + two ASCII spaces + repository path + LF, path sorted; all tracked .py under core/ and bomc/",
+    "inventoryUnchangedFromMain7cd6ca7": true
   },
   "schemas": [
     {
@@ -190,6 +203,13 @@
       "gitBlob": "38fbe910c8ac0b77144270d3df757bcdad2c3511",
       "sha256": "abc765f587c11d5461e1799d86447b7c4753195d3be51d23c1d4ecb979bfd351",
       "bytes": 1841
+    },
+    {
+      "path": "schemas/benchmark-result-v1.schema.json",
+      "gitBlob": "cf945801b638984af344a825c3b794583f466631",
+      "sha256": "85cd4db2d5616f876d140f8fdd1b737b11c321b7d78450558b8b730bbf9a74fb",
+      "bytes": null,
+      "note": "present on main and candidate; added to inventory at CP0 freeze; unchanged"
     }
   ],
   "futureSchemas": {
@@ -202,7 +222,8 @@
       "path": "packages/e4-import/src/bomc-loader.ts",
       "gitBlob": "f6acc2af4dd545c0ce3a73ce6f2ec6b7c4fb2f9d",
       "sha256": "9dbb8fe8e2f898da669e985c9c6ad70eeb1845f1c7e01efced0a2641bc98cc01",
-      "bytes": 131465
+      "bytes": 131465,
+      "note": "identical to #12 head b5f46a7 content; differs from Editor main only by #12 semantic directory-count validation (29+/15-). Original security/semantic validation preserved."
     },
     {
       "path": "apps/editor/src/routes/+page.svelte",
@@ -392,5 +413,226 @@
       },
       "maxCanonicalModuleBytes": 5329
     }
+  ],
+  "cp0RevisionDateJakarta": "2026-11-08",
+  "houseCorpusAtCandidate": {
+    "generator": "python -m examples.bmb026_house (Builder f1503748)",
+    "deterministic": "two consecutive runs byte-identical (local); hosted Ubuntu and Windows artifacts byte-identical to Editor pinned fixtures",
+    "files": {
+      "baseline.bomc": {
+        "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+        "bytes": 32660
+      },
+      "baseline.json": {
+        "sha256": "68279b5d0e83ace43ec81e15bd4d0461c8178351653dbe4cffc3bf91756cad6b",
+        "bytes": 40158
+      },
+      "receipt.json": {
+        "sha256": "462c2fac84755bc3b05af21db5a953fdc5af945a7e36673e3d3f7bc0ece875fc",
+        "bytes": 4028
+      },
+      "revised.bomc": {
+        "sha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+        "bytes": 32660
+      },
+      "revised.json": {
+        "sha256": "b776634dbe5ea22c9c81c548a81ee94d15ef7ea5b3ffb7277b3b2086542a1b86",
+        "bytes": 40158
+      }
+    },
+    "hostedArtifactsRun": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462751551",
+    "preservedOriginalEvidence": "original #62 run 42036423066 and Editor fixture manifest left intact"
+  },
+  "hostingDecisionD11": {
+    "authoritative": true,
+    "initialDemo": "Python MCP actor on owner Windows laptop; Editor on Vercel; HTTPS/WSS tunnel (Tailscale Funnel candidate, untested)",
+    "fastLocalLane": "existing stdio MCP must connect to the SAME canonical actor used by the Editor WebSocket and owner Save; a disconnected per-process draft is forbidden",
+    "fullRemoteLane": "Streamable HTTP + OAuth PKCE to the same actor; downstream acceptance (SE-11)",
+    "renderFree": "fallback only; not a CP0 prerequisite",
+    "cp0Requires": "none of: Auth0, Render, WebSocket, tunnel, remote MCP (source-level CP0 only)",
+    "preserved": "security, atomic transactions, project isolation, owner-only Save, no demo-only auth bypass"
+  },
+  "cp0Qualification": {
+    "sourceCandidates": {
+      "builder": "f1503748216b8778d2e11e6e73674bd64e295450",
+      "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+    },
+    "toolchain": {
+      "hostedPython": "3.12",
+      "hostedBun": "1.3.0",
+      "jsonschema": "4.23.0",
+      "mcp": "2.3.0",
+      "localCloudPython": "3.13.18",
+      "localCloudBun": "1.4.4",
+      "localCloudChromium": "pre-installed /opt/pw-browsers, Playwright 1.61.1"
+    },
+    "results": [
+      {
+        "id": "builder-full-suite-local",
+        "result": "PASS",
+        "detail": "634 tests OK = 620 inherited + 14 BMB-026 house tests; 0 failures",
+        "links": [
+          "receipt log sha256 8c574eeb1c2338a29eb15b8fd5b461ec8b88e523d0f544c816119645cf5619f0"
+        ]
+      },
+      {
+        "id": "builder-full-suite-hosted-ubuntu",
+        "result": "PASS",
+        "detail": "634 tests OK in 151.7 s",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462743933"
+        ]
+      },
+      {
+        "id": "builder-full-suite-hosted-windows",
+        "result": "PASS",
+        "detail": "634 tests OK (skipped=5: POSIX permission bits / ACL-not-validated x4, child peak memory x1); Windows ACLs NOT validated",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462743933"
+        ]
+      },
+      {
+        "id": "bmb026-four-room-house-hosted-ubuntu-windows",
+        "result": "PASS",
+        "detail": "14 house tests, compile, independent readback, receipt asserts; artifacts match Editor fixtures byte-for-byte on both OS",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462751551"
+        ]
+      },
+      {
+        "id": "journal-replay-identity-assembly",
+        "result": "PASS",
+        "detail": "test_bmb010_journal 48 OK (local); included in full suites; bmb023/022 workflows run journal/identity/assembly files",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462749810",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462758945"
+        ]
+      },
+      {
+        "id": "negative-adversarial",
+        "result": "PASS",
+        "detail": "test_bmb030_adversarial 42 OK (local); hosted BMB-030 both OS",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462753296"
+        ]
+      },
+      {
+        "id": "compiler-interop-and-other-builder-workflows",
+        "result": "PASS",
+        "detail": "BMB-020, 021, 022, 023, 024, 025, 028, 029, 032 hosted workflows (Ubuntu+Windows where matrix defines) success on exact candidate",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462746033",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462748012",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462758945",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462749810",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462756801",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462755049",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462760598",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462762462",
+          "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462764288"
+        ]
+      },
+      {
+        "id": "editor-original-e4-consumer-and-regressions-local",
+        "result": "PASS",
+        "detail": "80 tests / 0 fail: BMB-026 house consumer (11), BMB-021 original consumer/compat/geometry/strict-editable, materials v2, resource limits, roundtrip; provenance script PASS",
+        "links": [
+          "receipt log sha256 9209b5e1b5c96a435d4d8b4d4668f584502c221171691a6361f01cacfd1b588e"
+        ]
+      },
+      {
+        "id": "editor-check-types-build-local",
+        "result": "PASS",
+        "detail": "svelte-check 0 errors 0 warnings (979 files); tsc --project packages/tsconfig.json exit 0; vite build OK (adapter-node)",
+        "links": []
+      },
+      {
+        "id": "editor-original-consumer-hosted-ubuntu-windows",
+        "result": "PASS",
+        "detail": "80 tests per OS, provenance reproduction, check, types, build",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42462771023"
+        ]
+      },
+      {
+        "id": "editor-bmb021-hosted-ubuntu-windows",
+        "result": "PASS",
+        "detail": "exact head 98b01dc",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42462773070"
+        ]
+      },
+      {
+        "id": "editor-bmb005-007-hosted",
+        "result": "PASS (exact-SHA PR-event run 2026-11-07; workflow has no dispatch trigger, not re-run)",
+        "detail": "",
+        "links": [
+          "https://github.com/KaisAbiyyi/sibambo-editor/actions/runs/42417192641"
+        ]
+      },
+      {
+        "id": "editor-builder-preview-chromium",
+        "result": "PASS (local Linux)",
+        "detail": "2/2 Playwright Chromium; read-only Builder preview and source-face inspection retained",
+        "links": []
+      },
+      {
+        "id": "editor-builder-preview-hosted",
+        "result": "NOT_RUN",
+        "detail": "BMB-027 workflow triggers only on PRs into the #13 branch or its work branch; #14 head 7d03a40 is tree-identical to 98b01dc and ran earlier (run 42360761963)",
+        "links": []
+      },
+      {
+        "id": "cross-repo-builder-to-original-editor",
+        "result": "PASS",
+        "detail": "Builder f1503748 generated corpus (twice, identical) byte-equals Editor pinned fixtures; real BomcLoader.load import of the generated bytes: 11/11, five modules/four rooms, 278 source faces vs 66 analytical, 556 triangles, nine materials; hosted Ubuntu+Windows Builder artifacts byte-equal to the same fixtures",
+        "links": [
+          "docs/two-phase/se00_cross_repo_check.py",
+          "receipt sha256 see SE-00-CP0-VALIDATION.json"
+        ]
+      },
+      {
+        "id": "windows-native-local",
+        "result": "NOT_RUN",
+        "detail": "No Windows machine available in cloud; hosted Windows runners only; Windows ACL/private-root behavior NOT validated",
+        "links": []
+      },
+      {
+        "id": "remote-actor-auth-bff-websocket-save",
+        "result": "NOT_IMPLEMENTED / NOT_RUN",
+        "detail": "Absent by design; downstream SE tasks; not required for source-level CP0 under D11",
+        "links": []
+      },
+      {
+        "id": "tunnel-auth0-render-live-agents-owner-acceptance",
+        "result": "NOT_RUN",
+        "detail": "No credentials, tunnel, deployment or live Claude Code/Codex session authorized or performed",
+        "links": []
+      }
+    ],
+    "defectsFound": "none in the integration candidates; no source fix needed; no production, test, workflow or fixture byte changed by CP0",
+    "historicalEvidencePreserved": true
+  },
+  "remainingRisks": [
+    "Candidates are unmerged draft heads; merging in a different order or onto a moved base invalidates these SHAs and requires re-qualification.",
+    "Windows-native execution and Windows ACL/private-root semantics are not validated (5 hosted skips); relevant to the D11 laptop actor.",
+    "Existing stdio MCP uses spawn-per-call workers with filesystem journals; it cannot share an in-memory draft with a separate server. The canonical single actor is SE-01/SE-03 scope.",
+    "Editor viewing of Builder BOMC is not strict section-241 editability; no native SketchUp certification; full historical Editor suite remains partial.",
+    "Hosted Builder to Editor cross-repo workflow does not exist (Editor repo is private; Builder cannot check it out without a token). Evidence is local plus byte-identity chain.",
+    "Local qualification used Python 3.13 / Bun 1.4.4; pinned versions (3.12 / Bun 1.3.0) were covered by hosted CI.",
+    "Tailscale Funnel, Auth0, Render Free memory/CPU, WebSocket and OAuth client compatibility are unverified."
+  ],
+  "ownerGates": [
+    "Review and approve Builder #90 and Editor #12/#13 merge order (recommended below); no merge was performed.",
+    "Merge docs-only PR #89 after #90 (or together) so the manifest lands on main.",
+    "Supply nonproduction Auth0 inputs and tunnel/staging approval when SE-11-level testing is scheduled (no secrets in task text).",
+    "Separately authorize Stable IMPLEMENT for SE-01 and SE-04."
+  ],
+  "recommendedMergeSequence": [
+    "1. Builder #90 (draft->ready, four additive files) onto main 7cd6ca7; re-run its workflows if main moved.",
+    "2. Builder #89 (docs/manifest) after #90; if main moved, update manifest candidate SHAs to the merge commit and re-verify.",
+    "3. Editor #12 (b5f46a7) onto main 04e4c1d.",
+    "4. Editor #13 (98b01dc) after #12; it already contains #12 and the #14 squash, so GitHub will show only the remaining delta; fresh checks required if base changed. Never merge #14 separately.",
+    "5. Re-pin: record resulting Builder/Editor main SHAs and re-run cross-repo checker before SE-01/SE-04 start."
   ]
 }

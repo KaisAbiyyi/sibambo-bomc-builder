@@ -161,3 +161,8 @@ Source: [Master v1.5 D10](https://app.notion.com/p/412c4a6aaf738117ac36c5101c01f
 **Sequencing:** CP0 closes on source pin/integration compatibility and verified planning contracts; remote Auth0/HTTP/WS/Render live execution must be proven by downstream implementation and SE-11, not circular prerequisites of implementing their source. Existing owner gates, atomic transactions, original Editor BOMC reopen, owner Save, no unsaved-model logs/backups/swap/core dumps and all fail-closed controls remain. Status SE-00 Blocked/Owner Gate, Up Next SE-01/04 until separate IMPLEMENT approval. No merge, tunnel activation, credential provisioning or deployment authorized here.
 
 [Master D11](https://app.notion.com/p/412c4a6aaf738117ac36c5101c01fae2) · [SE-00](https://app.notion.com/p/412c4a6aaf73817a95c4f924aeb464ab) · [Builder integration draft #90](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/90). Original D10 Render Free selection preserved as fallback.
+
+
+## CP0 closure update (2026-11-08)
+
+Owner-approved predecessor integration was prepared and qualified on exact SHAs: Builder [#90](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/90) `f1503748216b8778d2e11e6e73674bd64e295450` and Editor [#13](https://github.com/KaisAbiyyi/sibambo-editor/pull/13) `98b01dc16ae11f6712dd86de38541a1b889f699d` (contains #12 and the #14 squash). All qualification gates PASS at source level; Windows-native and remote/live gates are NOT_RUN. Nothing was merged. See [SE-00-CP0-QUALIFICATION.md](SE-00-CP0-QUALIFICATION.md), the updated manifest and [SE-00-CP0-VALIDATION.json](SE-00-CP0-VALIDATION.json). The "future integration checks are NOT_RUN" statements above are superseded for those two SHAs. SE-00 is Review / Owner Acceptance.

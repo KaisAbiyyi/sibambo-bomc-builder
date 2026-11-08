@@ -1,0 +1,94 @@
+{
+  "formatVersion": 1,
+  "task": "SE-00",
+  "dateJakarta": "2026-11-08",
+  "kind": "CP0 exact-source qualification receipt (supplements, does not replace, SE-00-VALIDATION.json)",
+  "executor": "Claude Code managed cloud, single writer, no delegates; direct self-review, not independent review",
+  "sources": {
+    "builder": "f1503748216b8778d2e11e6e73674bd64e295450",
+    "editor": "98b01dc16ae11f6712dd86de38541a1b889f699d"
+  },
+  "localCloudLogs": [
+    {
+      "name": "builder-full.log",
+      "command": "python -m unittest discover -s tests -p test_*.py",
+      "result": "Ran 634 tests OK",
+      "sha256": "8c574eeb1c2338a29eb15b8fd5b461ec8b88e523d0f544c816119645cf5619f0"
+    },
+    {
+      "name": "editor-consumer.log",
+      "command": "bun test --preload bmb021-browser-test-stream.ts <8 files>",
+      "result": "80 pass 0 fail",
+      "sha256": "9209b5e1b5c96a435d4d8b4d4668f584502c221171691a6361f01cacfd1b588e"
+    }
+  ],
+  "localSubsets": {
+    "test_bmb026_house": "14 OK",
+    "test_bmb010_journal": "48 OK",
+    "test_bmb030_adversarial": "42 OK",
+    "test_bmb023_mcp": "30 OK"
+  },
+  "crossRepo": {
+    "builderSha": "f1503748216b8778d2e11e6e73674bd64e295450",
+    "editorSha": "98b01dc16ae11f6712dd86de38541a1b889f699d",
+    "files": {
+      "baseline.bomc": {
+        "sha256": "071ebe152b44d2bae387818094ad67a6f461645d45d1ad33c195848dbb0b49aa",
+        "bytes": 32660
+      },
+      "revised.bomc": {
+        "sha256": "e56924fead241df9a1a76c9de9e0e647b13caf2785cf14bc4c679a8979192233",
+        "bytes": 32660
+      },
+      "baseline.json": {
+        "sha256": "68279b5d0e83ace43ec81e15bd4d0461c8178351653dbe4cffc3bf91756cad6b",
+        "bytes": 40158
+      },
+      "revised.json": {
+        "sha256": "b776634dbe5ea22c9c81c548a81ee94d15ef7ea5b3ffb7277b3b2086542a1b86",
+        "bytes": 40158
+      },
+      "receipt.json": {
+        "sha256": "462c2fac84755bc3b05af21db5a953fdc5af945a7e36673e3d3f7bc0ece875fc",
+        "bytes": 4028
+      }
+    },
+    "verdict": "PASS"
+  },
+  "hostedArtifactComparison": {
+    "run": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/actions/runs/42462751551",
+    "ubuntu-latest": "baseline/revised .bomc byte-identical to Editor fixtures",
+    "windows-latest": "baseline/revised .bomc byte-identical to Editor fixtures"
+  },
+  "blobIdentityVsPR62": {
+    ".github/workflows/bmb026-house.yml": "bc39dadf81778c08a52a261a05052b4c74191394",
+    "docs/BMB-026-HOUSE-E2E.md": "dfffb902728a362bb63936b10a075338fa355676",
+    "examples/bmb026_house.py": "4c250c906866c9c689c4632fc844b7971061a653",
+    "tests/test_bmb026_house.py": "a569ceffe51372d07982909b2b27cf73f5be1f3c"
+  },
+  "compilerCoreInventorySha256": "5c067aae01a4f34b3179df3411f7f47678e481f541bf7dea0f56134f2c595053",
+  "unchangedPathsVsMain": [
+    "core",
+    "bomc",
+    "schemas",
+    "agent",
+    "agentctx",
+    "agentguide",
+    "cli",
+    "tools",
+    "evaluation",
+    "integration",
+    "compatibility"
+  ],
+  "checkerScriptSha256": "65dfd03a09e74ef3d9ca1739ddfcc406624e4704d88f19aaa45c34b0228b87c2",
+  "notRun": [
+    "Windows-native local execution",
+    "hosted BMB-027 on 98b01dc",
+    "hosted cross-repo Builder-candidate to Editor workflow",
+    "Auth0 / tunnel / Render / WebSocket / live Claude Code or Codex / remote Save / owner acceptance"
+  ],
+  "selfReview": {
+    "independentReview": false,
+    "scope": "docs/two-phase only in this commit; candidate source SHAs untouched; no PASS claimed beyond logs and runs listed"
+  }
+}
