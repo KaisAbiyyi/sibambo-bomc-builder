@@ -1,0 +1,95 @@
+name: SE-01 typed draft operations and shared projection
+on:
+  push:
+    paths:
+      - 'core/project/**'
+      - 'core/**'
+      - 'bomc/**'
+      - 'schemas/draft-*.json'
+      - 'tests/test_draft_operations.py'
+      - 'examples/se01_evidence.py'
+      - 'docs/stable/**'
+      - 'scripts/owner_acceptance/se01.ps1'
+      - '.github/workflows/se01-draft-operations.yml'
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'bomc/**'
+      - 'schemas/draft-*.json'
+      - 'tests/test_draft_operations.py'
+      - 'examples/se01_evidence.py'
+      - 'docs/stable/**'
+      - 'scripts/owner_acceptance/se01.ps1'
+      - '.github/workflows/se01-draft-operations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  se01:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact tested candidate SHA
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo "Exact HEAD: $EXPECTED_SHA"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned JSON Schema validator
+        run: python -m pip install jsonschema==4.23.0
+      - name: SE-01 unit, negative and atomic reciprocal-seam regressions
+        run: python -m unittest discover -s tests -p test_draft_operations.py -v
+      - name: Predecessor regressions (compiler bytes, interop, four-room, geometry)
+        shell: bash
+        run: |
+          python -m unittest discover -s tests -p 'test_bmb01*.py'
+          python -m unittest discover -s tests -p 'test_bmb020_*.py'
+          python -m unittest discover -s tests -p test_bmb021_interop.py
+          python -m unittest discover -s tests -p test_bmb026_house.py
+          python -m unittest discover -s tests -p 'test_bmb03*.py'
+      - name: Owner PowerShell helper end-to-end on a clean checkout (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/owner_acceptance/se01.ps1 -SelfTest
+          ./scripts/owner_acceptance/se01.ps1 -TestedSha $env:EXPECTED_SHA -EvidenceDir "$env:RUNNER_TEMP\se01-owner"
+          Get-Content "$env:RUNNER_TEMP\se01-owner\se01-result.txt"
+      - name: Show owner-helper logs on failure (Windows)
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem "$env:RUNNER_TEMP\se01-owner" -Filter "log-*.txt" -ErrorAction SilentlyContinue | ForEach-Object { "=== $($_.Name) ==="; Get-Content $_.FullName -Tail 60 }
+      - name: Owner evidence generator with pinned expected hashes
+        shell: bash
+        run: |
+          python -m examples.se01_evidence --out-dir se01-evidence --check docs/stable/owner-handoff/se01-expected.json | tee se01-stdout.txt
+          grep -q "SE01_RESULT=PASS" se01-stdout.txt
+          {
+            echo "### SE-01 cloud evidence (${{ matrix.os }})"
+            echo "Exact source SHA: $EXPECTED_SHA"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Cloud/Builder-only. Owner Windows review, live actor/WebSocket/Editor, OAuth, tunnel: NOT_RUN."
+            echo '~~~json'
+            cat se01-evidence/receipt.json
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload synthetic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: se01-evidence-${{ matrix.os }}
+          path: se01-evidence/*
+          if-no-files-found: error
+          retention-days: 14

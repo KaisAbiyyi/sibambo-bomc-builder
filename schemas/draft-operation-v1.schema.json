@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/blob/main/schemas/draft-operation-v1.schema.json",
+  "title": "BOMC Builder draft operation transaction v1 (SE-01)",
+  "description": "1-8 unique replace_module/remove_module changes. Module bodies are full Module IR 1.0 and are validated against module-ir-v1.schema.json plus assembly/seam rules before any state is committed. Unsupported operations, extra fields and missing revision/idempotency fields are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "transactionId", "idempotencyKey", "baseProjectRevision", "changes"],
+  "properties": {
+    "schemaVersion": {"const": "draft-operation-v1"},
+    "transactionId": {"$ref": "#/$defs/token"},
+    "idempotencyKey": {"$ref": "#/$defs/token"},
+    "baseProjectRevision": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "changes": {
+      "type": "array", "minItems": 1, "maxItems": 8,
+      "items": {"oneOf": [{"$ref": "#/$defs/replace"}, {"$ref": "#/$defs/remove"}]}
+    }
+  },
+  "$defs": {
+    "token": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+    "moduleId": {"type": "string", "maxLength": 180, "pattern": "^[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+$"},
+    "expectedRevision": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 0, "maximum": 4294967295}]},
+    "replace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["op", "moduleId", "expectedModuleRevision", "module"],
+      "properties": {
+        "op": {"const": "replace_module"},
+        "moduleId": {"$ref": "#/$defs/moduleId"},
+        "expectedModuleRevision": {"$ref": "#/$defs/expectedRevision"},
+        "module": {"type": "object", "required": ["schemaVersion", "moduleId", "revision", "ownedSeams", "ports"]}
+      }
+    },
+    "remove": {
+      "type": "object", "additionalProperties": false,
+      "required": ["op", "moduleId", "expectedModuleRevision"],
+      "properties": {
+        "op": {"const": "remove_module"},
+        "moduleId": {"$ref": "#/$defs/moduleId"},
+        "expectedModuleRevision": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    }
+  }
+}
