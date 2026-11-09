@@ -322,12 +322,19 @@ class Rejections(unittest.TestCase):
                          (4096, 8192, 20000, 254, 254, 128))
 
     def test_compiler_limit_is_enforced_not_raised(self):
-        # 130 distinct floors exceed the 128-operation compile budget: rejected, never truncated.
+        # More than 128 source operations exceed the compile budget: rejected, never truncated.
+        extra = [{"kind": "floor-slab", "opId": f"extra-{i}", "role": "floor", "materialId": "flooring",
+                  "footprint": [[0, 0], [1, 0], [1, 1]], "thickness": 0.1, "elevation": 0.0}
+                 for i in range(130)]
         m = copy.deepcopy(self.bed)
-        for i in range(130):
-            m = ops.add_floor(m, f"extra-{i}", [[0, 0], [1, 0], [1, 1]], 0.1, 0.0, "flooring")
+        m["operations"] = m["operations"] + extra
         m["revision"] = self.bed["revision"] + 1
         self.reject(self.txn([replace(self.state, m)]), "budget|rejected|schema")
+        # The typed helper fails closed at the same limit instead of emitting an uncompilable module.
+        h = copy.deepcopy(self.bed)
+        with self.assertRaisesRegex(OperationError, "budget"):
+            for i in range(130):
+                h = ops.add_floor(h, f"extra-{i}", [[0, 0], [1, 0], [1, 1]], 0.1, 0.0, "flooring")
 
 
 def empty_module(mid, parent=None, transform=dag.IDENTITY):
@@ -487,6 +494,268 @@ class SharedProjection(unittest.TestCase):
         txn = make_transaction(EMPTY_STATE, [create(m) for m in doc["modules"]], "schema-ok")
         Draft202012Validator(schema).validate(txn)
         self.assertEqual(len(txn["changes"]), 5)
+
+
+class ImmutableCommittedState(unittest.TestCase):
+    """Review P2-A: committed state cannot be changed except through apply_transaction."""
+
+    def setUp(self):
+        self.state = four_room_state()
+        self.start = snapshot(self.state)
+        self.sha = compiled_sha(self.state)
+        self.view = project_view(self.state)
+        self.mid = house.ROOM_IDS["bedroom-a"]
+
+    def assert_unchanged(self):
+        self.assertEqual(snapshot(self.state), self.start)
+        self.assertEqual(compiled_sha(self.state), self.sha)
+        self.assertEqual(project_view(self.state), self.view)
+
+    def test_nested_and_top_level_mutation_of_returned_modules_is_isolated(self):
+        modules = self.state.modules
+        modules[self.mid]["revision"] = 999
+        modules[self.mid]["operations"].append({"kind": "floor-slab"})
+        modules[self.mid]["bounds"]["max"][2] = 1e9
+        modules["house/level/injected"] = {"moduleId": "house/level/injected"}
+        modules.clear()
+        self.state.module(self.mid)["revision"] = 5
+        doc = self.state.document()
+        doc["modules"].clear()
+        self.assertEqual(self.state.module_revisions()[self.mid], 1)
+        self.assertEqual(len(self.state.modules), 5)
+        self.assert_unchanged()
+
+    def test_idempotency_record_cannot_be_cleared_or_rewritten_from_outside(self):
+        request = make_transaction(self.state, [replace(self.state, bump(self.state.modules[self.mid], 2))],
+                                   "keep-me")
+        first = apply_transaction(self.state, request)
+        records = first.state.idempotency
+        records.clear()
+        records["keep-me"] = ("0" * 64, 99)
+        self.assertIn("keep-me", first.state.idempotency)
+        replay = apply_transaction(first.state, copy.deepcopy(request))
+        self.assertTrue(replay.replayed)
+        self.assertIs(replay.state, first.state)
+        with self.assertRaisesRegex(OperationError, "idempotencyKey reused"):
+            apply_transaction(first.state, dict(request, changes=[]) if False else make_transaction(
+                first.state, [replace(first.state, bump(first.state.modules[self.mid], 3))], "keep-me"))
+        self.assert_unchanged()
+
+    def test_attribute_assignment_and_deletion_are_refused(self):
+        for name, value in (("project_revision", 7), ("modules", {}), ("idempotency", {}),
+                            ("_modules", ()), ("_revision", 7), ("_idem", ()), ("extra", 1)):
+            with self.assertRaises(AttributeError, msg=name):
+                setattr(self.state, name, value)
+        with self.assertRaises(AttributeError):
+            del self.state._modules
+        self.assert_unchanged()
+
+    def test_empty_state_singleton_cannot_be_polluted(self):
+        EMPTY_STATE.modules["house/level/x"] = {"revision": 1}
+        EMPTY_STATE.idempotency["k"] = ("0" * 64, 1)
+        with self.assertRaises(AttributeError):
+            EMPTY_STATE.project_revision = 5
+        self.assertEqual(EMPTY_STATE.modules, {})
+        self.assertEqual(EMPTY_STATE.idempotency, {})
+        self.assertEqual(EMPTY_STATE.project_revision, 0)
+        again = four_room_state()
+        self.assertEqual(again, self.state)
+
+    def test_constructor_input_is_snapshotted(self):
+        source = {self.mid: self.state.modules[self.mid]}
+        built = ops.ProjectState(3, source, {})
+        source[self.mid]["revision"] = 42
+        source.clear()
+        self.assertEqual(built.module(self.mid)["revision"], 1)
+        with self.assertRaises(OperationError):
+            ops.ProjectState(0, {self.mid: {"revision": float("nan")}})
+
+    def test_replace_remove_and_bytes_still_work_through_transactions(self):
+        revised = {m["moduleId"]: m for m in house.build_house(revised=True)["modules"]}
+        after = apply_transaction(self.state, make_transaction(
+            self.state, [replace(self.state, revised[self.mid])], "imm-1")).state
+        self.assertEqual(compiled_sha(after), REVISED_SHA)
+        self.assertEqual(after.project_revision, 2)
+        self.assert_unchanged()
+
+
+def validator_codes(state):
+    from core.validator.validation import validate_assembly
+    return sorted({d.code for d in validate_assembly(state.document()["modules"]).diagnostics
+                   if d.severity == "ERROR"})
+
+
+class ExactModuleBounds(unittest.TestCase):
+    """Review P2-B: bounds are the tight envelope of the whole module and shrink on edit."""
+
+    MID = "lab/annex/hall"
+
+    def build(self, steps):
+        state = apply_transaction(EMPTY_STATE, make_transaction(
+            EMPTY_STATE, [create(empty_module(self.MID))], "b-seed")).state
+        for n, call in enumerate(steps):
+            call = dict(call, moduleId=self.MID)
+            state = apply_transaction(state, make_transaction(
+                state, [ops.lower_helper(state, call)], f"b-{n}")).state
+        return state
+
+    def bounds(self, state):
+        return state.module(self.MID)["bounds"]
+
+    def wall(self, height, op_id="wall", first=True):
+        call = {"tool": "add_wall", "op_id": op_id, "path": [[0, 0], [4, 0]], "thickness": 0.2,
+                "height": height, "base_elevation": 0, "material_id": "plaster"}
+        if first:
+            call["material"] = PLASTER
+        return call
+
+    def test_wall_height_enlarge_then_shrink_updates_bounds(self):
+        state = self.build([self.wall(3.0)])
+        self.assertEqual(self.bounds(state)["max"][2], 3.0)
+        for height in (5.0, 2.0):
+            call = {"tool": "update_operation", "moduleId": self.MID, "op_id": "wall", "height": height}
+            state = apply_transaction(state, make_transaction(
+                state, [ops.lower_helper(state, call)], f"h-{height}")).state
+            self.assertEqual(self.bounds(state)["max"][2], height)
+        self.assertEqual(self.bounds(state)["min"][2], 0.0)
+        self.assertEqual(validator_codes(state), [])
+
+    def test_multi_operation_module_keeps_extent_of_remaining_operations(self):
+        floor = {"tool": "add_floor", "op_id": "floor", "footprint": [[0, 0], [6, 0], [6, 5], [0, 5]],
+                 "thickness": 0.15, "elevation": 0, "material_id": "flooring", "material": FLOOR}
+        state = self.build([floor, self.wall(3.0, "tall"),
+                            dict(self.wall(2.5, "low", first=False), path=[[1, 1], [2, 1]])])
+        self.assertEqual(self.bounds(state)["max"][2], 3.0)
+        call = {"tool": "update_operation", "moduleId": self.MID, "op_id": "tall", "height": 1.0}
+        state = apply_transaction(state, make_transaction(state, [ops.lower_helper(state, call)], "m-1")).state
+        self.assertEqual(self.bounds(state)["max"][2], 2.5, "the other wall still defines the top")
+        call = {"tool": "update_operation", "moduleId": self.MID, "op_id": "floor",
+                "footprint": [[0, 0], [2, 0], [2, 2], [0, 2]]}
+        state = apply_transaction(state, make_transaction(state, [ops.lower_helper(state, call)], "m-2")).state
+        b = self.bounds(state)
+        # x comes from the 4 m wall, y from the shrunken 2 m floor (the walls lie at y=0 and y=1)
+        self.assertEqual(b["max"][1], 2.0)
+        self.assertGreaterEqual(b["max"][0], 4.0)
+        self.assertEqual(validator_codes(state), [])
+
+    def test_bounds_equal_reference_envelope_validate_and_compile_matches(self):
+        state = TypedHelpers.build(TypedHelpers(), mid=self.MID)
+        module = state.module(self.MID)
+        b = module["bounds"]
+        ref = []
+        for op in module["operations"]:
+            if op["kind"] == "floor-slab":
+                z0, z1, xy = op["elevation"], op["elevation"] + op["thickness"], op["footprint"]
+            elif op["kind"] == "wall-run":
+                z0, z1, xy = op["baseElevation"], op["baseElevation"] + op["height"], op["path"]
+            else:
+                continue
+            ref += [(x, y, z) for x, y in xy for z in (z0, z1)]
+        for i in range(3):
+            if b["min"][i] < min(p[i] for p in ref) or b["max"][i] > max(p[i] for p in ref):
+                self.assertEqual(i, 1, "only a degenerate axis may borrow geometry extent")
+            self.assertLess(b["min"][i], b["max"][i])
+            self.assertLessEqual(b["min"][i], min(p[i] for p in ref))
+            self.assertGreaterEqual(b["max"][i], max(p[i] for p in ref))
+        self.assertEqual(validator_codes(state), [])
+        view = project_view(state)["projection"]["modules"][0]
+        self.assertEqual(independent_read(compile_document(state.document()).payload)["counts"]["faces"],
+                         len(view["faces"]))
+
+    def test_single_straight_wall_has_non_degenerate_bounds(self):
+        state = self.build([self.wall(2.0)])
+        b = self.bounds(state)
+        self.assertEqual((b["min"][0], b["max"][0], b["min"][2], b["max"][2]), (0.0, 4.0, 0.0, 2.0))
+        self.assertLess(b["min"][1], b["max"][1])
+        self.assertEqual(validator_codes(state), [])
+
+    def test_floor_bounds_are_elevation_to_elevation_plus_thickness(self):
+        state = self.build([{"tool": "add_floor", "op_id": "floor", "footprint": [[0, 0], [3, 0], [3, 2], [0, 2]],
+                             "thickness": 0.3, "elevation": 1.0, "material_id": "flooring", "material": FLOOR}])
+        b = self.bounds(state)
+        self.assertEqual((b["min"][2], b["max"][2]), (1.0, 1.3))
+        self.assertEqual(validator_codes(state), [])
+
+    def test_ports_stay_inside_recomputed_bounds_after_edit(self):
+        before, after = connected_pair()
+        state = apply_transaction(EMPTY_STATE, make_transaction(
+            EMPTY_STATE, [create(m) for m in before.values()], "p-seed")).state
+        state = apply_transaction(state, make_transaction(
+            state, [replace(state, m) for m in after.values()], "p-join")).state
+        living = house.ROOM_IDS["living"]
+        call = {"tool": "update_operation", "moduleId": living, "op_id": "door-bedroom-a", "width": 1.0}
+        state = apply_transaction(state, make_transaction(state, [ops.lower_helper(state, call)], "p-edit")).state
+        module = state.module(living)
+        for port in module["ports"]:
+            t = port["localTransform"]
+            for i, v in enumerate((t[3], t[7], t[11])):
+                self.assertTrue(module["bounds"]["min"][i] <= v <= module["bounds"]["max"][i])
+        self.assertEqual(validator_codes(state), [])
+
+
+class AnnotatedWallOpening(unittest.TestCase):
+    """Review P2-C: add_opening must never silently discard authored face semantics."""
+
+    MID = "lab/annex/hall"
+
+    def annotated(self):
+        m = empty_module(self.MID)
+        m["materials"] = [dict(PLASTER), dict(PLASTER, materialId="paint"), dict(PLASTER, materialId="tile")]
+        m["operations"] = [
+            {"kind": "wall-run", "opId": "wall-a", "role": "wall", "materialId": "plaster",
+             "path": [[0, 0], [4, 0]], "thickness": 0.15, "height": 2.8, "baseElevation": 0},
+            {"kind": "wall-run", "opId": "wall-b", "role": "wall", "materialId": "plaster",
+             "path": [[0, 0], [0, 3]], "thickness": 0.15, "height": 2.8, "baseElevation": 0}]
+        m["bounds"] = {"min": [-0.1, -0.1, 0], "max": [4.1, 3.1, 2.8]}
+        m["faceAnnotations"] = [
+            {"opId": "wall-a", "faceKey": "front-0", "role": "wall", "frontMaterialId": "paint",
+             "backMaterialId": "tile", "label": "interior south paint"},
+            {"opId": "wall-a", "faceKey": "back-0", "role": "wall", "frontMaterialId": "tile",
+             "backMaterialId": "paint", "label": "exterior south tile"}]
+        return m
+
+    def test_opening_on_annotated_wall_is_refused_and_input_untouched(self):
+        module = self.annotated()
+        before = json.dumps(module, sort_keys=True)
+        with self.assertRaisesRegex(OperationError, "annotation"):
+            ops.add_opening(module, "door", "wall-a", 0.5, 0.9, 2.1, 0, "door")
+        self.assertEqual(json.dumps(module, sort_keys=True), before)
+        self.assertEqual(len(module["faceAnnotations"]), 2)
+
+    def test_refusal_through_lower_helper_and_transaction_leaves_state_unchanged(self):
+        state = apply_transaction(EMPTY_STATE, make_transaction(
+            EMPTY_STATE, [create(self.annotated())], "a-seed")).state
+        start = snapshot(state)
+        call = {"tool": "add_opening", "moduleId": self.MID, "op_id": "door", "target_wall_op_id": "wall-a",
+                "offset": 0.5, "width": 0.9, "height": 2.1, "sill_height": 0, "opening_type": "door"}
+        with self.assertRaises(OperationError):
+            ops.lower_helper(state, call)
+        self.assertEqual(snapshot(state), start)
+        labels = {a["label"] for a in state.module(self.MID)["faceAnnotations"]}
+        self.assertEqual(labels, {"interior south paint", "exterior south tile"})
+
+    def test_unannotated_wall_in_an_annotated_module_still_gets_real_cutouts(self):
+        module = self.annotated()
+        opened = ops.add_opening(module, "win", "wall-b", 0.8, 1.0, 1.0, 0.9, "window")
+        self.assertEqual(opened["faceAnnotations"], module["faceAnnotations"],
+                         "annotations on other walls are preserved byte-for-byte")
+        state = apply_transaction(EMPTY_STATE, make_transaction(
+            EMPTY_STATE, [create(self.annotated())], "a2-seed")).state
+        call = {"tool": "add_opening", "moduleId": self.MID, "op_id": "win", "target_wall_op_id": "wall-b",
+                "offset": 0.8, "width": 1.0, "height": 1.0, "sill_height": 0.9, "opening_type": "window"}
+        state = apply_transaction(state, make_transaction(state, [ops.lower_helper(state, call)], "a2-1")).state
+        roles = {f["role"] for f in project_view(state)["projection"]["modules"][0]["faces"]}
+        self.assertIn("window", roles)
+        labels = {f["label"] for f in project_view(state)["projection"]["modules"][0]["faces"]}
+        self.assertTrue({"interior south paint", "exterior south tile"} <= labels)
+
+    def test_annotated_front_back_materials_survive_in_projection(self):
+        state = apply_transaction(EMPTY_STATE, make_transaction(
+            EMPTY_STATE, [create(self.annotated())], "a3-seed")).state
+        faces = {f["faceId"]: f for f in project_view(state)["projection"]["modules"][0]["faces"]}
+        front = faces[f"{self.MID}/wall-a/side-0"]
+        self.assertEqual((front["frontMaterialId"], front["backMaterialId"], front["label"]),
+                         ("paint", "tile", "interior south paint"))
 
 
 class OwnerEvidence(unittest.TestCase):

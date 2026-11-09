@@ -18,7 +18,7 @@ import copy
 import hashlib
 import json
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
@@ -93,19 +93,68 @@ def parse_transaction(payload: bytes) -> dict:
 
 # --- immutable project state ------------------------------------------------
 
-@dataclass(frozen=True)
 class ProjectState:
-    """Committed project revision. Treat as immutable; apply_transaction returns a new one."""
-    project_revision: int = 0
-    modules: dict = field(default_factory=dict)       # moduleId -> deep-copied Module IR
-    idempotency: dict = field(default_factory=dict)   # key -> (request sha256, resulting revision)
+    """Committed project revision, structurally immutable.
+
+    Modules and idempotency records are stored as canonical UTF-8 JSON ``bytes`` (immutable
+    values) and the attribute set is locked. ``modules`` / ``idempotency`` / ``document()``
+    return fresh deep copies on every access, so no caller ever holds a reference into
+    committed state: mutating a returned dict changes nothing. Only ``apply_transaction``
+    produces a new state (with CAS, revalidation and an incremented project revision).
+    """
+    __slots__ = ("_revision", "_modules", "_idem")
+
+    def __init__(self, project_revision: int = 0, modules: dict | None = None,
+                 idempotency: dict | None = None):
+        _need(type(project_revision) is int and 0 <= project_revision <= 0xFFFFFFFF,
+              "project revision must be a uint32")
+        frozen_modules = tuple((mid, canonical_json(m)) for mid, m in sorted((modules or {}).items()))
+        frozen_idem = tuple((k, (v[0], v[1])) for k, v in (idempotency or {}).items())
+        object.__setattr__(self, "_revision", project_revision)
+        object.__setattr__(self, "_modules", frozen_modules)
+        object.__setattr__(self, "_idem", frozen_idem)
+
+    def __setattr__(self, name, value):
+        raise AttributeError("ProjectState is immutable; use apply_transaction")
+
+    def __delattr__(self, name):
+        raise AttributeError("ProjectState is immutable; use apply_transaction")
+
+    def __eq__(self, other):
+        return (isinstance(other, ProjectState) and self._revision == other._revision
+                and self._modules == other._modules and self._idem == other._idem)
+
+    def __hash__(self):
+        return hash((self._revision, self._modules, self._idem))
+
+    def __repr__(self):
+        return f"ProjectState(revision={self._revision}, modules={[m for m, _ in self._modules]})"
+
+    @property
+    def project_revision(self) -> int:
+        return self._revision
+
+    @property
+    def modules(self) -> dict:
+        """Fresh deep copy of every committed module (mutating it never affects the state)."""
+        return {mid: json.loads(data) for mid, data in self._modules}
+
+    @property
+    def idempotency(self) -> dict:
+        """Fresh copy: key -> (request sha256, resulting project revision)."""
+        return {k: tuple(v) for k, v in self._idem}
+
+    def module(self, module_id: str) -> dict | None:
+        for mid, data in self._modules:
+            if mid == module_id:
+                return json.loads(data)
+        return None
 
     def module_revisions(self) -> dict:
-        return {mid: m["revision"] for mid, m in sorted(self.modules.items())}
+        return {mid: json.loads(data)["revision"] for mid, data in self._modules}
 
     def document(self) -> dict:
-        return {"schemaVersion": "1.0.0",
-                "modules": [copy.deepcopy(m) for _, m in sorted(self.modules.items())]}
+        return {"schemaVersion": "1.0.0", "modules": [json.loads(data) for _, data in self._modules]}
 
 
 EMPTY_STATE = ProjectState()
@@ -212,8 +261,9 @@ def apply_transaction(state: ProjectState, txn: object) -> TransactionResult:
     request_hash = sha256_hex(canonical_json(txn))
 
     key = txn["idempotencyKey"]
-    if key in state.idempotency:
-        prior_hash, _rev = state.idempotency[key]
+    idem_now = state.idempotency
+    if key in idem_now:
+        prior_hash, _rev = idem_now[key]
         _need(prior_hash == request_hash, "idempotencyKey reused with a different request")
         return TransactionResult(state, True, (), ())
 
@@ -224,12 +274,13 @@ def apply_transaction(state: ProjectState, txn: object) -> TransactionResult:
     ids = [c["moduleId"] for c in changes]
     _need(len(set(ids)) == len(ids), "duplicate moduleId in one transaction")
 
-    staged = copy.deepcopy(state.modules)           # staged clone; live state stays untouched
+    live = state.modules                            # private deep copy of committed modules
+    staged = copy.deepcopy(live)                    # staged clone; committed state stays untouched
     removing = {c["moduleId"] for c in changes if c["op"] == "remove_module"}
     changed, removed = [], []
     for c in changes:
         mid, expected = c["moduleId"], c["expectedModuleRevision"]
-        current = state.modules.get(mid)
+        current = live.get(mid)
         if c["op"] == "replace_module":
             module = copy.deepcopy(c["module"])
             _need(module.get("moduleId") == mid, f"{mid}: module body carries a different moduleId")
@@ -246,7 +297,7 @@ def apply_transaction(state: ProjectState, txn: object) -> TransactionResult:
             _need(current is not None, f"{mid}: cannot remove a module that does not exist")
             _need(expected == current["revision"],
                   f"{mid}: stale expectedModuleRevision {expected}, module is at {current['revision']}")
-            deps = _dependents(state.modules, mid, removing)
+            deps = _dependents(live, mid, removing)
             _need(not deps, f"{mid}: still referenced by " +
                   "; ".join(f"{d} ({', '.join(r)})" for d, r in deps))
             del staged[mid]
@@ -254,7 +305,7 @@ def apply_transaction(state: ProjectState, txn: object) -> TransactionResult:
 
     _validate_project(staged)                       # raises before any state is created
 
-    idem = dict(state.idempotency)
+    idem = dict(idem_now)
     new_revision = state.project_revision + 1
     idem[key] = (request_hash, new_revision)
     while len(idem) > MAX_IDEMPOTENCY_ENTRIES:
@@ -273,8 +324,9 @@ def canonical_ir_json(state: ProjectState) -> bytes:
 def project_view(state: ProjectState) -> dict:
     """draft-view-v1: shared projection + exact-byte hashes (hash before parsing)."""
     ir_bytes = canonical_ir_json(state)
-    if state.modules and any(m["operations"] for m in state.modules.values()):
-        projection = _projection.project_assembly(assemble(state.document()["modules"]))
+    document = state.document()
+    if any(m["operations"] for m in document["modules"]):
+        projection = _projection.project_assembly(assemble(document["modules"]))
     else:
         projection = {"schemaVersion": "1.0.0", "units": "m", "upAxis": "+Z",
                       "transformConvention": "row-major module-to-assembly; apply once to local Float64 positions",
@@ -311,28 +363,46 @@ def _material_ok(module: dict, material_id, material: dict | None = None) -> Non
     _need(material_id is None or material_id in known, f"unknown materialId {material_id!r}")
 
 
-def _op_extent(op: dict) -> tuple:
-    if op["kind"] == "floor-slab":
-        xs = [p[0] for p in op["footprint"]]
-        ys = [p[1] for p in op["footprint"]]
-        return (min(xs), min(ys), op["elevation"] - op["thickness"],
-                max(xs), max(ys), op["elevation"])
-    xs = [p[0] for p in op["path"]]
-    ys = [p[1] for p in op["path"]]
-    t = op["thickness"]
-    return (min(xs) - t, min(ys) - t, op["baseElevation"],
-            max(xs) + t, max(ys) + t, op["baseElevation"] + op["height"])
+def _recompute_bounds(module: dict) -> None:
+    """Typed helpers own ``bounds``: recomputed from the WHOLE module after every typed edit,
+    so it shrinks as well as grows.
 
+    Contract (docs/MODULE-IR-V1.md, BMB-012): ``bounds`` is the module's enclosing box; every
+    operation's reference extent (2-D path/footprint points, ``[z, z + extent]``) and every port
+    origin must lie inside it, ``min < max`` on all axes, and neighbouring modules' boxes must
+    not collide. Wall thickness and miters may therefore bleed past the box (the BMB-026 rooms
+    do exactly that), so the box is NOT padded by geometry.
 
-def _grow_bounds(module: dict, op: dict) -> None:
-    ext = _op_extent(op)
-    b = module["bounds"]
-    if len(module["operations"]) == 1 and all(v == 0 for part in ("min", "max") for v in b[part]):
-        lo, hi = list(ext[:3]), list(ext[3:])
-    else:
-        lo = [min(b["min"][i], ext[i]) for i in range(3)]
-        hi = [max(b["max"][i], ext[i + 3]) for i in range(3)]
-    b["min"], b["max"] = lo, hi
+    Envelope = reference extents of all operations UNION port origins. Only on an axis where
+    that is degenerate (e.g. one straight wall along y = 0) is the built geometry's extent on
+    that axis used, so ``min < max`` holds.
+    """
+    if not module["operations"]:
+        return
+    ref = []
+    for op in module["operations"]:
+        if op["kind"] == "floor-slab":
+            z0, z1, xy = op["elevation"], op["elevation"] + op["thickness"], op["footprint"]
+        elif op["kind"] == "wall-run":
+            z0, z1, xy = op["baseElevation"], op["baseElevation"] + op["height"], op["path"]
+        else:
+            continue
+        for x, y in xy:
+            ref.append((x, y, z0))
+            ref.append((x, y, z1))
+    for port in module["ports"]:
+        t = port["localTransform"]
+        ref.append((t[3], t[7], t[11]))
+    lo = [min(p[i] for p in ref) for i in range(3)]
+    hi = [max(p[i] for p in ref) for i in range(3)]
+    if any(a >= b for a, b in zip(lo, hi)):
+        geometry = [v for face in _projection._shape_faces(module["moduleId"], module) for v in face["outer"]]
+        for i in range(3):
+            if lo[i] >= hi[i]:
+                lo[i] = min(lo[i], min(v[i] for v in geometry))
+                hi[i] = max(hi[i], max(v[i] for v in geometry))
+    _need(all(a < b for a, b in zip(lo, hi)), "module geometry has a degenerate bounding box")
+    module["bounds"] = {"min": [float(v) + 0.0 for v in lo], "max": [float(v) + 0.0 for v in hi]}
 
 
 def _finish(module: dict, replaced_op: dict | None, op: dict | None) -> dict:
@@ -354,6 +424,14 @@ def _finish(module: dict, replaced_op: dict | None, op: dict | None) -> dict:
         raise
     except Exception as exc:  # the geometry builders raise their own typed errors
         raise OperationError(f"geometry builder rejected the change: {exc}") from exc
+    try:
+        # The exact routine the compiler runs: budgets, annotations and cut-wall mapping fail here.
+        _projection._shape_faces(module["moduleId"], module)
+        _recompute_bounds(module)
+    except OperationError:
+        raise
+    except Exception as exc:
+        raise OperationError(f"cannot derive module bounds: {exc}") from exc
     module["revision"] += 1
     return module
 
@@ -370,7 +448,6 @@ def add_floor(module, op_id, footprint, thickness, elevation, material_id, role=
     op = {"kind": "floor-slab", "opId": op_id, "role": role, "materialId": material_id,
           "footprint": [list(p) for p in footprint], "thickness": thickness, "elevation": elevation}
     m["operations"].append(op)
-    _grow_bounds(m, op)
     return _finish(m, None, op)
 
 
@@ -382,7 +459,6 @@ def add_wall(module, op_id, path, thickness, height, base_elevation, material_id
           "path": [list(p) for p in path], "thickness": thickness, "height": height,
           "baseElevation": base_elevation}
     m["operations"].append(op)
-    _grow_bounds(m, op)
     return _finish(m, None, op)
 
 
@@ -394,10 +470,13 @@ def add_opening(module, op_id, target_wall_op_id, offset, width, height, sill_he
     op = {"kind": "opening-cut", "opId": op_id, "role": "opening", "targetWallOpId": target_wall_op_id,
           "offset": offset, "width": width, "height": height, "sillHeight": sill_height,
           "openingType": opening_type}
+    annotated = [a for a in m.get("faceAnnotations", []) if a["opId"] == target_wall_op_id]
+    _need(not annotated,
+          f"wall {target_wall_op_id!r} has {len(annotated)} authored face annotation(s) (labels and "
+          "front/back materials); the compiler has no lossless mapping onto cut-wall faces, so the "
+          "opening is refused instead of silently discarding them. Remove or re-author the "
+          "annotations explicitly first.")
     m["operations"].append(op)
-    # Face annotations on a cut wall have no cut mapping; drop them rather than keep stale labels.
-    if "faceAnnotations" in m:
-        m["faceAnnotations"] = [a for a in m["faceAnnotations"] if a["opId"] != target_wall_op_id]
     return _finish(m, None, op)
 
 
@@ -419,8 +498,6 @@ def update_operation(module, op_id, **fields):
     if "materialId" in fields:
         _material_ok(m, fields["materialId"])
     op.update(copy.deepcopy(fields))
-    if op["kind"] != "opening-cut":
-        _grow_bounds(m, op)
     return _finish(m, None, op if op["kind"] != "opening-cut" else None)
 
 
@@ -435,7 +512,7 @@ def lower_helper(state: ProjectState, call: dict) -> dict:
     _need(type(call) is dict and call.get("tool") in HELPERS, "unsupported helper tool")
     args = {k: v for k, v in call.items() if k not in ("tool", "moduleId")}
     mid = call.get("moduleId")
-    current = state.modules.get(mid)
+    current = state.module(mid) if isinstance(mid, str) else None
     _need(current is not None, f"unknown moduleId {mid!r}")
     try:
         module = HELPERS[call["tool"]](current, **args)
