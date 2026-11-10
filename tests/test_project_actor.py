@@ -9,10 +9,7 @@ from __future__ import annotations
 import ast
 import builtins
 import copy
-import io
 import json
-import os
-import pathlib
 import subprocess
 import sys
 import threading
@@ -266,7 +263,7 @@ class FailureAtomicity(unittest.TestCase):
             if point == "before-swap":
                 raise RuntimeError("simulated crash")
         actor, _ = make_actor(_fault_hook=crash)
-        lease = seed_with(actor, crash_after_seed=True)
+        lease = seed_with(actor)
         before, request = actor.state_digest(), txn(1, [replace(tweak(room("living"), 0.16), 1)], "crashy")
         self.assertEqual(code_of(self, actor.submit, AGENT_A, lease, request).code, "INTERNAL_ERROR")
         self.assertEqual(actor.state_digest(), before)
@@ -325,6 +322,15 @@ class FailureAtomicity(unittest.TestCase):
             self.assertEqual(code_of(self, actor.submit, AGENT_A, lease, bad).code, "INVALID_REQUEST")
         self.assertEqual(actor.state_digest(), before)
 
+    def test_oversized_in_memory_request_is_rejected_before_any_state_change(self):
+        actor, _ = make_actor()
+        lease = seed(actor)
+        before = actor.state_digest()
+        huge = txn(1, [replace(tweak(room("living"), 0.16), 1)], "huge")
+        huge["padding"] = "x" * (256 * 1024)
+        self.assertEqual(code_of(self, actor.submit, AGENT_A, lease, huge).code, "INVALID_REQUEST")
+        self.assertEqual(actor.state_digest(), before)
+
     def test_strict_bytes_and_size_cap(self):
         actor, _ = make_actor()
         lease = seed(actor)
@@ -349,7 +355,7 @@ class FailureAtomicity(unittest.TestCase):
             self.assertEqual(actor.state_digest(), before)
 
 
-def seed_with(actor, crash_after_seed=False):
+def seed_with(actor):
     hook, actor._fault = actor._fault, None
     lease = seed(actor)
     actor._fault = hook
@@ -508,6 +514,15 @@ class Ownership(unittest.TestCase):
         impostor = Grant("tenant-1", "project-1", "agent-evil", "agent-a", frozenset({"read"}))
         actor.grant(OWNER, impostor)
         self.assertEqual(code_of(self, actor.acquire_lease, "agent-evil").code, "GRANT_DENIED")
+
+    def test_downgrading_the_writer_to_read_only_fences_it_out(self):
+        actor, _ = make_actor()
+        lease = seed(actor)
+        actor.grant(OWNER, grant(AGENT_A, "read"))
+        request = txn(1, [replace(tweak(room("living"), 0.16), 1)], "downgraded")
+        self.assertIn(code_of(self, actor.submit, AGENT_A, lease, request).code, ("GRANT_DENIED",))
+        self.assertIsNone(actor.status(OWNER)["writer"])
+        self.assertEqual(actor.submit(AGENT_B, actor.acquire_lease(AGENT_B), request)["projectRevision"], 2)
 
     def test_grant_for_another_tenant_or_project_is_rejected(self):
         actor, _ = make_actor()

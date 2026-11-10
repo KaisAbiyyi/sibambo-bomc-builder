@@ -25,7 +25,7 @@ from types import MappingProxyType
 
 from core.project import state as S
 from core.project.operations import (
-    OperationError, _schema_check, apply_transaction, canonical_json, parse_transaction,
+    MAX_REQUEST_BYTES, OperationError, _schema_check, apply_transaction, canonical_json, parse_transaction,
     project_view, sha256_hex)
 from core.project.state import ActorError, ActorState, Grant, Lease
 
@@ -138,6 +138,8 @@ class ProjectActor:
             grants = dict(self._grants)
             grants[grant.subject] = grant
             self._grants = MappingProxyType(grants)
+            if "write" not in grant.scopes and self._lease is not None and self._lease.holder == grant.subject:
+                self._bump_fence()                     # a downgrade fences the old writer out immediately
 
     def revoke(self, subject: str, target: str) -> bool:
         self._owner_only(subject)
@@ -287,6 +289,8 @@ class ProjectActor:
     def _commit(self, subject: str, txn: object, now: float) -> dict:
         try:
             raw = canonical_json(txn)
+            if len(raw) > MAX_REQUEST_BYTES:
+                raise OperationError("request exceeds 256 KiB")
             txn = json.loads(raw)                          # private, detached copy of the request
             _schema_check(txn)
         except OperationError as exc:
