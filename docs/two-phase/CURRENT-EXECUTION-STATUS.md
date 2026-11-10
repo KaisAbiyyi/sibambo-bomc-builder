@@ -1,4 +1,18 @@
-# Sibambo Stable — current execution checkpoint (2026-11-08)
+# Sibambo Stable — current execution checkpoint (2026-11-10)
+
+> **Board update 2026-11-10 (supersedes the board table and "Ready" wording below; the 2026-11-08 text is kept as history).** Source: Notion master v1.5 checkpoints D13–D15 and the current `main` branches.
+>
+> | Task | Status | Board | Evidence |
+> | --- | --- | --- | --- |
+> | SE-00 | Done | Last Done | [Builder #70](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/70) |
+> | SE-01 | Done — merged [#91](https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/91) at `4c15fc304a6bf93077937947e7720fe9fb802a48`; manual owner Windows evidence NOT_RUN, accepted by the owner with that limitation | Last Done | [Builder #71](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/71) |
+> | SE-02 | Ready (unclaimed) | Now | its task issue |
+> | SE-03 | Blocked by SE-02 | Up Next | [Builder #73](https://github.com/KaisAbiyyi/sibambo-bomc-builder/issues/73) |
+> | SE-04 | Review — source merged in Editor at `4166e829840e393541506f4963995f193cc93d07`; live owner gate NOT_RUN | no focus lane | [Editor #15](https://github.com/KaisAbiyyi/sibambo-editor/issues/15) |
+> | SE-05 | Blocked on SE-03 and the SE-04 live gate | no focus lane | [Editor #16](https://github.com/KaisAbiyyi/sibambo-editor/issues/16) |
+>
+> Draft hardening proposals awaiting an owner decision: [STABLE-HARDENING-D16.md](STABLE-HARDENING-D16.md). They change no status above.
+
 
 > **CURRENT STATUS / READ FIRST.** This file supersedes **status and merge instructions only** in the historical SE-00 baseline audit, CP0 receipt, and v1.3/v1.5 planning snapshots. Do not reinterpret historical observations as today's gates. Preserve their test hashes and history. The GitHub issue heads and current main branches remain the live sources of truth for claims.
 
