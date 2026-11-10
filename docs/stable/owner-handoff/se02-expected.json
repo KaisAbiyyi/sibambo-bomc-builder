@@ -1,0 +1,90 @@
+{
+  "facts": {
+    "afterContention": {
+      "canonicalIrSha256": "b67e9b753f759d106b65f1ae096e2181992cabd49729a569f60840a970abace0",
+      "projectionSha256": "fed07400bb0429850840b36db37e9d2751a1114241147bb646a60e9aee09c25f"
+    },
+    "afterSeed": {
+      "canonicalIrSha256": "62fe1f947aa61070307bf72892c745449c836c47b54c112e685179d21e9ff7e0",
+      "moduleRevisions": {
+        "house/level/bath": 1,
+        "house/level/bedroom-a": 1,
+        "house/level/bedroom-b": 1,
+        "house/level/living": 1,
+        "house/level/roof": 1
+      },
+      "projectionSha256": "8ac853a5b489a768911be85c0133ae13c1eea1215ba6af301c8a16a809576cfd"
+    },
+    "finalStatus": {
+      "paused": false,
+      "projectRevision": 4,
+      "writer": "owner-demo"
+    }
+  },
+  "steps": [
+    {
+      "actual": "epoch=1 projectRevision=0",
+      "n": 1
+    },
+    {
+      "actual": "OK fence=1",
+      "n": 2
+    },
+    {
+      "actual": "OK COMMITTED projectRevision=1",
+      "n": 3
+    },
+    {
+      "actual": "LEASE_HELD writer=agent-a",
+      "n": 4
+    },
+    {
+      "actual": "OK COMMITTED projectRevision=2",
+      "n": 5
+    },
+    {
+      "actual": "OK replayed=True projectRevision=2",
+      "n": 6
+    },
+    {
+      "actual": "REVISION_CONFLICT currentProjectRevision=2",
+      "n": 7
+    },
+    {
+      "actual": "OK COMMITTED projectRevision=3",
+      "n": 8
+    },
+    {
+      "actual": "PAUSED",
+      "n": 9
+    },
+    {
+      "actual": "FENCE_STALE",
+      "n": 10
+    },
+    {
+      "actual": "LEASE_HELD writer=owner-demo",
+      "n": 11
+    },
+    {
+      "actual": "OK COMMITTED projectRevision=4",
+      "n": 12
+    },
+    {
+      "actual": "INVALID_OPERATION INVALID_OPERATION unchanged=True",
+      "n": 13
+    },
+    {
+      "actual": "OK COMMITTED projectRevision=2 living=2 bedroom-a=2",
+      "n": 14
+    },
+    {
+      "actual": "OK replayed=True projectRevision=2",
+      "n": 15
+    },
+    {
+      "actual": "0",
+      "n": 16
+    }
+  ]
+}
