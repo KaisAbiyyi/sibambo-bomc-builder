@@ -57,8 +57,19 @@ function Get-OverallVerdict($Items) {
     return "PASS"
 }
 
+function Get-AutomatedVerdict($Items) {
+    # The owner's manual review row is always NOT_RUN until the owner does it; it must not make
+    # the automated part read NOT_RUN when every automated step passed.
+    return Get-OverallVerdict @($Items | Where-Object { $_.Step -notlike "owner manual*" })
+}
+
 if ($SelfTest) {
     $fake = [pscustomobject]@{ Step = "x"; Status = "PASS"; Detail = "" }
+    $manual = [pscustomobject]@{ Step = "owner manual contention review (transcript.txt)"; Status = "NOT_RUN"; Detail = "" }
+    if ((Get-AutomatedVerdict @($fake, $manual)) -ne "PASS") { throw "automated verdict must ignore the manual NOT_RUN row" }
+    if ((Get-OverallVerdict @($fake, $manual)) -ne "NOT_RUN") { throw "overall verdict must still show NOT_RUN" }
+    $failed = [pscustomobject]@{ Step = "x"; Status = "FAIL"; Detail = "" }
+    if ((Get-AutomatedVerdict @($failed, $manual)) -ne "FAIL") { throw "automated verdict must show FAIL" }
     if ((Get-OverallVerdict @($fake)) -ne "PASS") { throw "verdict logic broken (PASS)" }
     $fake2 = [pscustomobject]@{ Step = "y"; Status = "FAIL"; Detail = "" }
     if ((Get-OverallVerdict @($fake, $fake2)) -ne "FAIL") { throw "verdict logic broken (FAIL)" }
@@ -75,7 +86,7 @@ function Stop-WithFail([string]$Step, [string]$Detail) {
 }
 
 function Write-Summary {
-    $verdict = Get-OverallVerdict $Results
+    $verdict = Get-AutomatedVerdict $Results
     $lines = @("SE-02 owner acceptance result", "Tested SHA: $TestedSha", "Verdict (automated part): $verdict", "")
     foreach ($r in $Results) { $lines += ("{0,-8} {1} :: {2}" -f $r.Status, $r.Step, (Protect-Text $r.Detail)) }
     $lines += ""
