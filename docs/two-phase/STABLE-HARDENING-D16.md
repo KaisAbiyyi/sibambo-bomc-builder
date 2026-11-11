@@ -1,8 +1,16 @@
-# Stable remote MCP — D16 hardening proposals (public edition)
+# Stable remote MCP — D16 hardening additions (public edition)
 
-> **Status: DRAFT planning proposal, 2026-11-10. Not owner-accepted.** Additive to SIB-TWO-PHASE-001 v1.5. No task status, claim, merge, deploy or IMPLEMENT authority changes. Nothing here is implemented or tested. This public edition covers **Stable and shared-core only**; the complete planning note lives in the private Editor repository and in Notion.
+> **Status: ACCEPTED by the owner on 2026-11-11 (drafted 2026-11-10). Part of the active plan, SIB-TWO-PHASE-001 v1.5 + D16.** Additive: no v1.3–v1.5 contract is removed or weakened. Acceptance changes no task status and grants no claim, merge, deploy or IMPLEMENT authority. Nothing here is implemented or tested yet. This public edition covers **Stable and shared-core only**; the complete planning note lives in the private Editor repository and in Notion.
 
-The proposals below came from re-reading the SE-02 … SE-11 contracts against the MCP 2026-07-28 specification and the current source. Each item names the task that would own it if the owner accepts it. IDs match the private D16 note.
+The items below came from re-reading the SE-02 … SE-11 contracts against the MCP 2026-07-28 specification and the current source. Each item names the task that owns it: the item is additional acceptance for that task, which closes only when it passes. IDs match the private D16 note.
+
+## Owner decisions, 2026-11-11
+
+- **All D16 items accepted** as additional acceptance on SE-03, SE-05, SE-06, SE-07, SE-09, SE-10 and SE-11. The critical path and dependencies are unchanged.
+- **SE-02 is not amended.** It was already cloud-complete and in Review, so S2 moved to SE-03 and P5 moved to SE-09.
+- **SE-03.0 compatibility probe approved**: one day, no product code, runnable now by the owner without waiting for SE-02 acceptance. Creating the nonproduction identity-provider tenant and opening a tunnel remain owner actions.
+- **No active viewer means no writes**: `NO_ACTIVE_VIEWER`. There is no headless mode in Batch 1.
+- **One combined owner session** for the SE-03 and SE-04 live gates; SE-05 cloud-side work may start once SE-03 is in Review, using the existing mock identity-provider harness. SE-05 still needs both live gates to close.
 
 ## Why now
 
@@ -15,12 +23,12 @@ Two findings change the order of work rather than its content:
 
 | ID | Gap | Proposal | Owner task |
 | --- | --- | --- | --- |
-| S2 | The D11 stdio → actor bridge is described as a thin loopback client with no authentication requirement. Any local process could call it | Named pipe / Unix socket with an owner-only ACL, or loopback plus a per-launch random secret read from an owner-only file. Bind 127.0.0.1. Negative test: a second local process without the secret is refused | SE-02 |
+| S2 | The D11 stdio → actor bridge is described as a thin loopback client with no authentication requirement. Any local process could call it | Named pipe / Unix socket with an owner-only ACL, or loopback plus a per-launch random secret read from an owner-only file. Bind 127.0.0.1. Negative test: a second local process without the secret is refused | SE-03 (moved from SE-02) |
 | S3 | SE-03 does not enumerate transport-conformance tests | Invalid `Origin` → 403. `MCP-Protocol-Version`, `Mcp-Method` or `Mcp-Name` disagreeing with the body → 400 `HeaderMismatch` (−32020). GET / DELETE on the endpoint → 405. `Mcp-Session-Id` ignored, never minted. No `Last-Event-ID` resumption. Send `X-Accel-Buffering: no` and keep-alive comments on long streams | SE-03 |
 | S4 | Writer leases, operation IDs, idempotency keys and WebSocket tickets are state handles. Possession must never authenticate | Explicit rows: a handle minted for principal A presented by principal B (including one with a read grant on the same project) is rejected; a lease released by a non-holder is rejected | SE-09 |
-| S5 | No early proof that real clients can register and obtain a correctly audience-bound token from the chosen provider | **SE-03.0 compatibility probe** before adapter code: record protocol version, registration method and `resource` behaviour of the installed Claude Code and Codex versions against the nonproduction tenant. Requires separate owner approval | SE-03 |
+| S5 | No early proof that real clients can register and obtain a correctly audience-bound token from the chosen provider | **SE-03.0 compatibility probe** before adapter code: record protocol version, registration method and `resource` behaviour of the installed Claude Code and Codex versions against the nonproduction tenant. Approved by the owner on 2026-11-11 | SE-03 |
 | S6 | A Tailscale Funnel hostname is public internet exposure, limited to ports 443 / 8443 / 10000, with non-configurable bandwidth limits | Path allowlist in the service (MCP endpoint, draft socket, owner API, OAuth metadata, health); everything else 404. Health reveals nothing. Rate-limit unauthenticated requests. The stop script closes the tunnel first | SE-09, D11 scripts |
-| S8 | Browser render ACK gates the next write. An early or forged ACK, or an absent viewer, is unspecified | The server compares the ACK digest with the digest it computed for that revision, accepts it only from the owner-ticketed socket, once per revision. ACK deadline → project state `awaiting_viewer`. Typed errors `RENDER_ACK_TIMEOUT` (retryable) and `NO_ACTIVE_VIEWER`. An ACK is never skipped automatically | SE-05 service side, SE-03.B |
+| S8 | Browser render ACK gates the next write. An early or forged ACK, or an absent viewer, is unspecified | The server compares the ACK digest with the digest it computed for that revision, accepts it only from the owner-ticketed socket, once per revision. ACK deadline → project state `awaiting_viewer`. Typed errors `RENDER_ACK_TIMEOUT` (retryable) and `NO_ACTIVE_VIEWER` (decided: writes are rejected without an active viewer). An ACK is never skipped automatically | SE-05 service side, SE-03.B |
 | S9 | Stored injection across agents: text authored by one agent is read by another through `read_project` / `inspect_module` | The construction guide marks every string in a tool result as untrusted data. Add two rows to the threat tests: hostile label read by a second agent; hostile label echoed to the owner view | SE-09 |
 | S10 | Two owner tabs mean two viewers; whose ACK counts is undefined | One primary viewer per project (latest attached); others are read-only followers and do not gate | SE-05 service side |
 | S11 | `service/requirements.lock` is not required to carry hashes | Install with `--require-hashes`; CI fails on an unhashed lock | SE-03 |
@@ -32,7 +40,7 @@ Two findings change the order of work rather than its content:
 | P1 | `replace_module` carries the whole module body. Checked-in examples are 0.9–1.4 KiB per room module; the cap is 64 KiB. Large modules make every small revision expensive for the agent | The guide fixes a granularity budget (one room per module, target ≤ 8 KiB). SE-10 records bytes per operation and the gap between operations. If the measured median crosses a recorded threshold, open a plan for parametric patch operations | SE-03.A, SE-10 |
 | P2 | A 256 KiB tool response can cost an agent tens of thousands of tokens | `read_project` is compact by default (IDs, revisions, hashes, bounds; target ≤ 4 KiB); detail only through `inspect_module`. Report total tool-result bytes per build | SE-03, SE-11 |
 | P3 | An isolated geometry process with a 30 s deadline versus a P95 ≤ 500 ms accepted-to-ACK target: spawning Python per operation is costly on Windows | Warm isolated worker (pool of one, recycled after N operations or on RSS growth). Measure cold and warm | SE-09, SE-10 |
-| P5 | "20 active projects per worker" combined with 10,000 modules × 64 KiB does not fit a 512 MiB instance | Per-project live-draft caps (starting proposal ≤ 200 modules, ≤ 8 MiB canonical IR, snapshot chunks ≤ 2 MiB) and RAM-based admission. Numbers are to be measured, not promised | SE-02 |
+| P5 | "20 active projects per worker" combined with 10,000 modules × 64 KiB does not fit a 512 MiB instance | Per-project live-draft caps (starting proposal ≤ 200 modules, ≤ 8 MiB canonical IR, snapshot chunks ≤ 2 MiB) and RAM-based admission. Numbers are to be measured, not promised | SE-09 (moved from SE-02) |
 | P6 | "No unbounded replay" has no number; a slow viewer can grow a server queue | Per-connection queue bound (starting proposal 64 events / 4 MiB) then forced snapshot resync. Slow-consumer test | SE-05 service side |
 | P7 | Agents may issue parallel tool calls; with a single fenced writer the result is a run of `REVISION_CONFLICT` | Guide: write sequentially. Server: `BUSY` with `retryAfterMs`. SE-11 reports the conflict rate per client | SE-03.A, SE-11 |
 
