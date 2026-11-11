@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/blob/main/schemas/draft-errors-v1.schema.json",
+  "title": "BOMC Builder remote tool error v1 (SE-03.B)",
+  "description": "Every failed tool call / owner REST call carries one error object. v1.3 and SE-02 codes are unchanged; SE-03 adds retryable and nextAction to all of them and the codes UNAUTHENTICATED, FORBIDDEN, BUSY, RENDER_ACK_TIMEOUT, NO_ACTIVE_VIEWER and PAUSED_BY_OWNER. A failed call never changes the draft.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "error"
+  ],
+  "properties": {
+    "projectId": {
+      "type": "string"
+    },
+    "ok": {
+      "const": false
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "nextAction"
+      ],
+      "properties": {
+        "code": {
+          "enum": [
+            "REVISION_CONFLICT",
+            "DEPENDENCY_STALE",
+            "IDEMPOTENCY_CONFLICT",
+            "FENCE_STALE",
+            "LEASE_HELD",
+            "LEASE_EXPIRED",
+            "GRANT_DENIED",
+            "OWNER_ABSENT",
+            "PAUSED",
+            "QUEUE_FULL",
+            "TOMBSTONED",
+            "INVALID_REQUEST",
+            "INVALID_OPERATION",
+            "BUDGET_EXCEEDED",
+            "EPOCH_CLOSED",
+            "NOT_FOUND",
+            "TENANT_MISMATCH",
+            "INTERNAL_ERROR",
+            "UNAUTHENTICATED",
+            "FORBIDDEN",
+            "BUSY",
+            "RENDER_ACK_TIMEOUT",
+            "NO_ACTIVE_VIEWER",
+            "PAUSED_BY_OWNER"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "nextAction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "integer",
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

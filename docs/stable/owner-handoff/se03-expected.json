@@ -1,0 +1,26 @@
+{
+  "bomcSha256": "313916f892f4448b23c507e77bf14b5a937b4b31f1b53892794d500cc2b96059",
+  "canonicalIrSha256": "a237167b3167aa8355a1d29abdbcd83a9d4a137499578d080fb31b3ff1199d95",
+  "compactReadProjectBytes": 651,
+  "errorCatalogSha256": "994438708c70f9b2bfabc8cf300c5819479a6064f9f2a00454653dfabf756c0c",
+  "errorCodeCount": 24,
+  "faceCount": 150,
+  "guideSha256": "91f51cf4e28d279cd64b411105cacae1e1c6d32346459b5e9e1db7474555f9d4",
+  "guideVersion": 1,
+  "moduleCount": 2,
+  "observedErrorCodes": [
+    "BUSY",
+    "FORBIDDEN",
+    "GRANT_DENIED",
+    "INVALID_OPERATION",
+    "LEASE_HELD",
+    "NO_ACTIVE_VIEWER",
+    "PAUSED_BY_OWNER",
+    "RENDER_ACK_TIMEOUT",
+    "REVISION_CONFLICT"
+  ],
+  "projectRevision": 2,
+  "projectionSha256": "b8f362f0448d04ee62750eb9ac3ecbd1bd91a3eca92f68e292e50b8959f61570",
+  "toolDescriptionsSha256": "da0b47d38993b98ef3eb030ce245e35404f02d3efe5279c8a2a582eb594af8e3",
+  "triangleCount": 300
+}
