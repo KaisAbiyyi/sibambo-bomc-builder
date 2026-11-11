@@ -59,17 +59,30 @@ class ProjectHost:
         self._epochs: dict[tuple[str, str], int] = {}
         self._write_gates: dict[tuple[str, str], threading.Lock] = {}
 
-    def open_project(self, tenant: str, project: str, owner: Principal) -> ProjectActor:
+    def open_project(self, tenant: str, project: str, owner: Principal, *, new_epoch: bool = False):
+        """Check-and-open under ONE lock. Returns ``(actor, created)``.
+
+        - project does not exist: the first opener becomes its owner;
+        - project exists: only its owner may re-open it or start a new epoch (``new_epoch`` included);
+          anyone else gets FORBIDDEN and nothing changes. A plain re-open never discards the draft.
+        """
         if owner.tenant != tenant:
             raise ToolFailure("FORBIDDEN", "principal is not in this tenant")
         with self._lock:
+            epoch = self._epochs.get((tenant, project))
+            if epoch is not None:
+                existing = self.registry.get(tenant, project, epoch)
+                if existing.owner != owner.id:
+                    raise ToolFailure("FORBIDDEN", "only the project owner may do this")
+                if not new_epoch:
+                    return existing, False
             try:
                 actor = self.registry.open_epoch(tenant, project, owner.id)
             except ActorError as exc:
                 raise _from_actor(exc) from exc
             self._epochs[(tenant, project)] = actor.epoch
             self._write_gates.setdefault((tenant, project), threading.Lock())
-            return actor
+            return actor, True
 
     def actor(self, tenant: str, project: str) -> ProjectActor:
         """One answer for unknown and for someone else's project."""
@@ -242,19 +255,9 @@ class OwnerApi:
         return {"projectId": project, **body}
 
     def open(self, principal: Principal, project: str, new_epoch: bool = False) -> dict:
-        """Idempotent: re-opening never discards an unsaved draft. Only an explicit ``newEpoch`` starts a
-        fresh, empty epoch (the owner's restore decision, SE-08)."""
-        if not new_epoch:
-            try:
-                existing = self.host.actor(principal.tenant, project)
-            except ToolFailure:
-                existing = None
-            if existing is not None:
-                if existing.owner != principal.id:
-                    raise ToolFailure("FORBIDDEN", "only the project owner may do this")
-                return self._wrap(project, {"epoch": existing.epoch, "created": False})
-        actor = self.host.open_project(principal.tenant, project, principal)
-        return self._wrap(project, {"epoch": actor.epoch, "created": True})
+        """Idempotent for the owner; ``newEpoch`` starts a fresh empty epoch and is owner-only too."""
+        actor, created = self.host.open_project(principal.tenant, project, principal, new_epoch=new_epoch)
+        return self._wrap(project, {"epoch": actor.epoch, "created": created})
 
     def status(self, principal, project):
         actor = self._own(principal, project)

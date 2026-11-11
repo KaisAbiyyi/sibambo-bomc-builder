@@ -538,6 +538,17 @@ class OwnerApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(ENV.host.actor(TENANT, project), actor)
         other_owner = await ENV.owner_post(ENV.mint("owner-2"), project, "open")
         self.assertEqual((other_owner.status_code, other_owner.json()["error"]["code"]), (403, "FORBIDDEN"))
+        # review P1: another principal of the SAME tenant can neither re-open nor take over via newEpoch
+        digest = actor.state_digest()
+        for body in ({}, {"newEpoch": True}, {"newEpoch": True, "extra": 1}):
+            taken = await ENV.owner_post(ENV.mint("mallory"), project, "open", body)
+            self.assertEqual((taken.status_code, taken.json()["error"]["code"]), (403, "FORBIDDEN"), body)
+        self.assertIs(ENV.host.actor(TENANT, project), actor)
+        self.assertEqual((actor.owner, actor.epoch, actor.state_digest()), (ENV.pid("owner-1"), 1, digest))
+        self.assertEqual((await ENV.owner_post(owner, project, "heartbeat")).status_code, 200)   # still the owner
+        status = await ENV.owner_post(owner, project, "pause")
+        self.assertEqual(status.status_code, 200)
+        await ENV.owner_post(owner, project, "resume")
         fresh = await ENV.owner_post(owner, project, "open", {"newEpoch": True})
         self.assertEqual((fresh.json()["epoch"], fresh.json()["created"]), (2, True))
         self.assertIsNot(ENV.host.actor(TENANT, project), actor)
@@ -580,6 +591,67 @@ class OwnerApiTests(unittest.IsolatedAsyncioTestCase):
                                          "Mcp-Method": "tools/list"})
             self.assertEqual(r.status_code, 404)
         self.assertEqual(ENV.host.requests.read("globex", project), [])
+
+
+class OpenProjectOwnershipTests(unittest.TestCase):
+    """Review P1: check-and-open is atomic and ownership is enforced for every kind of open."""
+
+    def principals(self):
+        mk = lambda sub, tenant=TENANT: Principal(f"p-{sub}", tenant, ISSUER, sub, "t")
+        return mk("alice"), mk("mallory"), mk("carol", "globex")
+
+    def test_other_principal_cannot_take_over_with_new_epoch_and_nothing_changes(self):
+        host = ProjectHost()
+        api = OwnerApi(host)
+        alice, mallory, _ = self.principals()
+        self.assertEqual(api.open(alice, "proj-a"), {"projectId": "proj-a", "epoch": 1, "created": True})
+        actor = host.actor(TENANT, "proj-a")
+        before = (actor.owner, actor.epoch, actor.state_digest())
+        for flag in (False, True):
+            with self.assertRaises(ToolFailure) as caught:
+                api.open(mallory, "proj-a", new_epoch=flag)
+            self.assertEqual(caught.exception.code, "FORBIDDEN")
+        self.assertIs(host.actor(TENANT, "proj-a"), actor)
+        self.assertEqual((actor.owner, actor.epoch, actor.state_digest()), before)
+        self.assertEqual(api.status(alice, "proj-a")["epoch"], 1)               # alice is not locked out
+        self.assertEqual(api.open(alice, "proj-a"), {"projectId": "proj-a", "epoch": 1, "created": False})
+        self.assertEqual(api.open(alice, "proj-a", new_epoch=True)["epoch"], 2)  # the owner still can
+        self.assertTrue(actor._closed)
+
+    def test_other_tenant_with_the_same_project_name_is_a_different_project(self):
+        host = ProjectHost()
+        api = OwnerApi(host)
+        alice, _, carol = self.principals()
+        api.open(alice, "shared-name")
+        self.assertEqual(api.open(carol, "shared-name")["created"], True)
+        self.assertNotEqual(host.actor(TENANT, "shared-name").owner, host.actor("globex", "shared-name").owner)
+
+    def test_concurrent_first_open_has_exactly_one_owner_and_the_winner_is_not_closed(self):
+        for attempt in range(25):
+            host = ProjectHost()
+            api = OwnerApi(host)
+            alice, mallory, _ = self.principals()
+            barrier, results = threading.Barrier(2), {}
+
+            def go(who, new_epoch):
+                barrier.wait()
+                try:
+                    results[who.id] = api.open(who, "race", new_epoch=new_epoch)
+                except ToolFailure as failure:
+                    results[who.id] = failure.code
+            threads = [threading.Thread(target=go, args=(alice, attempt % 2 == 0)),
+                       threading.Thread(target=go, args=(mallory, attempt % 2 == 1))]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            winners = [k for k, v in results.items() if isinstance(v, dict)]
+            losers = [k for k, v in results.items() if v == "FORBIDDEN"]
+            self.assertEqual((len(winners), len(losers)), (1, 1), results)
+            actor = host.actor(TENANT, "race")
+            self.assertEqual(actor.owner, winners[0])
+            self.assertFalse(actor._closed)
+            self.assertEqual(actor.epoch, 1)
 
 
 class TicketTests(unittest.TestCase):
