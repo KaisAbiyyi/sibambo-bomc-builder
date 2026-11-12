@@ -90,11 +90,19 @@ jobs:
           ./scripts/owner_acceptance/se03.ps1 -SelfTest
           ./scripts/owner_acceptance/se03.ps1 -TestedSha $env:EXPECTED_SHA -EvidenceDir "$env:RUNNER_TEMP\se03-owner"
           Get-Content "$env:RUNNER_TEMP\se03-owner\se03-result.txt"
+      - name: Owner PowerShell helper under Windows PowerShell 5.1 (the owner's default shell)
+        if: always() && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          ./scripts/owner_acceptance/se03.ps1 -SelfTest
+          ./scripts/owner_acceptance/se03.ps1 -TestedSha $env:EXPECTED_SHA -EvidenceDir "$env:RUNNER_TEMP\se03-owner-ps51"
+          Get-Content "$env:RUNNER_TEMP\se03-owner-ps51\se03-result.txt"
       - name: Show owner-helper logs on failure (Windows)
         if: failure() && runner.os == 'Windows'
         shell: pwsh
         run: |
-          Get-ChildItem "$env:RUNNER_TEMP\se03-owner" -Filter "log-*.txt" -ErrorAction SilentlyContinue | ForEach-Object { "=== $($_.Name) ==="; Get-Content $_.FullName -Tail 60 }
+          Get-ChildItem "$env:RUNNER_TEMP\se03-owner*" -Recurse -Filter "log-*.txt" -ErrorAction SilentlyContinue | ForEach-Object { "=== $($_.Name) ==="; Get-Content $_.FullName -Tail 60 }
       - name: Owner evidence generator with pinned expected hashes
         shell: bash
         run: |

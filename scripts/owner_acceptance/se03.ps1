@@ -64,6 +64,39 @@ function Get-AutomatedVerdict($Items) {
     return Get-OverallVerdict @($Items | Where-Object { $_.Step -notlike "owner manual*" })
 }
 
+function Find-Python($Candidates) {
+    # Probe each candidate with ErrorActionPreference=Continue: the py launcher writes to stderr when a
+    # version (e.g. -3.12) is not installed, and Windows PowerShell 5.1 turns redirected native stderr
+    # into a terminating error under "Stop", which would skip the fallback to the next candidate.
+    foreach ($candidate in $Candidates) {
+        $cmd = Get-Command $candidate[0] -ErrorAction SilentlyContinue
+        if (-not $cmd) { continue }
+        $extra = @()
+        if ($candidate.Count -gt 1) { $extra = $candidate[1..($candidate.Count - 1)] }
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $text = $null
+        $code = 1
+        try {
+            $text = & $candidate[0] @extra -c "import sys;print('%d.%d' % sys.version_info[:2])" 2>$null
+            $code = $LASTEXITCODE
+        } catch {
+            $text = $null
+            $code = 1
+        } finally {
+            $ErrorActionPreference = $prev
+        }
+        $line = ($text | Select-Object -First 1)
+        if ($code -eq 0 -and $line) {
+            $parts = ([string]$line).Trim().Split(".")
+            if ([int]$parts[0] -gt 3 -or ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 12)) {
+                return [pscustomobject]@{ Command = (@($candidate[0]) + $extra); Version = ([string]$line).Trim() }
+            }
+        }
+    }
+    return $null
+}
+
 if ($SelfTest) {
     $fake = [pscustomobject]@{ Step = "x"; Status = "PASS"; Detail = "" }
     $manual = [pscustomobject]@{ Step = "owner manual review (receipt.json)"; Status = "NOT_RUN"; Detail = "" }
@@ -74,6 +107,11 @@ if ($SelfTest) {
     if ((Get-OverallVerdict @($fake)) -ne "PASS") { throw "verdict logic broken (PASS)" }
     $fake2 = [pscustomobject]@{ Step = "y"; Status = "FAIL"; Detail = "" }
     if ((Get-OverallVerdict @($fake, $fake2)) -ne "FAIL") { throw "verdict logic broken (FAIL)" }
+    # Python detection must fall through a missing first candidate (real py launcher error, or no such command).
+    $fallback = Find-Python @(@("py", "-3.99"), @("definitely-not-a-command-se03"), @("python"), @("python3"))
+    if (-not $fallback) { throw "Find-Python did not fall through to a working interpreter" }
+    if (-not ($fallback.Version -match '^3\.\d+$')) { throw "Find-Python returned a bad version" }
+    if ($null -ne (Find-Python @(@("py", "-3.99"), @("definitely-not-a-command-se03")))) { throw "Find-Python must return null when nothing works" }
     $probe = "path " + $env:USERPROFILE + "\secret"
     if ((Protect-Text $probe) -match [regex]::Escape($env:USERPROFILE)) { throw "redaction broken" }
     Write-Host "SE03_SELFTEST=PASS"
@@ -133,20 +171,10 @@ if ($outside.Count -gt 0) { Stop-WithFail "only docs/helper changed after tested
 Add-Result "tested commit" "PASS" "HEAD=$head contains $TestedSha (docs/helper-only delta)"
 
 # ---- Step 3: Python 3.12+ ---------------------------------------------------------
-$py = $null
-foreach ($candidate in @(@("py", "-3.12"), @("py", "-3.13"), @("py", "-3.14"), @("python"), @("python3"))) {
-    $cmd = Get-Command $candidate[0] -ErrorAction SilentlyContinue
-    if (-not $cmd) { continue }
-    $extra = @()
-    if ($candidate.Count -gt 1) { $extra = $candidate[1..($candidate.Count - 1)] }
-    $v = & $candidate[0] @extra -c "import sys;print('%d.%d' % sys.version_info[:2])" 2>$null
-    if ($LASTEXITCODE -eq 0 -and $v) {
-        $parts = $v.Trim().Split(".")
-        if ([int]$parts[0] -gt 3 -or ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 12)) { $py = @($candidate[0]) + $extra; break }
-    }
-}
-if (-not $py) { Stop-WithFail "Python 3.12+" "Install Python 3.12 or newer from python.org (tick 'Add to PATH'), open a NEW PowerShell, retry." }
-Add-Result "Python 3.12+" "PASS" ("Python " + $v.Trim())
+$found = Find-Python @(@("py", "-3.12"), @("py", "-3.13"), @("py", "-3.14"), @("python"), @("python3"))
+if (-not $found) { Stop-WithFail "Python 3.12+" "Install Python 3.12 or newer from python.org (tick 'Add to PATH'), open a NEW PowerShell, retry." }
+$py = $found.Command
+Add-Result "Python 3.12+" "PASS" ("Python " + $found.Version)
 
 function Invoke-Py([string[]]$Arguments, [string]$LogName) {
     $exe = $py[0]

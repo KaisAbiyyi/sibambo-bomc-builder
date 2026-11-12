@@ -101,7 +101,8 @@ def run() -> tuple[dict, list[str]]:
         owner_api.pause(agent, "home")
     except ToolFailure as failure:
         observed.append(failure.code)
-        log.append(f"REJECTED agent uses owner API: {failure.code}")
+        log.append(f"REJECTED agent uses owner API: {failure.code} retryable={failure.body['retryable']} "
+                   f"-> {failure.body['nextAction']}")
 
     joined = call(agent, "apply_operation", fence=fence, transaction=join)
     log.append(f"apply_operation(join atomically): revision={joined['projectRevision']} replayed={joined['replayed']}")
