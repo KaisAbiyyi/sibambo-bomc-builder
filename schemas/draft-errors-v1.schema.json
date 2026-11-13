@@ -27,6 +27,7 @@
       "properties": {
         "code": {
           "enum": [
+            "RENDER_PENDING",
             "REVISION_CONFLICT",
             "DEPENDENCY_STALE",
             "IDEMPOTENCY_CONFLICT",

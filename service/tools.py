@@ -58,6 +58,10 @@ class ProjectHost:
         self._lock = threading.Lock()
         self._epochs: dict[tuple[str, str], int] = {}
         self._write_gates: dict[tuple[str, str], threading.Lock] = {}
+        from service.draft_ws import DraftHub
+        self.drafts = DraftHub(self)
+        if viewer is None:
+            self.viewer = ViewerCheck(self.drafts.viewer)
 
     def open_project(self, tenant: str, project: str, owner: Principal, *, new_epoch: bool = False):
         """Check-and-open under ONE lock. Returns ``(actor, created)``.
@@ -112,7 +116,11 @@ class Tools:
 
     # ------------------------------------------------------------------ plumbing
     def _actor(self, principal: Principal, project: str) -> ProjectActor:
-        return self.host.actor(principal.tenant, project)
+        actor = self.host.actor(principal.tenant, project)
+        grant = actor._grants.get(principal.id)
+        if principal.id != actor.owner and grant is not None and grant.client != principal.client:
+            raise ToolFailure('FORBIDDEN', 'credential client is not the approved client')
+        return actor
 
     def _guard(self, project: str, args: dict) -> None:
         pid = args.get("projectId")
@@ -168,6 +176,16 @@ class Tools:
         st = self._actor(principal, project).status(principal.id)
         st = {k: v for k, v in st.items() if k not in ("tenant", "project")}
         st["writer"] = "you" if st["writer"] == principal.id else ("another" if st["writer"] else None)
+        opid = args.get('operationId')
+        if opid is not None:
+            actor = self._actor(principal, project)
+            record = actor._state.outcomes.get(opid)
+            if record and record[0] == principal.id:
+                import json
+                outcome = json.loads(record[2])
+                st['operation'] = dict(outcome, rendered=self.host.drafts.channel(actor).acked >= outcome['projectRevision'])
+            else:
+                st['operation'] = None
         return st
 
     def tool_validate_draft(self, principal, project, args):
@@ -194,6 +212,15 @@ class Tools:
         self._actor(principal, project).view(principal.id)      # needs a read grant
         since = args.get("sinceId", 0)
         items = self.host.requests.read(principal.tenant, project, since)
+        from service.owner_mcp import OwnerMcp
+        actor = self._actor(principal, project)
+        channel = self.host.drafts.channel(actor)
+        with self.host.drafts.lock:
+            for item in items:
+                meta = channel.requests.setdefault(str(item['id']), {})
+                if meta.get('status', 'open') == 'open':
+                    meta['status'] = 'read'
+            OwnerMcp(None, self.host, None).request_status(actor)
         return {"requests": items, "untrusted": True}
 
     # ------------------------------------------------------------------ writer lease and writes
@@ -219,18 +246,34 @@ class Tools:
             raise ToolFailure("NO_ACTIVE_VIEWER", "no viewer has the project open")
         if verdict == "timeout":
             raise ToolFailure("RENDER_ACK_TIMEOUT", "the viewer did not acknowledge in time")
+        if verdict == 'pending':
+            raise ToolFailure('RENDER_PENDING', 'the primary viewer has not acknowledged the current revision')
 
     def tool_apply_operation(self, principal, project, args):
         txn, fence = args.get("transaction"), args.get("fence")
         if not isinstance(txn, dict) or type(fence) is not int:
             raise ToolFailure("INVALID_REQUEST", "transaction (object) and fence (integer) are required")
         actor = self._actor(principal, project)
+        from service.draft_wire import operation
+        txn = operation(txn, actor, self.host.drafts.channel(actor), fence)
+        # An exact retry of an accepted transaction returns its outcome without a second write/event,
+        # even after the response was lost and the viewer disconnected. Still require this principal's grant.
+        from core.project.operations import canonical_json, sha256_hex
+        actor._authorize(principal.id, 'write')
+        record = actor._state.outcomes.get(txn.get('idempotencyKey'))
+        if record and record[0] == principal.id and record[1] == sha256_hex(canonical_json(txn)):
+            import json
+            out = json.loads(record[2])
+            return dict(out, replayed=True, rendered=self.host.drafts.channel(actor).acked >= out['projectRevision'])
         self._preflight(actor, principal, write=True)
         gate = self.host.gate(principal.tenant, project)
         if not gate.acquire(blocking=False):                    # one write at a time per project
             raise ToolFailure("BUSY", "a write is already in flight for this project")
         try:
-            return actor.submit(principal.id, Lease(principal.id, fence, 0.0), txn)
+            self._preflight(actor, principal, write=True)
+            out = actor.submit(principal.id, Lease(principal.id, fence, 0.0), txn)
+            self.host.drafts.publish(actor, out, args.get('requestId'))
+            return out
         finally:
             gate.release()
 

@@ -57,12 +57,12 @@ class Env:
     """One TLS server + one synthetic IdP key set."""
 
     def __init__(self, *, host: ProjectHost | None = None, allowed_origins=("https://editor.sibambo.test",),
-                 tls: bool = True):
+                 tls: bool = True, port: int | None = None):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = Path(self.tmp.name)
         self.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         self.other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        self.port = _free_port()
+        self.port = port or _free_port()
         self.scheme = "https" if tls else "http"
         self.base = f"{self.scheme}://127.0.0.1:{self.port}"
         self.audience = f"{self.base}/mcp"

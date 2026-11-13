@@ -130,6 +130,9 @@ def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, ho
         transport_security=security_settings(config.allowed_hosts, config.allowed_origins),
         max_request_body_size=256 * 1024)
     app = EdgeGuard(inner, verifier, host)
+    from service.owner_mcp import OwnerMcp
+    from service.draft_ws import DraftSocket
+    app = DraftSocket(OwnerMcp(app, host, verifier), host.drafts, config.allowed_origins, config.allowed_hosts)
     app.host_state = host                      # test/ops handle; the app holds no other global state
     app.inner = inner
     return app
