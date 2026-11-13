@@ -102,9 +102,12 @@ class OwnerMcp:
                         hub.identities[pending['principal'].id] = pending['agentSubject']
                     hub.pending.pop(key, None)
                 elif action in ('revoke', 'remove'):
-                    target = principal_id(principal.issuer, body.get('agentSubject', ''))
+                    scopes = body.get('scopes')
+                    if not isinstance(scopes, list) or any(s not in ('read', 'write') for s in scopes):
+                        raise ToolFailure('INVALID_REQUEST', 'grant scopes required')
+                    target = principal_id(principal.issuer, body.get('agentSubject', ''), body.get('clientId', ''))
                     grant = actor._grants.get(target)
-                    if gid != target or not grant or body.get('clientId') != grant.client or sorted(body.get('scopes', [])) != sorted(grant.scopes):
+                    if gid != target or not grant or body.get('clientId') != grant.client or sorted(scopes) != sorted(grant.scopes):
                         raise ToolFailure('FORBIDDEN', 'exact credential grant required')
                     actor.revoke(principal.id, target)
                 else:
@@ -115,14 +118,17 @@ class OwnerMcp:
                 action = body.get('action')
                 if action == 'create':
                     text, mids, kind, params = body.get('body'), body.get('moduleIds'), body.get('kind'), body.get('parameters')
-                    if not isinstance(mids, list) or len(mids) > 8 or any(not isinstance(mid, str) or len(mid) > 180 for mid in mids):
+                    import re
+                    if (not isinstance(mids, list) or len(mids) > 8 or
+                            any(not isinstance(mid, str) or len(mid) > 180 or not re.fullmatch(r'[a-z][a-z0-9-]*(/[a-z][a-z0-9-]*)+', mid) for mid in mids) or
+                            len(set(mids)) != len(mids)):
                         raise ToolFailure('INVALID_REQUEST', 'at most eight module IDs required')
                     if kind not in ('instruction', 'typed-parameters') or not isinstance(params, dict) or len(params) > 16:
                         raise ToolFailure('INVALID_REQUEST', 'invalid typed request')
                     import math
                     import re
                     if any(not isinstance(k, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}', k) or
-                           type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e6 for k, v in params.items()) or (kind == 'typed-parameters' and not params):
+                           type(v) not in (int, float) or abs(v) > 1e6 or not math.isfinite(v) for k, v in params.items()) or (kind == 'typed-parameters' and not params):
                         raise ToolFailure('INVALID_REQUEST', 'invalid typed parameters')
                     rid = str(self.host.requests.post(actor.tenant, project, text))
                     channel.requests[rid] = dict(status='open', moduleIds=mids, kind=kind, parameters=params)

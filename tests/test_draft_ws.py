@@ -1,5 +1,6 @@
 """SE-05: real owner HTTP and application WebSocket, synthetic identities only."""
 import asyncio
+import copy
 import json
 import ssl
 import unittest
@@ -245,6 +246,127 @@ class OwnerCompatibilityTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolFailure) as error:
             Tools(self.env.host).call(principal, 'draft-test', 'read_project')
         self.assertEqual(error.exception.code, 'FORBIDDEN')
+
+    async def test_same_human_subject_in_agent_oauth_client_is_not_the_owner_bff(self):
+        async with self.env.http(self.env.mint('owner-1', client='agent-oauth-client')) as http:
+            reply = await http.get(self.env.base + '/v1/projects/draft-test/owner/mcp')
+            self.assertEqual(reply.status_code, 403)
+
+    async def test_withdrawn_request_is_not_offered_to_agent_and_typed_context_is_retained(self):
+        url = self.env.base + '/v1/projects/draft-test/owner/mcp/requests'
+        body = dict(action='create', body='Revise width', moduleIds=['house/room'], kind='typed-parameters', parameters={'width': 3.5})
+        async with self.env.http(self.token) as http:
+            first = (await http.post(url, json=body)).json()['requests'][-1]['id']
+            await http.post(url, json=dict(action='withdraw', requestId=first))
+            second = (await http.post(url, json=body)).json()['requests'][-1]['id']
+        items = self.call('read_owner_requests')['requests']
+        self.assertEqual([str(x['id']) for x in items], [second])
+        self.assertEqual(items[0]['parameters'], {'width': 3.5})
+        self.assertEqual(items[0]['moduleIds'], ['house/room'])
+        self.assertEqual(self.env.host.actor(TENANT, 'draft-test')._state.project.project_revision, 0)
+
+    async def test_legacy_owner_pause_invalidates_new_unused_ticket(self):
+        ticket = await self.ticket()
+        await self.env.owner_post(self.token, 'draft-test', 'pause', {})
+        with self.assertRaises(ValueError):
+            await self.attach(ticket)
+
+    async def test_logout_fences_writer_tickets_and_presence_but_retains_draft(self):
+        socket, snapshot = await self.attach(); await self.ack(socket, snapshot)
+        fence = self.call('acquire_writer')['fence']
+        self.call('apply_operation', fence=fence, transaction=txn(0, [create(house._room('living', False))], 'logout-1'))
+        ticket = await self.ticket()
+        async with self.env.http(self.token) as http:
+            self.assertEqual((await http.post(self.env.base + '/owner/v1/logout')).status_code, 200)
+        with self.assertRaises(ValueError):
+            await self.attach(ticket)
+        actor = self.env.host.actor(TENANT, 'draft-test')
+        self.assertEqual(actor._state.project.project_revision, 1)
+        self.assertTrue(actor.status(actor.owner)['paused'])
+        with self.assertRaises(ToolFailure) as error:
+            self.call('acquire_writer')
+        self.assertEqual(error.exception.code, 'PAUSED_BY_OWNER')
+
+    async def test_wire_dependency_cas_and_complete_idempotency_are_preserved(self):
+        socket, snapshot = await self.attach(); await self.ack(socket, snapshot)
+        fence = self.call('acquire_writer')['fence']
+        module, dependency = house._room('living', False), house._room('bedroom-a', False)
+        module['dependencies'] = [dict(moduleId=dependency['moduleId'], minRevision=1)]
+        self.call('apply_operation', fence=fence, transaction=txn(0, [create(module), create(dependency)], 'deps-1'))
+        await self.ack(socket, await socket.message('event'))
+        module['revision'] = 2
+        operation = dict(schemaVersion=1, projectId='draft-test', epoch=snapshot['epoch'], operationId=str(uuid.uuid4()),
+                         expectedProjectRevision=1, leaseFence=fence, expectedModuleRevisions={module['moduleId']: 1},
+                         action=dict(kind='transaction', changes=[dict(kind='replace_module', module=module)]))
+        with self.assertRaises(ToolFailure) as missing:
+            self.call('apply_operation', fence=fence, transaction=operation)
+        self.assertEqual(missing.exception.code, 'REVISION_CONFLICT')
+        operation['expectedModuleRevisions'][dependency['moduleId']] = 1
+        self.call('apply_operation', fence=fence, transaction=operation)
+        await self.ack(socket, await socket.message('event'))
+        self.assertTrue(self.call('apply_operation', fence=fence, transaction=operation)['replayed'])
+        changed = copy.deepcopy(operation); changed['expectedModuleRevisions'][dependency['moduleId']] = 2
+        with self.assertRaises(ToolFailure) as conflict:
+            self.call('apply_operation', fence=fence, transaction=changed)
+        self.assertEqual(conflict.exception.code, 'IDEMPOTENCY_CONFLICT')
+
+    async def test_lost_accepted_http_receipt_retries_without_a_second_event_or_write(self):
+        host = self.env.host
+        self.env.stop(); self.env = Env(host=host)
+        product = self.env.app
+        lost = []
+        async def lose_one_receipt(scope, receive, send):
+            suppress = False
+            async def intercepted(message):
+                nonlocal suppress
+                if message['type'] == 'http.response.start' and not lost and scope['path'] == '/mcp' and host.actor(TENANT, 'draft-test')._state.project.project_revision == 1:
+                    lost.append(True); suppress = True
+                    await send({'type': 'http.response.start', 'status': 503, 'headers': []})
+                    await send({'type': 'http.response.body', 'body': b'receipt interrupted by synthetic test'})
+                elif not suppress:
+                    await send(message)
+            await product(scope, receive, intercepted)
+        self.env.server.config.app = lose_one_receipt
+        self.env.start(); self.token = self.env.mint('owner-1')
+        socket, snapshot = await self.attach(); await self.ack(socket, snapshot)
+        async with self.env.client(self.env.mint('agent-1'), 'draft-test') as client:
+            fence = (await client.call_tool('acquire_writer', {})).structured_content['fence']
+            transaction = txn(0, [create(house._room('living', False))], 'lost-accepted-receipt')
+            with self.assertRaises(Exception):
+                await client.call_tool('apply_operation', dict(fence=fence, transaction=transaction))
+            event = await socket.message('event')
+            self.assertEqual(event['revision'], 1)
+            await self.ack(socket, event)
+            replay = await client.call_tool('apply_operation', dict(fence=fence, transaction=transaction))
+            self.assertTrue(replay.structured_content['replayed'])
+            self.assertTrue(replay.structured_content['rendered'])
+        self.assertEqual(len(lost), 1)
+        self.assertEqual(len(host.drafts.channel(host.actor(TENANT, 'draft-test')).events), 1)
+
+    async def test_real_agent_pairing_approval_read_and_revocation_round_trip(self):
+        agent_token = self.env.mint('owner-1', client='agent-client-approved')
+        async with self.env.http(agent_token) as http:
+            denied = await http.post(self.env.audience + '?project=draft-test', json={})
+        self.assertEqual(denied.status_code, 403)
+        pairing = denied.json()['pairing']
+        url = self.env.base + '/v1/projects/draft-test/owner/mcp'
+        async with self.env.http(self.token) as http:
+            status = (await http.get(url)).json()
+            self.assertNotIn('pairingCode', status['pending'][0])
+            body = dict(action='approve', grantId=pairing['id'], clientId=pairing['clientId'],
+                        agentSubject=pairing['agentSubject'], scopes=pairing['scopes'], confirmationCode=pairing['pairingCode'])
+            approved = await http.post(url + '/grants', json=body)
+            self.assertEqual(approved.status_code, 200)
+            grant = next(g for g in approved.json()['grants'] if g['clientId'] == 'agent-client-approved')
+        async with self.env.client(agent_token, 'draft-test') as client:
+            self.assertFalse((await client.call_tool('read_project', {})).is_error)
+        async with self.env.http(agent_token) as http:
+            self.assertEqual((await http.get(url)).status_code, 403)
+        async with self.env.http(self.token) as http:
+            revoke = dict(action='revoke', grantId=grant['id'], agentSubject=grant['agentSubject'], clientId=grant['clientId'], scopes=grant['scopes'])
+            self.assertEqual((await http.post(url + '/grants', json=revoke)).status_code, 200)
+        async with self.env.http(agent_token) as http:
+            self.assertEqual((await http.post(self.env.audience + '?project=draft-test', json={})).status_code, 403)
 
 
 if __name__ == '__main__':

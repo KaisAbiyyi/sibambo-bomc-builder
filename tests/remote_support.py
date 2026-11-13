@@ -107,8 +107,8 @@ class Env:
         return jwt.encode(claims, key or self.key, algorithm=alg)
 
     @staticmethod
-    def pid(sub: str) -> str:
-        return principal_id(ISSUER, sub)
+    def pid(sub: str, client: str = 'Test Client') -> str:
+        return principal_id(ISSUER, sub, client)
 
     # ---- http -----------------------------------------------------------------
     def http(self, token: str | None = None, **kw) -> httpx2.AsyncClient:

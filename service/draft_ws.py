@@ -34,9 +34,9 @@ def compact(value):
     return canonical_json(value).decode('utf-8')
 
 
-def records(actor):
+def records(actor, state=None):
     """One immutable actor-state reference, never a multi-revision read."""
-    state = actor._state
+    state = state or actor._state
     view = state.view()
     projections = {m['moduleId']: m for m in view['projection']['modules']}
     changed, manifest = [], []
@@ -103,11 +103,18 @@ class Channel:
         self.detached_at = now
         self.requests = {}  # bounded metadata only; original text belongs to RequestStore
         self.request_operations = {}
+        self.wire_requests = {}  # bound to the actor's 1024 retained outcome entries
+        self._snapshot_state = None
+        self._snapshot = None
 
     def snapshot(self):
-        revision, modules, manifest, digest = records(self.actor)
-        return dict(type='snapshot', schemaVersion=1, projectId=self.actor.project, epoch=self.epoch,
-                    revision=revision, modules=modules, manifest=manifest, draftSha256=digest)
+        state = self.actor._state
+        if state is not self._snapshot_state:
+            revision, modules, manifest, digest = records(self.actor, state)
+            self._snapshot = dict(type='snapshot', schemaVersion=1, projectId=self.actor.project, epoch=self.epoch,
+                                  revision=revision, modules=modules, manifest=manifest, draftSha256=digest)
+            self._snapshot_state = state
+        return self._snapshot
 
 
 class DraftHub:
@@ -229,7 +236,7 @@ class DraftHub:
             channel.acked, channel.ack_hash = revision, digest
             channel.pending_since = None
             request_id = channel.request_operations.pop(revision, None)
-            if request_id in channel.requests:
+            if request_id in channel.requests and channel.requests[request_id].get('status') != 'withdrawn':
                 channel.requests[request_id]['status'] = 'addressed'
                 from service.owner_mcp import OwnerMcp
                 OwnerMcp(None, self.host, None).request_status(channel.actor)
@@ -240,7 +247,8 @@ class DraftHub:
             if outcome.get('replayed'):
                 return  # retrying an accepted operation never creates another event
             channel = self.channel(actor)
-            revision, modules, manifest, digest = records(actor)
+            snapshot = channel.snapshot()
+            revision, modules, manifest, digest = (snapshot[key] for key in ('revision', 'modules', 'manifest', 'draftSha256'))
             changed = set(outcome['changedModules'])
             event = dict(type='event', schemaVersion=1, projectId=actor.project, epoch=channel.epoch,
                          revision=revision, previousRevision=revision - 1, operationId=outcome['transactionId'],
@@ -295,10 +303,13 @@ class DraftHub:
                     self.host.requests.clear(*key)
                     self.channels.pop(key, None)
                     self.host.registry._actors.pop((*key, channel.actor.epoch), None)
-                    self.host._epochs.pop(key, None)
-                    self.host._write_gates.pop(key, None)
+                    if self.host._epochs.get(key) == channel.actor.epoch:
+                        self.host._epochs.pop(key, None)
+                        self.host._write_gates.pop(key, None)
             self.tickets = {k: v for k, v in self.tickets.items() if v[0] > now and self._current(v[1])}
             self.pending = {k: v for k, v in self.pending.items() if v['deadline'] > now}
+            active_grants = {gid for channel in self.channels.values() for gid in channel.actor._grants}
+            self.identities = {gid: sub for gid, sub in self.identities.items() if gid in active_grants}
 
     def request_pairing(self, principal, actor):
         from service.tools import ToolFailure

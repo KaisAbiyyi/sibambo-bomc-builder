@@ -51,6 +51,8 @@ class ProjectHost:
 
     def __init__(self, *, registry: ActorRegistry | None = None, requests: RequestStore | None = None,
                  tickets: TicketStore | None = None, viewer: ViewerCheck | None = None, **actor_defaults):
+        if viewer is None:
+            actor_defaults = {'heartbeat_ttl': 15, 'lease_ttl': 30, 'max_pending': 8, **actor_defaults}
         self.registry = registry or ActorRegistry(**actor_defaults)
         self.requests = requests or RequestStore()
         self.tickets = tickets or TicketStore()
@@ -216,10 +218,12 @@ class Tools:
         actor = self._actor(principal, project)
         channel = self.host.drafts.channel(actor)
         with self.host.drafts.lock:
+            items = [item for item in items if channel.requests.get(str(item['id']), {}).get('status') != 'withdrawn']
             for item in items:
                 meta = channel.requests.setdefault(str(item['id']), {})
                 if meta.get('status', 'open') == 'open':
                     meta['status'] = 'read'
+                item.update({key: meta[key] for key in ('moduleIds', 'kind', 'parameters') if key in meta})
             OwnerMcp(None, self.host, None).request_status(actor)
         return {"requests": items, "untrusted": True}
 
@@ -254,13 +258,18 @@ class Tools:
         if not isinstance(txn, dict) or type(fence) is not int:
             raise ToolFailure("INVALID_REQUEST", "transaction (object) and fence (integer) are required")
         actor = self._actor(principal, project)
-        from service.draft_wire import operation
-        txn = operation(txn, actor, self.host.drafts.channel(actor), fence)
+        from service.draft_wire import operation, fingerprint, check_dependencies
+        wire = txn if txn.get('schemaVersion') == 1 else None
+        channel = self.host.drafts.channel(actor)
+        txn = operation(txn, actor, channel, fence)
         # An exact retry of an accepted transaction returns its outcome without a second write/event,
         # even after the response was lost and the viewer disconnected. Still require this principal's grant.
         from core.project.operations import canonical_json, sha256_hex
         actor._authorize(principal.id, 'write')
         record = actor._state.outcomes.get(txn.get('idempotencyKey'))
+        wire_hash = fingerprint(wire) if wire else None
+        if record and wire and channel.wire_requests.get(txn['idempotencyKey']) != (principal.id, wire_hash):
+            raise ToolFailure('IDEMPOTENCY_CONFLICT', 'operation ID was already used for a different wire request')
         if record and record[0] == principal.id and record[1] == sha256_hex(canonical_json(txn)):
             import json
             out = json.loads(record[2])
@@ -271,7 +280,12 @@ class Tools:
             raise ToolFailure("BUSY", "a write is already in flight for this project")
         try:
             self._preflight(actor, principal, write=True)
+            if wire:
+                check_dependencies(wire, actor)
             out = actor.submit(principal.id, Lease(principal.id, fence, 0.0), txn)
+            channel.wire_requests = {key: value for key, value in channel.wire_requests.items() if key in actor._state.outcomes}
+            if wire:
+                channel.wire_requests[txn['idempotencyKey']] = (principal.id, wire_hash)
             self.host.drafts.publish(actor, out, args.get('requestId'))
             return out
         finally:
@@ -300,6 +314,7 @@ class OwnerApi:
     def open(self, principal: Principal, project: str, new_epoch: bool = False) -> dict:
         """Idempotent for the owner; ``newEpoch`` starts a fresh empty epoch and is owner-only too."""
         actor, created = self.host.open_project(principal.tenant, project, principal, new_epoch=new_epoch)
+        self.host.drafts.channel(actor)  # rotate wire epoch and close old peers at the explicit owner boundary
         return self._wrap(project, {"epoch": actor.epoch, "created": created})
 
     def status(self, principal, project):
@@ -316,18 +331,25 @@ class OwnerApi:
             actor.grant(principal.id, Grant(principal.tenant, project, subject, client, frozenset(scopes)))
         except ActorError as exc:
             raise _from_actor(exc) from exc
+        self.host.drafts.invalidate(actor)
         return self._wrap(project, {"granted": subject, "scopes": sorted(scopes)})
 
     def revoke(self, principal, project, subject: str):
-        existed = self._own(principal, project).revoke(principal.id, subject)
+        actor = self._own(principal, project)
+        existed = actor.revoke(principal.id, subject)
+        self.host.drafts.invalidate(actor)
         return self._wrap(project, {"revoked": bool(existed)})
 
     def pause(self, principal, project):
-        self._own(principal, project).pause(principal.id)
+        actor = self._own(principal, project)
+        actor.pause(principal.id)
+        self.host.drafts.invalidate(actor)
         return self._wrap(project, {"paused": True})
 
     def resume(self, principal, project):
-        self._own(principal, project).resume(principal.id)
+        actor = self._own(principal, project)
+        actor.resume(principal.id)
+        self.host.drafts.invalidate(actor)
         return self._wrap(project, {"paused": False})
 
     def ticket(self, principal, project):

@@ -67,6 +67,10 @@ async def main(output, port):
             channel = env.host.drafts.channel(actor)
             result = {'revision': actor._state.project.project_revision, 'acked': channel.acked,
                       'events': len(channel.events), 'epoch': channel.epoch}
+        elif action == 'new-epoch':
+            await env.owner_post(env.mint('owner-1'), project, 'open', {'newEpoch': True})
+            env.host.drafts.channel(env.host.actor(TENANT, project))
+            result = {'ok': True}
         else:
             result = {'ok': False}
         await JSONResponse(result)(scope, receive, send)
