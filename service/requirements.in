@@ -1,0 +1,5 @@
+# SE-03 remote MCP service. Direct pins only; the hash-locked closure lives in requirements.lock.
+mcp==2.3.0
+uvicorn==0.54.0
+PyJWT[crypto]==2.15.0
+jsonschema==4.23.0
