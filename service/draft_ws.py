@@ -28,6 +28,9 @@ MAX_QUEUE_EVENTS = 64
 MAX_QUEUE_BYTES = 4 * 1024 * 1024
 MAX_REPLAY_EVENTS = 128
 MAX_REPLAY_BYTES = 8 * 1024 * 1024
+# Nominal 30s cap, conservatively shortened for coarse Windows/JS wall-clock ticks.
+# Keep the BFF/browser's strict <=30,000ms validation; never extend a ticket for skew.
+TICKET_LIFETIME = 29.95
 
 
 def compact(value):
@@ -156,9 +159,9 @@ class DraftHub:
                 raise ToolFailure('BUSY', 'too many outstanding draft tickets')
             channel = self.channel(actor)
             ticket = secrets.token_urlsafe(48)
-            self.tickets[hashlib.sha256(ticket.encode()).hexdigest()] = (now + 30, channel, channel.authority)
+            self.tickets[hashlib.sha256(ticket.encode()).hexdigest()] = (now + TICKET_LIFETIME, channel, channel.authority)
             return dict(ticket=ticket, ttlSeconds=30,
-                        ticketExpiresAt=datetime.fromtimestamp(time.time() + 30, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z'))
+                        ticketExpiresAt=datetime.fromtimestamp(time.time() + TICKET_LIFETIME, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z'))
 
     def attach(self, hello):
         with self.lock:

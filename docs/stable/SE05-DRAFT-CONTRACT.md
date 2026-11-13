@@ -10,6 +10,8 @@ The verified credential identity is `(issuer, subject, signed azp/client_id)` wi
 
 Ticket POST returns `ticket`, `ticketExpiresAt` (UTC with millisecond precision) and `ttlSeconds:30`. RAM holds only its SHA-256 and exact actor/authority binding. It is consumed once, including failed attachment. Grant/revoke/pause, explicit new epoch, logout or expiry prevents reuse. Authenticated `/owner/v1/logout` pauses/fences the owner's channels and disconnects their viewers, retaining canonical state until the normal idle expiry.
 
+The 30-second lifetime is an upper bound. The advertised expiry and monotonic attachment deadline are both conservatively 29.95 seconds, leaving 50 ms for coarse receiver wall-clock ticks on Windows. BFF/browser validation still rejects anything over 30,000 ms; no clock-skew allowance extends the credential. This fixes the observed Windows false rejection of a fine-clock timestamp without weakening expiry or single use.
+
 ## Preserved actor, explicit wire mapping
 
 The accepted actor retains integer internal epochs, the `draft-operation-v1` transaction envelope, uint32/core limits, canonical-module ledger, reciprocal-seam validation, tombstones and 1024-entry outcome cache. Existing legacy operations are unchanged. Project IDs retain the accepted service's validated IDs. The application channel exposes a random UUID per actor instance; this UUID never changes the actor's integer identity. A new actor gets a different UUID and the browser refuses to silently replace retained state across epochs. Explicit restoration belongs to SE-08.

@@ -5,6 +5,8 @@ import json
 import ssl
 import unittest
 import uuid
+from unittest.mock import patch
+from datetime import datetime
 from wsproto import WSConnection, ConnectionType
 from wsproto.events import Request, TextMessage, AcceptConnection, CloseConnection, RejectConnection
 from tests.remote_support import Env, TENANT, ISSUER
@@ -104,6 +106,18 @@ class OwnerCompatibilityTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(ticket.json()['ttlSeconds'], 30)
             self.assertIn('ticketExpiresAt', ticket.json())
             self.assertRegex(ticket.json()['ticketExpiresAt'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$')
+
+    async def test_ticket_never_exceeds_strict_cap_on_a_coarse_receiver_clock(self):
+        actor = self.env.host.actor(TENANT, 'draft-test')
+        hub = self.env.host.drafts
+        hub.clock = lambda: 10.0
+        # Windows receiver Date.now can lag the issuer's fine wall clock by one ~16ms tick.
+        with patch('service.draft_ws.time.time', return_value=1000.015):
+            ticket = hub.issue_ticket(actor)
+        expires = datetime.fromisoformat(ticket['ticketExpiresAt'].replace('Z', '+00:00')).timestamp()
+        self.assertLessEqual(expires - 1000.0, 30.0)
+        self.assertGreater(expires - 1000.0, 29.0)
+        self.assertLessEqual(next(iter(hub.tickets.values()))[0] - 10.0, 30.0)
 
     async def test_no_viewer_is_not_substituted_by_owner_rest_heartbeat(self):
         with self.assertRaises(ToolFailure) as error:
