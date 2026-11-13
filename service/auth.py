@@ -5,13 +5,15 @@ the tokens (PKCE S256 is enforced there; this module never mints an access token
 is accepted only if its signature verifies against the issuer's keys, ``alg`` is on a
 strict allow-list (never ``none``/HMAC), ``iss`` and ``aud`` match exactly, ``exp`` is in
 the future, and it carries ``sub`` and a tenant claim. Provider credentials are never
-accepted, forwarded or stored; ``clientInfo`` / ``client_id`` are display data only and
+accepted, forwarded or stored; unverified ``clientInfo`` is display data only. The
+signature-verified ``azp``/``client_id`` binds the OAuth application to the principal and
 the MCP session id is never authentication (the transport mints none).
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import hmac
 import re
 import secrets
@@ -30,16 +32,18 @@ TICKET_MIN, TICKET_MAX, TICKET_MAX_TTL = 32, 512, 300
 
 @dataclass(frozen=True)
 class Principal:
-    """Who the credential is. ``id`` is derived from (issuer, sub), never from client display data."""
+    """Verified credential identity (issuer, sub, OAuth client), never an MCP display name."""
     id: str
     tenant: str
     issuer: str
     subject: str
-    client: str          # display label only, never used for authorization
+    client: str          # signature-verified OAuth client; an explicit grant is still required
 
 
-def principal_id(issuer: str, subject: str) -> str:
-    return "p-" + hashlib.sha256(f"{issuer}\n{subject}".encode("utf-8")).hexdigest()[:40]
+def principal_id(issuer: str, subject: str, client: str | None = None) -> str:
+    # Legacy two-argument helpers retain their identity bytes; verified OAuth always supplies client.
+    identity = f"{issuer}\n{subject}" if client is None else json.dumps([issuer, subject, client], ensure_ascii=False, separators=(',', ':'))
+    return "p-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:40]
 
 
 class JwtVerifier:
@@ -68,8 +72,10 @@ class JwtVerifier:
         sub, tenant = claims.get("sub"), claims.get(self.tenant_claim)
         if not (isinstance(sub, str) and sub and isinstance(tenant, str) and TENANT_RE.match(tenant)):
             return None
-        client = claims.get("azp") or claims.get("client_id") or "unknown"
-        return Principal(principal_id(self.issuer, sub), tenant, self.issuer, sub, str(client)[:128])
+        client = claims.get("azp") or claims.get("client_id")
+        if not isinstance(client, str) or not client or len(client) > 128:
+            return None
+        return Principal(principal_id(self.issuer, sub, client), tenant, self.issuer, sub, client)
 
     async def verify_token(self, token: str) -> AccessToken | None:
         principal = await asyncio.to_thread(self.principal_of, token)   # JWKS fetch may block

@@ -108,14 +108,21 @@ def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, ho
         if not (isinstance(sub, str) and sub and isinstance(client, str) and isinstance(scopes, list)):
             raise ToolFailure("INVALID_REQUEST", "sub, client and scopes[] are required")
         from service.auth import principal_id
-        return owner.grant(p, j, principal_id(p.issuer, sub), client, scopes)
+        subject = principal_id(p.issuer, sub, client)
+        result = owner.grant(p, j, subject, client, scopes)
+        with host.drafts.lock:
+            host.drafts.identities[subject] = sub
+        return result
 
     def revoke(p, j, b):
         sub = b.get("sub")
         if not isinstance(sub, str) or not sub:
             raise ToolFailure("INVALID_REQUEST", "sub is required")
         from service.auth import principal_id
-        return owner.revoke(p, j, principal_id(p.issuer, sub))
+        actor = owner._own(p, j)
+        targets = [gid for gid in actor._grants if host.drafts.identities.get(gid) == sub]
+        revoked = [owner.revoke(p, j, gid)['revoked'] for gid in targets]
+        return {'projectId': j, 'revoked': any(revoked)}
 
     route(base + "/grants", ["POST"], grant)
     route(base + "/revoke", ["POST"], revoke)
@@ -130,6 +137,9 @@ def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, ho
         transport_security=security_settings(config.allowed_hosts, config.allowed_origins),
         max_request_body_size=256 * 1024)
     app = EdgeGuard(inner, verifier, host)
+    from service.owner_mcp import OwnerMcp
+    from service.draft_ws import DraftSocket
+    app = DraftSocket(OwnerMcp(app, host, verifier), host.drafts, config.allowed_origins, config.allowed_hosts)
     app.host_state = host                      # test/ops handle; the app holds no other global state
     app.inner = inner
     return app

@@ -59,12 +59,12 @@ def register_tools(server: MCPServer, run) -> None:
         return await run("release_writer", {"fence": fence, "projectId": projectId})
 
     @server.tool(name="apply_operation", description=TOOLS["apply_operation"])
-    async def apply_operation(transaction: dict, fence: int, projectId: str | None = None) -> CallToolResult:
-        return await run("apply_operation", {"transaction": transaction, "fence": fence, "projectId": projectId})
+    async def apply_operation(transaction: dict, fence: int, projectId: str | None = None, requestId: str | None = None) -> CallToolResult:
+        return await run("apply_operation", {"transaction": transaction, "fence": fence, "projectId": projectId, 'requestId': requestId})
 
     @server.tool(name="operation_status", description=TOOLS["operation_status"])
-    async def operation_status(projectId: str | None = None) -> CallToolResult:
-        return await run("operation_status", {"projectId": projectId})
+    async def operation_status(projectId: str | None = None, operationId: str | None = None) -> CallToolResult:
+        return await run("operation_status", {"projectId": projectId, 'operationId': operationId})
 
     @server.tool(name="validate_draft", description=TOOLS["validate_draft"])
     async def validate_draft(projectId: str | None = None) -> CallToolResult:
@@ -156,10 +156,17 @@ class EdgeGuard:
             return await _json_response(send, 400, {"ok": False, "error": body})
         try:
             actor = self.host.actor(principal.tenant, project)
+            grant = actor._grants.get(principal.id)
+            if principal.id != actor.owner and grant is not None and grant.client != principal.client:
+                raise ActorError('GRANT_DENIED', 'credential client is not approved')
             await asyncio.to_thread(actor.status, principal.id)    # needs at least a read grant
         except ToolFailure as failure:
             return await _json_response(send, errors.http_status(failure.code), {"ok": False, "projectId": project, "error": failure.body})
         except ActorError as exc:
+            if exc.code == 'GRANT_DENIED':
+                pairing = self.host.drafts.request_pairing(principal, actor)
+                body = errors.error_body('FORBIDDEN', 'Owner approval required. Compare pairing code ' + pairing['pairingCode'])
+                return await _json_response(send, 403, {'ok': False, 'projectId': project, 'error': body, 'pairing': pairing})
             code = "FORBIDDEN" if exc.code in ("GRANT_DENIED", "TENANT_MISMATCH") else exc.code
             body = errors.error_body(code, "this principal has no capability on the project")
             return await _json_response(send, errors.http_status(code), {"ok": False, "projectId": project, "error": body})

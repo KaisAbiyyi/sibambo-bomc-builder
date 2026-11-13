@@ -7,6 +7,7 @@ from core.project import state as S
 
 # code -> (retryable, nextAction, httpStatus for the owner REST surface)
 CATALOG: dict[str, tuple[bool, str, int]] = {
+    'RENDER_PENDING': (True, 'Wait for the primary Editor viewer to acknowledge this revision; query operation_status before retrying.', 409),
     # --- v1.3 / SE-02 codes, unchanged names -------------------------------------------
     S.REVISION_CONFLICT: (True, "Call read_project, rebuild the change on the new projectRevision, resend with a new idempotencyKey.", 409),
     S.DEPENDENCY_STALE: (True, "Call read_project, raise the dependency minRevision or rebuild against current revisions.", 409),
