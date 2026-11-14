@@ -25,11 +25,13 @@ from service.app import ServiceConfig, create_app
 from service.auth import JwtVerifier, Principal, principal_id
 from service.bridge import ENV_ADDR, ENV_PROJECT, ENV_SECRET_FILE, BridgeServer
 from service.tools import OwnerApi, ProjectHost, Tools
+from service.agent_relay import AgentRelay
+from service.recorder import Recorder
 
 LOCAL_ISSUER = "http://127.0.0.1/sibambo-local-demo"   # the MCP SDK requires a URL-shaped issuer
 LOCAL_TENANT = "local"
 OWNER_SUB, OWNER_CLIENT = "local-owner", "sibambo-editor-local"
-CLIENTS = {"claude-code": "local-claude-code", "codex": "local-codex"}
+CLIENTS = {"claude-code": "local-claude-code", "codex": "local-codex", "other": "local-other"}
 SERVER_NAME = "sibambo_local"
 TOOLS = ("read_project", "inspect_module", "acquire_writer", "release_writer", "apply_operation",
          "operation_status", "validate_draft", "read_owner_requests")
@@ -60,7 +62,8 @@ class LocalVerifier(JwtVerifier):
 
 
 class LocalDemo:
-    def __init__(self, *, project: str, port: int, owner_secret: str, editor_origins, clients=tuple(CLIENTS)):
+    def __init__(self, *, project: str, port: int, owner_secret: str, editor_origins, clients=tuple(CLIENTS),
+                 record_root=Path('D:/projects/sibambo/outputs/mcp-sessions'), no_record=False):
         unknown = [c for c in clients if c not in CLIENTS]
         if unknown:
             raise ValueError("unknown client " + unknown[0])
@@ -70,18 +73,20 @@ class LocalDemo:
         api = OwnerApi(self.host)
         api.open(self.owner, project)
         self.bridges: dict[str, BridgeServer] = {}
+        self.relay = AgentRelay(None, Recorder(record_root, not no_record))
+        self._discovery = []
         self.agents: dict[str, Principal] = {}
         for client in self.clients:
             agent = principal(CLIENTS[client], client)
             api.grant(self.owner, project, agent.id, client, ["read", "write"])
             self.host.drafts.identities[agent.id] = agent.subject
             self.agents[client] = agent
-            self.bridges[client] = BridgeServer(Tools(self.host), agent, project)
+            self.bridges[client] = BridgeServer(Tools(self.host), agent, project, relay=self.relay, slot=client)
         audience = f"http://127.0.0.1:{port}/mcp"
         config = ServiceConfig(issuer=LOCAL_ISSUER, audience=audience,
                                allowed_hosts=(f"127.0.0.1:{port}", f"localhost:{port}"),
                                allowed_origins=tuple(editor_origins))
-        self.app = create_app(config, verifier=LocalVerifier(owner_secret, audience), host=self.host)
+        self.app = create_app(config, verifier=LocalVerifier(owner_secret, audience), host=self.host, relay=self.relay)
 
     def start_bridges(self) -> None:
         for bridge in self.bridges.values():
@@ -90,36 +95,37 @@ class LocalDemo:
     def stop(self) -> None:
         for bridge in self.bridges.values():
             bridge.stop()
+        for path in self._discovery:
+            try:
+                # Do not delete a discovery file replaced by another service instance.
+                info = json.loads(path.read_text(encoding='utf-8'))
+                if info.get('secret') == self.bridges[info.get('slot')].secret:
+                    path.unlink()
+            except (OSError, ValueError, KeyError):
+                pass
 
     def epoch(self) -> str:
         return self.host.drafts.channel(self.host.actor(LOCAL_TENANT, self.project)).epoch
 
     def write_client_files(self, run_root: Path) -> dict:
-        """Private bridge secrets + secret-free client configs. Returns the public manifest."""
-        private, agents = run_root / "private", run_root / "agents"
+        """Atomic per-slot discovery only; stable registrations are owned by WP11."""
+        _refuse_c_drive(run_root)
+        private = run_root / "private"
         private.mkdir(parents=True, exist_ok=True)
         (run_root / "tmp").mkdir(parents=True, exist_ok=True)
-        agents.mkdir(parents=True, exist_ok=True)
-        tmp = (run_root / "tmp").as_posix()
         python = Path(sys.executable).as_posix()
         for client, bridge in self.bridges.items():
-            secret_path = private / f"bridge-{client}.secret"
-            secret_path.write_text(bridge.secret, encoding="utf-8")
-            env = {"PYTHONPATH": ROOT.as_posix(), "PYTHONDONTWRITEBYTECODE": "1", "TEMP": tmp, "TMP": tmp,
-                   ENV_ADDR: f"{bridge.address[0]}:{bridge.address[1]}", ENV_PROJECT: self.project,
-                   ENV_SECRET_FILE: secret_path.as_posix()}
-            if client == "claude-code":
-                body = {"mcpServers": {SERVER_NAME: {"type": "stdio", "command": python,
-                                                       "args": ["-m", "service.stdio_bridge"], "env": env}}}
-                (agents / "claude.mcp.json").write_text(json.dumps(body, indent=2), encoding="utf-8")
-            else:
-                def q(text: str) -> str:
-                    return json.dumps(text)
-                env_toml = "{" + ",".join(f"{k}={q(v)}" for k, v in env.items()) + "}"
-                overrides = [f"mcp_servers.{SERVER_NAME}={{command={q(python)},args=[\"-m\",\"service.stdio_bridge\"],"
-                             f"env={env_toml},enabled=true,required=true,enabled_tools={json.dumps(list(TOOLS))}}}"]
-                overrides += [f'mcp_servers.{SERVER_NAME}.tools.{tool}.approval_mode="approve"' for tool in TOOLS]
-                (agents / "codex.overrides.json").write_text(json.dumps(overrides, indent=2), encoding="utf-8")
+            path = private / f'bridge-{client}.json'
+            body = {'addr': f'{bridge.address[0]}:{bridge.address[1]}', 'secret': bridge.secret,
+                    'project': self.project, 'epoch': self.epoch(), 'slot': client}
+            temp = path.with_suffix('.json.tmp')
+            try:
+                temp.write_text(json.dumps(body, separators=(',', ':')), encoding='utf-8')
+                os.replace(temp, path)
+            finally:
+                temp.unlink(missing_ok=True)
+            if path not in self._discovery:
+                self._discovery.append(path)
         return {"schemaVersion": 1, "mode": "local-demo", "project": self.project, "servicePort": self.port,
                 "serverName": SERVER_NAME, "clients": list(self.clients), "epoch": self.epoch(), "pid": os.getpid(),
                 "python": python, "startedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
@@ -137,6 +143,8 @@ def main(argv=None) -> int:
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--clients", default=",".join(CLIENTS))
+    parser.add_argument('--record-root', type=Path, default=Path('D:/projects/sibambo/outputs/mcp-sessions'))
+    parser.add_argument('--no-record', action='store_true')
     parser.add_argument("--editor-origin", action="append", default=None)
     args = parser.parse_args(argv)
     if args.bind != "127.0.0.1":
@@ -150,7 +158,8 @@ def main(argv=None) -> int:
         _refuse_c_drive(args.run_root)
         origins = args.editor_origin or ["http://localhost:5175", "http://127.0.0.1:5175"]
         demo = LocalDemo(project=args.project, port=args.port, owner_secret=secret, editor_origins=origins,
-                         clients=tuple(c for c in args.clients.split(",") if c))
+                         clients=tuple(c for c in args.clients.split(",") if c),
+                         record_root=args.record_root, no_record=args.no_record)
     except (ValueError, SystemExit) as exc:
         print(str(exc), file=sys.stderr)
         return 2

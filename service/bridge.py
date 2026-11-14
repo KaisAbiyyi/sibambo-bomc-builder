@@ -20,6 +20,7 @@ import secrets
 import socket
 import socketserver
 import threading
+from pathlib import Path
 
 from service import errors
 from service.auth import Principal
@@ -46,7 +47,11 @@ class _Handler(socketserver.StreamRequestHandler):
             if not (isinstance(supplied, str) and hmac.compare_digest(supplied.encode(), server.secret.encode())):
                 return                                           # refuse silently: no oracle, no detail
             reply = server.dispatch(frame)
-            self.wfile.write((json.dumps(reply, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8"))
+            raw = (json.dumps(reply, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+            if frame.get('api') == 'addon-1' and len(raw) > 4 * MAX_FRAME:
+                raw = (json.dumps({'id': frame.get('id'), 'ok': False,
+                    'error': errors.error_body('BUDGET_EXCEEDED', 'Add-on result exceeds 4 MiB')}) + '\n').encode('utf-8')
+            self.wfile.write(raw)
             self.wfile.flush()
 
 
@@ -57,8 +62,9 @@ class _TCP(socketserver.ThreadingTCPServer):
 
 
 class BridgeServer:
-    def __init__(self, tools: Tools, principal: Principal, project: str, *, secret: str | None = None):
+    def __init__(self, tools: Tools, principal: Principal, project: str, *, secret: str | None = None, relay=None, slot=None):
         self.tools, self.principal, self.project = tools, principal, project
+        self.relay, self.slot = relay, slot
         self.secret = secret or secrets.token_hex(32)           # 64 hex chars, per launch
         self._srv = _TCP((HOST, 0), _Handler)                   # loopback only, ephemeral port
         self._srv.owner = self
@@ -86,6 +92,10 @@ class BridgeServer:
         rid, tool, args = frame.get("id"), frame.get("tool"), frame.get("args") or {}
         if not isinstance(tool, str) or not isinstance(args, dict):
             return {"id": rid, "ok": False, "error": errors.error_body("INVALID_REQUEST", "tool and args are required")}
+        if frame.get('api') == 'addon-1':
+            if self.relay is None:
+                return {'id': rid, 'ok': False, 'error': errors.error_body('INVALID_REQUEST', 'Add-on relay is not configured')}
+            return {'id': rid, **self.relay.call_sync(self.slot, frame.get('session'), tool, args)}
         try:
             return {"id": rid, "ok": True, "result": self.tools.call(self.principal, self.project, tool, args)}
         except ToolFailure as failure:
@@ -116,3 +126,41 @@ def bridge_call(tool: str, args: dict, *, env=os.environ, timeout: float = 30.0)
     if not reply:
         return {"ok": False, "error": errors.error_body("UNAUTHENTICATED", "bridge refused the request")}
     return json.loads(reply.decode("utf-8"))
+
+
+def bridge_call_addon(tool, args, run_root, slot, session):
+    """Re-read atomic discovery on every call; never accept a non-loopback address."""
+    from service.recorder import SLOT
+    message = 'Sibambo local service is not running. Ask the owner to run: node tooling/local-demo/launch.mjs'
+    def offline():
+        return {'ok': False, 'error': errors.error_body('SERVICE_OFFLINE', message)}
+    try:
+        if not isinstance(slot, str) or not SLOT.fullmatch(slot):
+            return offline()
+        with (Path(run_root) / 'private' / f'bridge-{slot}.json').open('rb') as handle:
+            raw = handle.read(4097)
+        if len(raw) > 4096:
+            return offline()
+        info = json.loads(raw)
+        if not isinstance(info, dict) or set(info) != {'addr', 'secret', 'project', 'epoch', 'slot'}:
+            return offline()
+        if info['slot'] != slot or not all(isinstance(info[k], str) and info[k] for k in info):
+            return offline()
+        host, port = info['addr'].rsplit(':', 1)
+        if host != HOST or not 1 <= int(port) <= 65535 or len(info['secret']) != 64:
+            return offline()
+        frame = json.dumps({'secret': info['secret'], 'id': 1, 'api': 'addon-1', 'session': session,
+                            'tool': tool, 'args': args}, allow_nan=False, separators=(',', ':')).encode('utf-8') + b'\n'
+        if len(frame) > 256 * 1024:
+            return {'ok': False, 'error': errors.error_body('BUDGET_EXCEEDED', 'Add-on request exceeds 256 KiB')}
+        with socket.create_connection((host, int(port)), timeout=130) as sock:
+            sock.sendall(frame)
+            reply = sock.makefile('rb').readline(4 * MAX_FRAME + 1)
+        if not reply or len(reply) > 4 * MAX_FRAME:
+            return offline()
+        parsed = json.loads(reply)
+        if not isinstance(parsed, dict) or parsed.get('id') != 1 or type(parsed.get('ok')) is not bool:
+            return offline()
+        return parsed
+    except (KeyError, ValueError, TypeError, AttributeError, OSError, RecursionError):
+        return offline()

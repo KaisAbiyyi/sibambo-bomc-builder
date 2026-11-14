@@ -49,7 +49,7 @@ def _fail(project: str | None, failure: ToolFailure) -> JSONResponse:
     return JSONResponse(body, status_code=errors.http_status(failure.code), headers={"X-Accel-Buffering": "no"})
 
 
-def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, host: ProjectHost | None = None):
+def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, host: ProjectHost | None = None, relay=None):
     host = host or ProjectHost()
     verifier = verifier or JwtVerifier(issuer=config.issuer, audience=config.audience,
                                        key_resolver=jwks_resolver(config.jwks_url), tenant_claim=config.tenant_claim)
@@ -140,6 +140,9 @@ def create_app(config: ServiceConfig, *, verifier: JwtVerifier | None = None, ho
     from service.owner_mcp import OwnerMcp
     from service.draft_ws import DraftSocket
     app = DraftSocket(OwnerMcp(app, host, verifier), host.drafts, config.allowed_origins, config.allowed_hosts)
+    if relay is not None:
+        from service.agent_relay import AgentSocket
+        app = AgentSocket(app, relay, host.drafts, config.allowed_origins, config.allowed_hosts)
     app.host_state = host                      # test/ops handle; the app holds no other global state
     app.inner = inner
     return app
