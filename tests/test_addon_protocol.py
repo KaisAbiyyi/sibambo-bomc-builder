@@ -72,6 +72,12 @@ class AddonProtocolTests(unittest.IsolatedAsyncioTestCase):
                             ws.send_json({'type': 'agent_result', 'id': call['id'], 'ok': True, 'result': 'Floor plan pending'})
                             result = await pending
                             self.assertIn('Floor plan pending', result.content[0].text)
+                            pending = asyncio.create_task(client.call_tool('get_floor_plan', {'moduleId': 'house/ground', 'format': 'svg'}))
+                            call = await asyncio.to_thread(ws.receive_json)
+                            large = 'x' * (1024 * 1024 + 512)
+                            ws.send_json({'type': 'agent_result', 'id': call['id'], 'ok': True, 'result': large})
+                            result = await pending
+                            self.assertEqual(result.structured_content['result'], large)
                         (Path(tmp) / 'private/bridge-codex.json').unlink()
                         offline = await client.call_tool('describe_scene', {})
                         self.assertEqual(offline.structured_content['error']['code'], 'SERVICE_OFFLINE')

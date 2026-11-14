@@ -56,3 +56,15 @@ class RecorderTests(unittest.TestCase):
                                             (Recorder(Path(tmp), True), 'codex', '../../escape')]:
                 recorder.append(slot, session, 'measure', {}, True, {}, 0, None)
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_non_d_windows_root_is_disabled_without_creating_files(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp, patch('service.recorder.os', SimpleNamespace(name='nt')):
+            # On Windows use a C: path; on Linux a POSIX path has no D: drive.
+            import os
+            root = Path('C:/sibambo-recorder-refused') if os.name == 'nt' else Path(tmp)
+            with contextlib.redirect_stderr(io.StringIO()) as output:
+                recorder = Recorder(root, True)
+                recorder.append('codex', 'a' * 32, 'measure', {}, True, {}, 0, None)
+            self.assertFalse(recorder.enabled)
+            self.assertEqual(len(output.getvalue().splitlines()), 1)
