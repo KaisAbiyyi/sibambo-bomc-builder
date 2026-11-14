@@ -249,6 +249,10 @@ class AgentSocket:
             done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 task.result()
+        except asyncio.CancelledError:
+            # ASGI may cancel a disconnected WebSocket before its receive task observes
+            # websocket.disconnect. Retire the peer just as for an ordinary disconnect.
+            pass
         except (ValueError, TypeError, KeyError, OSError, RuntimeError, WebSocketDisconnect, asyncio.TimeoutError):
             try:
                 await socket.close(code=1008, reason='Attachment or channel rejected')
