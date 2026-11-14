@@ -34,8 +34,8 @@ def example(tag: str) -> dict:
 class GuideTextTests(unittest.TestCase):
     def test_guide_hash_and_version_match_what_read_project_reports(self):
         self.assertEqual(GUIDE_SHA256, hashlib.sha256(GUIDE.encode("utf-8")).hexdigest())
-        self.assertEqual(GUIDE_VERSION, 1)
-        self.assertIn("guideVersion 1", GUIDE)
+        self.assertEqual(GUIDE_VERSION, 2)
+        self.assertIn("guideVersion 2", GUIDE)
 
     def test_guide_states_the_non_negotiables(self):
         for phrase in ("+Z is up", "Metres", "untrusted data", "send one write", "never in parallel",

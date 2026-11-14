@@ -28,6 +28,7 @@ from service.tools import ToolFailure, Tools
 MAX_FRAME = 1024 * 1024
 HOST = "127.0.0.1"
 ENV_ADDR, ENV_SECRET, ENV_PROJECT = "SIBAMBO_BRIDGE_ADDR", "SIBAMBO_BRIDGE_SECRET", "SIBAMBO_BRIDGE_PROJECT"
+ENV_SECRET_FILE = "SIBAMBO_BRIDGE_SECRET_FILE"
 
 
 class _Handler(socketserver.StreamRequestHandler):
@@ -95,8 +96,13 @@ def bridge_call(tool: str, args: dict, *, env=os.environ, timeout: float = 30.0)
     """Client side (used by the stdio process). Returns {"ok", "result"|"error"}."""
     try:
         host, port = env[ENV_ADDR].rsplit(":", 1)
-        secret = env[ENV_SECRET]
-    except (KeyError, ValueError):
+        secret = env.get(ENV_SECRET)
+        if secret is None:                       # launcher-provided private file keeps the secret out of client argv/env
+            with open(env[ENV_SECRET_FILE], "r", encoding="utf-8") as handle:
+                secret = handle.read(257).strip()
+            if not secret or len(secret) > 256:
+                raise ValueError("bad secret file")
+    except (KeyError, ValueError, OSError):
         return {"ok": False, "error": errors.error_body("UNAUTHENTICATED", "bridge address/secret are not configured")}
     if host != HOST:
         return {"ok": False, "error": errors.error_body("UNAUTHENTICATED", "bridge must be on 127.0.0.1")}

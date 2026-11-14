@@ -5,8 +5,8 @@
   "errorCatalogSha256": "994438708c70f9b2bfabc8cf300c5819479a6064f9f2a00454653dfabf756c0c",
   "errorCodeCount": 24,
   "faceCount": 150,
-  "guideSha256": "91f51cf4e28d279cd64b411105cacae1e1c6d32346459b5e9e1db7474555f9d4",
-  "guideVersion": 1,
+  "guideSha256": "a2366ccf86cbfe508aad7ce9a17b2755b3be0a68ec5750e41a2455c8f0c04262",
+  "guideVersion": 2,
   "moduleCount": 2,
   "observedErrorCodes": [
     "BUSY",
@@ -21,6 +21,6 @@
   ],
   "projectRevision": 2,
   "projectionSha256": "b8f362f0448d04ee62750eb9ac3ecbd1bd91a3eca92f68e292e50b8959f61570",
-  "toolDescriptionsSha256": "da0b47d38993b98ef3eb030ce245e35404f02d3efe5279c8a2a582eb594af8e3",
+  "toolDescriptionsSha256": "bf8e9f66b19b80d740ded0087f987c4aad43c778d35a964aef17ce138ff694b7",
   "triangleCount": 300
 }

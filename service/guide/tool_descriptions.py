@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-GUIDE_VERSION = 1
+GUIDE_VERSION = 2
 GUIDE_PATH = Path(__file__).with_name("REMOTE-CONSTRUCTION-GUIDE.md")
 # Line-ending independent: a Windows checkout with autocrlf must report the same guide hash.
 GUIDE_SHA256 = hashlib.sha256(GUIDE_PATH.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
@@ -19,11 +19,13 @@ TOOLS: dict[str, str] = {
         "Compact snapshot of the shared draft: projectRevision, per-module revision, face/triangle counts, "
         "module bounds, writer, fence, paused flag, canonicalIrSha256, projectionSha256, guideVersion and guideSha256. "
         "Target size about 4 KiB; use inspect_module for faces. Call it first and after every conflict. "
+        "Pass includeGuide=true once per session to also receive the construction guide (guide.markdown, version, sha256). "
         "Units: metres, +Z up. Bounds: at most 8 modules shown in detail per transaction, 256 KiB request cap. "
         "Example: {} -> {\"projectRevision\":2,\"modules\":[{\"moduleId\":\"house/level/living\",\"revision\":2}]}. "
         "Errors: GRANT_DENIED, FORBIDDEN, NOT_FOUND, UNAUTHENTICATED. " + _COMMON),
     "inspect_module": (
         "Detail of ONE module: revision, bounds, materials, and its faces (faceId, role, label, triangle count). "
+        "Pass includeIr=true to also receive the canonical module IR (module) that you must copy, edit and resend to revise it. "
         "Units: metres, +Z up; bounds are module-local. Bounds: at most 200 faces are listed, the rest is counted. "
         "Example: {\"moduleId\":\"house/level/living\"} -> {\"moduleId\":\"house/level/living\",\"faceCount\":120}. "
         "Errors: NOT_FOUND, GRANT_DENIED, INVALID_REQUEST. " + _COMMON),
@@ -45,6 +47,8 @@ TOOLS: dict[str, str] = {
         "Units: metres, +Z up, row-major 4x4 transforms. "
         "Bounds: 1..8 modules, 256 KiB request, 64 KiB per module (aim for 8 KiB), baseProjectRevision must equal "
         "projectRevision. No save or export exists. "
+        "When this transaction answers an owner request returned by read_owner_requests, pass that request's id as requestId "
+        "(integer or string): the owner's request becomes addressed only after the viewer has drawn this revision. "
         "Example: {\"fence\":3,\"transaction\":{\"schemaVersion\":\"draft-operation-v1\",\"transactionId\":\"t1\","
         "\"idempotencyKey\":\"t1\",\"baseProjectRevision\":0,\"changes\":[...]}} -> {\"status\":\"COMMITTED\",\"projectRevision\":1}. "
         "Errors: REVISION_CONFLICT, FENCE_STALE, LEASE_EXPIRED, IDEMPOTENCY_CONFLICT, INVALID_OPERATION, INVALID_REQUEST, "

@@ -7,6 +7,7 @@ never saves or exports anything.
 """
 from __future__ import annotations
 
+import copy
 import threading
 from dataclasses import dataclass
 
@@ -16,7 +17,7 @@ from core.project.requests import RequestError, RequestStore
 from core.project.state import ActorError, Grant, Lease
 from service import errors
 from service.auth import Principal, TicketStore
-from service.guide.tool_descriptions import GUIDE_SHA256, GUIDE_VERSION
+from service.guide.tool_descriptions import GUIDE_PATH, GUIDE_SHA256, GUIDE_VERSION
 
 MAX_INSPECT_FACES = 200
 MAX_DIAGNOSTICS = 50
@@ -154,11 +155,15 @@ class Tools:
             modules.append({"moduleId": m["moduleId"], "revision": m["revision"],
                             "faces": len(m["faces"]), "triangles": sum(len(f["triangles"]) for f in m["faces"]),
                             "bounds": _bounds(m["positions"])})
-        return {"guideVersion": GUIDE_VERSION, "guideSha256": GUIDE_SHA256, "epoch": status["epoch"],
-                "projectRevision": status["projectRevision"], "modules": modules,
-                "removedModules": status["removedModules"], "canonicalIrSha256": view["canonicalIrSha256"],
-                "projectionSha256": view["projectionSha256"], "writer": status["writer"],
-                "fence": status["fence"], "paused": status["paused"], "ownerAlive": status["ownerAlive"]}
+        out = {"guideVersion": GUIDE_VERSION, "guideSha256": GUIDE_SHA256, "epoch": status["epoch"],
+               "projectRevision": status["projectRevision"], "modules": modules,
+               "removedModules": status["removedModules"], "canonicalIrSha256": view["canonicalIrSha256"],
+               "projectionSha256": view["projectionSha256"], "writer": status["writer"],
+               "fence": status["fence"], "paused": status["paused"], "ownerAlive": status["ownerAlive"]}
+        if args.get("includeGuide") is True:       # v1.6 L9: the guide is delivered through MCP, not by the operator
+            out["guide"] = {"version": GUIDE_VERSION, "sha256": GUIDE_SHA256,
+                            "markdown": GUIDE_PATH.read_bytes().replace(b"\r\n", b"\n").decode("utf-8")}
+        return out
 
     def tool_inspect_module(self, principal, project, args):
         mid = args.get("moduleId")
@@ -170,9 +175,12 @@ class Tools:
             raise ToolFailure("NOT_FOUND", "no such module")
         faces = [{"faceId": f["faceId"], "role": f["role"], "label": f["label"], "triangles": len(f["triangles"])}
                  for f in module["faces"][:MAX_INSPECT_FACES]]
-        return {"moduleId": mid, "revision": module["revision"], "bounds": _bounds(module["positions"]),
-                "materials": [m["materialId"] for m in module["materials"]], "faceCount": len(module["faces"]),
-                "facesTruncated": len(module["faces"]) > MAX_INSPECT_FACES, "faces": faces}
+        out = {"moduleId": mid, "revision": module["revision"], "bounds": _bounds(module["positions"]),
+               "materials": [m["materialId"] for m in module["materials"]], "faceCount": len(module["faces"]),
+               "facesTruncated": len(module["faces"]) > MAX_INSPECT_FACES, "faces": faces}
+        if args.get("includeIr") is True:          # v1.6: canonical module IR so an agent can revise faithfully
+            out["module"] = copy.deepcopy(self._actor(principal, project)._state.project.modules[mid])
+        return out
 
     def tool_operation_status(self, principal, project, args):
         st = self._actor(principal, project).status(principal.id)
@@ -286,7 +294,10 @@ class Tools:
             channel.wire_requests = {key: value for key, value in channel.wire_requests.items() if key in actor._state.outcomes}
             if wire:
                 channel.wire_requests[txn['idempotencyKey']] = (principal.id, wire_hash)
-            self.host.drafts.publish(actor, out, args.get('requestId'))
+            request_id = args.get('requestId')
+            if type(request_id) is int and request_id >= 0:   # read_owner_requests returns integer ids
+                request_id = str(request_id)
+            self.host.drafts.publish(actor, out, request_id if isinstance(request_id, str) else None)
             return out
         finally:
             gate.release()
