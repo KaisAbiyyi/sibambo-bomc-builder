@@ -164,5 +164,8 @@ def bridge_call_addon(tool, args, run_root, slot, session):
         if not isinstance(parsed, dict) or parsed.get('id') != 1 or type(parsed.get('ok')) is not bool:
             return offline()
         return parsed
+    except TimeoutError:
+        return {'ok': False, 'error': errors.error_body('EDITOR_TIMEOUT',
+            'The Editor may still finish; call describe_scene before retrying')}
     except (KeyError, ValueError, TypeError, AttributeError, OSError, RecursionError):
         return offline()

@@ -15,6 +15,7 @@ from starlette.websockets import WebSocketDisconnect
 from service.bridge import bridge_call_addon
 from service.local_demo import LocalDemo
 from service.tools import OwnerApi
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = {'read_guide', 'describe_scene', 'describe_element', 'query_region', 'measure',
@@ -30,6 +31,19 @@ def hello(demo):
     actor = demo.host.actor('local', demo.project)
     return {'type': 'HELLO', **demo.host.drafts.issue_ticket(actor), 'projectId': demo.project,
             'epoch': None, 'lastAppliedRevision': 0, 'lastRenderedRevision': 0}
+
+
+class BridgeTimeoutTests(unittest.TestCase):
+    def test_transport_timeout_warns_that_a_write_might_still_finish(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'private/bridge-codex.json'
+            path.parent.mkdir()
+            path.write_text(json.dumps({'addr': '127.0.0.1:8765', 'secret': 'a' * 64,
+                                        'project': 'addon-test', 'epoch': 'epoch', 'slot': 'codex'}))
+            with patch('service.bridge.socket.create_connection', side_effect=TimeoutError):
+                reply = bridge_call_addon('edit_model', {'changes': []}, tmp, 'codex', 'a' * 32)
+            self.assertEqual(reply['error']['code'], 'EDITOR_TIMEOUT')
+            self.assertIn('describe_scene', reply['error']['nextAction'])
 
 
 class AddonProtocolTests(unittest.IsolatedAsyncioTestCase):
