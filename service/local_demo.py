@@ -5,9 +5,9 @@ agent client against ONE ``ProjectHost``/``ProjectActor``. The owner is authenti
 secret that only the Editor BFF holds (``LocalVerifier``); agents never use HTTP ``/mcp`` here.
 
 This is not a remote/production configuration: it never binds a non-loopback address, never accepts a
-JWT, and is only reachable through ``python -m service.local_demo``. Nothing is persisted except the
-per-launch bridge secrets and client configuration, written under the run root's ``private/`` and
-``agents/`` folders (cleaned by the launcher on exit).
+JWT, and is only reachable through ``python -m service.local_demo``. Per-slot discovery is written
+under the run root's ``private/`` and deleted on stop. Optional redacted session recordings persist
+on D:. Stable client registrations are owned by the launcher (WP11).
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from service.app import ServiceConfig, create_app
 from service.auth import JwtVerifier, Principal, principal_id
-from service.bridge import ENV_ADDR, ENV_PROJECT, ENV_SECRET_FILE, BridgeServer
+from service.bridge import BridgeServer
 from service.tools import OwnerApi, ProjectHost, Tools
 from service.agent_relay import AgentRelay
 from service.recorder import Recorder
@@ -74,6 +74,7 @@ class LocalDemo:
         api.open(self.owner, project)
         self.bridges: dict[str, BridgeServer] = {}
         self.relay = AgentRelay(None, Recorder(record_root, not no_record))
+        self.relay.scope = (LOCAL_TENANT, project)
         self._discovery = []
         self.agents: dict[str, Principal] = {}
         for client in self.clients:

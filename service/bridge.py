@@ -90,6 +90,8 @@ class BridgeServer:
 
     def dispatch(self, frame: dict) -> dict:
         rid, tool, args = frame.get("id"), frame.get("tool"), frame.get("args") or {}
+        if frame.get('api') == 'addon-1':
+            args = frame.get('args')
         if not isinstance(tool, str) or not isinstance(args, dict):
             return {"id": rid, "ok": False, "error": errors.error_body("INVALID_REQUEST", "tool and args are required")}
         if frame.get('api') == 'addon-1':

@@ -14,6 +14,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from service.bridge import bridge_call_addon
 from service.local_demo import LocalDemo
+from service.tools import OwnerApi
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = {'read_guide', 'describe_scene', 'describe_element', 'query_region', 'measure',
@@ -94,6 +95,35 @@ class AddonProtocolTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AgentHandshakeTests(unittest.TestCase):
+    def test_wrong_project_expired_revoked_and_consumed_tickets_fail_closed(self):
+        demo = make_demo()
+        try:
+            socket = demo.app
+            # A valid owner ticket for a different project must not hijack this relay.
+            OwnerApi(demo.host).open(demo.owner, 'other-project')
+            actor = demo.host.actor('local', 'other-project')
+            other = {'type': 'HELLO', **demo.host.drafts.issue_ticket(actor), 'projectId': 'other-project',
+                     'epoch': None, 'lastAppliedRevision': 0, 'lastRenderedRevision': 0}
+            with self.assertRaises(ValueError):
+                socket._consume(other)
+            valid = hello(demo)
+            channel, _ = socket._consume(valid)
+            with self.assertRaises(ValueError):
+                socket._consume(valid)
+            stale = hello(demo)
+            channel.authority += 1
+            with self.assertRaises(ValueError):
+                socket._consume(stale)
+            expired = hello(demo)
+            import hashlib
+            key = hashlib.sha256(expired['ticket'].encode()).hexdigest()
+            _, channel, authority = demo.host.drafts.tickets[key]
+            demo.host.drafts.tickets[key] = (0, channel, authority)
+            with self.assertRaises(ValueError):
+                socket._consume(expired)
+        finally:
+            demo.stop()
+
     def test_origin_host_query_ticket_replay_and_legacy_primary_is_untouched(self):
         demo = make_demo()
         try:

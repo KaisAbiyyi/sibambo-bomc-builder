@@ -31,14 +31,16 @@ class AgentRelay:
         self.primary, self.worker = None, None
         self.pending, self.queue = {}, asyncio.Queue(maxsize=8)
         self.ignored, self.closed = 0, False
+        self.scope, self.authorized = None, lambda: True
 
-    async def attach(self, socket):
+    async def attach(self, socket, authorized=None):
         if self.closed:
             raise ValueError('relay stopped')
         previous = self.primary
         if previous is not None:
             await self.detach(previous)
         self.primary = socket
+        self.authorized = authorized or (lambda: True)
         if previous is not None:
             try:
                 await asyncio.wait_for(previous.send_json({'type': 'superseded'}), 5)
@@ -55,7 +57,7 @@ class AgentRelay:
                 future.set_result(offline())
 
     def receive(self, socket, message):
-        valid = (socket is self.primary and isinstance(message, dict) and message.get('type') == 'agent_result'
+        valid = (socket is self.primary and self.authorized() and isinstance(message, dict) and message.get('type') == 'agent_result'
                  and isinstance(message.get('id'), str) and type(message.get('ok')) is bool)
         if valid:
             key = 'result' if message['ok'] else 'error'
@@ -94,7 +96,7 @@ class AgentRelay:
                     size = MAX_REQUEST + 1
                 if size > MAX_REQUEST:
                     reply = failure('BUDGET_EXCEEDED', 'Add-on request exceeds 256 KiB')
-                elif self.closed or self.primary is None:
+                elif self.closed or self.primary is None or not self.authorized():
                     reply = offline()
                 elif self.queue.full():
                     reply = failure('BUSY', 'Editor call queue is full')
@@ -124,7 +126,7 @@ class AgentRelay:
             try:
                 if done.cancelled():
                     continue
-                if socket is not self.primary:
+                if socket is not self.primary or not self.authorized():
                     reply = offline()
                 else:
                     response = asyncio.get_running_loop().create_future()
@@ -188,6 +190,7 @@ class AgentSocket:
                 raise ValueError('invalid attachment')
             expires, channel, authority = binding
             if (expires <= self.hub.clock() or authority != channel.authority or not self.hub._current(channel)
+                    or (self.relay.scope is not None and self.relay.scope != (channel.actor.tenant, channel.actor.project))
                     or hello.get('projectId') != channel.actor.project or hello.get('epoch') not in (None, channel.epoch)):
                 raise ValueError('invalid attachment')
             for field in ('lastAppliedRevision', 'lastRenderedRevision'):
@@ -217,7 +220,10 @@ class AgentSocket:
                 raise ValueError('invalid attachment')
             channel, authority = self._consume(json.loads(raw))
             del raw
-            await self.relay.attach(socket)
+            def authorized():
+                with self.hub.lock:
+                    return self.hub._current(channel) and channel.authority == authority
+            await self.relay.attach(socket, authorized)
 
             async def receiver():
                 while True:

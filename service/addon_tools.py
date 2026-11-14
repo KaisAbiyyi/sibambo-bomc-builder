@@ -31,7 +31,7 @@ def read_guide(topic=None):
 
 
 def as_addon_result(reply):
-    payload = {'ok': True, **reply['result']} if reply.get('ok') and isinstance(reply.get('result'), dict) else reply
+    payload = {**reply['result'], 'ok': True} if reply.get('ok') and isinstance(reply.get('result'), dict) else reply
     text = payload.get('text') if payload.get('ok') and isinstance(payload.get('text'), str) else None
     import json
     return CallToolResult(content=[TextContent(type='text', text=text or json.dumps(payload, ensure_ascii=False))],
