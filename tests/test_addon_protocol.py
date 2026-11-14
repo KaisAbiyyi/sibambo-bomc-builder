@@ -49,7 +49,7 @@ class AddonProtocolTests(unittest.IsolatedAsyncioTestCase):
                         self.assertFalse(guide.is_error)
                         offline = await client.call_tool('describe_scene', {})
                         self.assertEqual(offline.structured_content['error']['code'], 'EDITOR_OFFLINE')
-                        with http.websocket_connect('/agent', headers={'origin': 'http://localhost:5175'}) as ws:
+                        with http.websocket_connect('ws://127.0.0.1:8765/agent', headers={'origin': 'http://localhost:5175'}) as ws:
                             ws.send_json(hello(demo))
                             for _ in range(100):
                                 if demo.relay.primary is not None:
@@ -105,7 +105,7 @@ class AgentHandshakeTests(unittest.TestCase):
                         with client.websocket_connect(path, headers=headers):
                             pass
                 ticket = hello(demo)
-                with client.websocket_connect('/agent', headers={'origin': 'http://localhost:5175'}) as ws:
+                with client.websocket_connect('ws://127.0.0.1:8765/agent', headers={'origin': 'http://localhost:5175'}) as ws:
                     ws.send_json(ticket)
                     import time
                     for _ in range(100):
@@ -120,7 +120,7 @@ class AgentHandshakeTests(unittest.TestCase):
                     self.assertTrue(pending.result(2)['ok'])
                     channel = demo.host.drafts.channel(demo.host.actor('local', demo.project))
                     self.assertIsNone(channel.primary)
-                    with client.websocket_connect('/agent', headers={'origin': 'http://localhost:5175'}) as replay:
+                    with client.websocket_connect('ws://127.0.0.1:8765/agent', headers={'origin': 'http://localhost:5175'}) as replay:
                         replay.send_json(ticket)
                         with self.assertRaises(WebSocketDisconnect):
                             replay.receive_json()
