@@ -6,6 +6,7 @@ import json
 import time
 import uuid
 from fnmatch import fnmatchcase
+import anyio
 
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from service import errors
@@ -259,7 +260,11 @@ class AgentSocket:
             except (RuntimeError, OSError):
                 pass
         finally:
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            await self.relay.detach(socket)
+            # Starlette's ASGI cancellation scope can already be cancelled here.
+            # Shield bounded teardown so another cancellation cannot strand the
+            # primary or escape while its receiver/heartbeat tasks are retiring.
+            with anyio.CancelScope(shield=True):
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                await self.relay.detach(socket)
