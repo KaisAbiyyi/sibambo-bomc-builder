@@ -1,5 +1,10 @@
 # sibambo-bomc-builder
 
+> **Phase order correction — 2026-11-08:** Stable SE-00…11 only now. All Experimental XB tasks are LOCKED until accepted SE-11 and a subsequent owner Phase2 instruction. [Stable-only IMPLEMENT handoff](docs/two-phase/NEXT-STABLE-IMPLEMENT-PROMPT.md).
+
+> **Product architecture update — 2026-11-08:** the [two-phase MASTER IMPLEMENTATION PLAN v1.3](docs/two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md) governs new Stable Editor remote MCP/live draft/owner Save delivery and the separate **EXPERIMENTAL** native agentic application. This older document is retained as foundation/history; its task/component completion is not product readiness. [Gap audit](docs/two-phase/GAP-AUDIT.md) · [ADRs](docs/two-phase/ADR-LEDGER.md) · [task contracts](docs/two-phase/TASK-CONTRACTS.md) · [Notion/GitHub resource map](docs/two-phase/RESOURCE-MAP.md). No product implementation/deployment/release is performed by this documentation update.
+
+
 Headless, agent-operable modular building construction into a deterministic compiled BOMC 3D document. **Incremental implementation:** a bounded Python journal/assembly CLI is available (BMB-022); MCP, full geometric construction and compiler/consumer proof are separately gated.
 
 ## Available headless CLI

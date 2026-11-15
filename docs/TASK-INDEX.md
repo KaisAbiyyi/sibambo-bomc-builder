@@ -1,5 +1,10 @@
 # BMB execution task index — detailed 32-task WBS
 
+> **Phase order correction — 2026-11-08:** Stable SE-00…11 only now. All Experimental XB tasks are LOCKED until accepted SE-11 and a subsequent owner Phase2 instruction. [Stable-only IMPLEMENT handoff](two-phase/NEXT-STABLE-IMPLEMENT-PROMPT.md).
+
+> **Product architecture update — 2026-11-08:** the [two-phase MASTER IMPLEMENTATION PLAN v1.3](two-phase/MASTER_IMPLEMENTATION_PLAN_2026-11-08_SIB-TWO-PHASE-001_v1.3.md) governs new Stable Editor remote MCP/live draft/owner Save delivery and the separate **EXPERIMENTAL** native agentic application. This older document is retained as foundation/history; its task/component completion is not product readiness. [Gap audit](two-phase/GAP-AUDIT.md) · [ADRs](two-phase/ADR-LEDGER.md) · [task contracts](two-phase/TASK-CONTRACTS.md) · [Notion/GitHub resource map](two-phase/RESOURCE-MAP.md). No product implementation/deployment/release is performed by this documentation update.
+
+
 [Notion standalone project hub](https://app.notion.com/p/402c4a6aaf738181adf0eb95320ff947) | [Notion task database](https://app.notion.com/p/2e112a1b046641b6a5cb35589ed14b8f) | [Roadmap](ROADMAP.md).
 
 **As of 2026-10-24 (after baseline merges):** BMB-005 PR #38 and BMB-007 PR #40 are DONE for scoped **evidence matrix** and **container-only** fixture acceptance, respectively. Semantic cross-consumer proof is NOT_RUN and belongs to BMB-021 after writer/compiler. Eligible Now: BMB-008,009,013,014,018,019 (all distinct locks, Ready unless claimed after this snapshot). Direct-successor Up Next: BMB-010,011,015,016,017. Task status is independent of Focus Lane; use live Notion for current claims and readiness. No count cap on Now/Up Next. No private code or real-house fixtures.
