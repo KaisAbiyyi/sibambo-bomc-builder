@@ -1,0 +1,166 @@
+name: BMB-031 Foundation Beta packaging and readiness
+on:
+  pull_request:
+    paths:
+      - "release/**"
+      - "scripts/build_foundation_beta.py"
+      - "scripts/release_readiness.py"
+      - "scripts/bmb031_smoke.py"
+      - "tests/test_bmb031_release.py"
+      - "docs/BMB-031-*.md"
+      - ".github/workflows/bmb031-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Exact-source checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # baseline ancestry proof requires full history
+      - name: Assert exact tested HEAD
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+          echo "Exact HEAD: ${EXPECTED_SHA}"
+      - name: Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned test/schema dependencies
+        run: python -m pip install jsonschema==4.23.0 mcp==2.3.0
+      - name: Regression - readiness failure injection
+        run: python -m unittest discover -s tests -p test_bmb031_release.py -v
+      - name: Existing Builder compilation, reader, MCP, benchmark, QA and generator regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in test_bmb020_compiler test_bmb020_semantic test_bmb021_interop test_bmb023_mcp test_bmb023_mcp_schema test_bmb023_mcp_sdk test_bmb028_benchmarks test_bmb029_rooms test_bmb030_adversarial test_bmb032_generator; do
+            echo "::group::${suite}"
+            python -m unittest discover -s tests -p "${suite}.py" -v
+            echo "::endgroup::"
+          done
+      - name: Synthetic create validate compile inspect smoke
+        run: python scripts/bmb031_smoke.py --report dist/smoke.json
+      - name: Build exact-SHA deterministic source candidate
+        run: python scripts/build_foundation_beta.py --out dist
+      - name: Reproduce identical bytes in an independent output directory
+        shell: bash
+        run: |
+          python scripts/build_foundation_beta.py --out dist/repeat
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('dist/release-manifest.json').read_text())
+          b=json.loads(Path('dist/repeat/release-manifest.json').read_text())
+          assert a == b, 'nondeterministic manifest'
+          assert (Path('dist') / a['artifact']['name']).read_bytes() == (Path('dist/repeat') / b['artifact']['name']).read_bytes(), 'nondeterministic artifact'
+          print('Reproducible SHA256:', a['artifact']['sha256'])
+          PY
+      - name: Clean unpack candidate install smoke
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys, tempfile, zipfile
+          from pathlib import Path
+          manifest = json.loads(Path('dist/release-manifest.json').read_text())
+          with tempfile.TemporaryDirectory(prefix='bmb031-installed-') as temp:
+              installed = Path(temp) / 'package'
+              installed.mkdir()
+              with zipfile.ZipFile(Path('dist') / manifest['artifact']['name']) as archive:
+                  archive.extractall(installed)
+              subprocess.run([sys.executable, 'scripts/bmb031_smoke.py'], cwd=installed,
+                             check=True, timeout=90)
+          print('Clean extracted source candidate smoke PASS')
+          PY
+      - name: Packaging Ready must pass
+        run: python scripts/release_readiness.py --gate packaging --report-dir dist/readiness
+      - name: Release Approved must remain blocked until owner authorization
+        shell: bash
+        run: |
+          if python scripts/release_readiness.py --gate release --report-dir dist/readiness; then
+            echo 'ERROR: release unexpectedly approved'
+            exit 1
+          else
+            code=$?
+            test "${code}" -eq 4
+          fi
+      - name: Append qualification summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### BMB-031 Foundation Beta (provisional)'
+            echo "- exact source: ${EXPECTED_SHA}"
+            echo "- runner: ${{ matrix.os }}; Python: $(python --version)"
+            echo '- Cloud packaging source and BMB-031 regression only; see job logs for test counts.'
+            echo '- Release Approved remains BLOCKED by unresolved owner/security/integration/provenance gates.'
+            echo '- No tag, published archive, GitHub Release, or native owner acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Attach machine/human evidence reports only (NOT release ZIP)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bmb031-readiness-${{ matrix.os }}
+          if-no-files-found: warn
+          path: |
+            dist/readiness/readiness.json
+            dist/readiness/readiness.md
+            dist/release-manifest.json
+            dist/provenance-report.json
+            dist/smoke.json
+
+  cross_platform_reproducibility:
+    name: Compare exact-Git-source archives (Ubuntu vs Windows)
+    needs: packaging
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Download Ubuntu manifest/verification reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: bmb031-readiness-ubuntu-24.04
+          path: compare/ubuntu
+      - name: Download Windows manifest/verification reports
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: bmb031-readiness-windows-2022
+          path: compare/windows
+      - name: Check both platforms produce identical source/artifact SHA256 and inventory
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          linux = json.loads(Path('compare/ubuntu/release-manifest.json').read_text())
+          windows = json.loads(Path('compare/windows/release-manifest.json').read_text())
+          assert linux['source_sha'] == windows['source_sha'] == os.environ['EXPECTED_SHA'], 'source mismatch'
+          assert linux['source_tree_sha'] == windows['source_tree_sha'], 'source tree mismatch'
+          assert linux['artifact'] == windows['artifact'], 'cross-platform archive SHA256/size mismatch'
+          assert linux['files'] == windows['files'], 'cross-platform member hashes/inventory mismatch'
+          for platform in ('ubuntu', 'windows'):
+              verdict = json.loads(Path('compare', platform, 'readiness/readiness.json').read_text())
+              assert verdict['sourceSha'] == os.environ['EXPECTED_SHA'], 'report source mismatch'
+              assert verdict['packagingReady'] is True, 'packaging not ready'
+              assert verdict['releaseApproved'] is False, 'release unexpectedly approved'
+          print('Cross-platform canonical archive and per-member SHA256 PASS: ' +
+                linux['artifact']['sha256'])
+          PY
+          echo '### Cross-platform source bundle SHA256 equality PASS' >> "$GITHUB_STEP_SUMMARY"

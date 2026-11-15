@@ -1,0 +1,103 @@
+{
+  "schema_version": "bmb-foundation-beta-plan-v1",
+  "target": "Foundation Beta",
+  "version": "0.1.0-beta.0",
+  "version_status": "PROVISIONAL_OWNER_APPROVAL_REQUIRED",
+  "source": {
+    "repository": "KaisAbiyyi/sibambo-bomc-builder",
+    "baseline_main_sha": "7cd6ca7771e7ad64418cb1808edf9460e9f6cc19",
+    "checkout": "verified HEAD"
+  },
+  "compatibility": {
+    "bomc": "1.2",
+    "profile": "bomc-1.2-semantic-solid-subset",
+    "exclusions": [
+      "BOMC Exact/full producer parity",
+      "Editor 241 editable metadata",
+      "texture and UV",
+      "arbitrary geometric hole authoring",
+      "unqualified native/security/consumer integrations"
+    ]
+  },
+  "runtime": {
+    "python": "3.12",
+    "packages": [
+      {
+        "name": "jsonschema",
+        "version": "4.23.0",
+        "license": "MIT",
+        "license_review": "DECLARED_NOT_FULLY_AUDITED"
+      }
+    ],
+    "optional_validation": [
+      {
+        "name": "mcp",
+        "version": "2.3.0",
+        "license": "MIT",
+        "license_review": "UPSTREAM_ATTESTATION_NOT_A_FULL_TRANSITIVE_AUDIT"
+      }
+    ]
+  },
+  "license": {
+    "project_spdx": "GPL-3.0-only",
+    "license_file": "LICENSE",
+    "policy_file": "docs/LICENSE-IP-FIXTURE-POLICY.md",
+    "owner_authorship": "ATTESTED_NOT_INDEPENDENTLY_VERIFIED",
+    "clean_room": "POLICY_ONLY_NOT_INDEPENDENTLY_CERTIFIED",
+    "fixtures": "SYNTHETIC_ONLY",
+    "transitive_dependency_audit": "NOT_RUN",
+    "historical_source_ip_audit": "NOT_RUN"
+  },
+  "packaging": {
+    "artifact_prefix": "bomc-builder-foundation-beta",
+    "source_roots": [
+      "agent/",
+      "agentctx/",
+      "agentguide/",
+      "bomc/",
+      "cli/",
+      "core/",
+      "evaluation/",
+      "integration/",
+      "schemas/"
+    ],
+    "source_files": [
+      "AGENTS.md",
+      "README.md",
+      "LICENSE",
+      "docs/ARCHITECTURE.md",
+      "docs/BMB-020-COMPILER.md",
+      "docs/BMB-022-HEADLESS-CLI.md",
+      "docs/BMB-023-STDIO-MCP.md",
+      "docs/BMB-031-FOUNDATION-BETA.md",
+      "docs/BMB-031-PROVENANCE.md",
+      "docs/BMB-031-OWNER-HANDOFF.md",
+      "docs/LICENSE-IP-FIXTURE-POLICY.md",
+      "examples/bmb020-semantic-floor.json",
+      "examples/module-ir-two-rooms.json",
+      "scripts/build_foundation_beta.py",
+      "scripts/release_readiness.py",
+      "scripts/bmb031_smoke.py",
+      "release/foundation-beta.json",
+      "release/acceptance-ledger.json",
+      "tests/interop/reader.py"
+    ],
+    "format": "zip-stored-fixed-1980-timestamp",
+    "max_artifact_bytes": 20971520
+  },
+  "required_documents": [
+    "README.md",
+    "LICENSE",
+    "AGENTS.md",
+    "docs/LICENSE-IP-FIXTURE-POLICY.md",
+    "docs/BMB-031-FOUNDATION-BETA.md",
+    "docs/BMB-031-PROVENANCE.md",
+    "docs/BMB-031-OWNER-HANDOFF.md"
+  ],
+  "publication": {
+    "approved": false,
+    "tag": null,
+    "github_release": false,
+    "published": false
+  }
+}
