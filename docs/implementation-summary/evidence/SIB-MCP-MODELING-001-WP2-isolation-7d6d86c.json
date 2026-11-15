@@ -1,0 +1,65 @@
+{
+  "schema": "sibambo.wp2.isolation-evidence.v1",
+  "date_timezone": "2026-11-15 Asia/Jakarta",
+  "source_sha": "7d6d86ca24362cd8a89dc810216ced0823bca5fb",
+  "source_tree": "90f314648dcd7ebedec00b925c5781642c452bed",
+  "base_sha": "a4f602f65256ebbcbbe22f00b3b030b17dbfdc3b",
+  "pr": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/95",
+  "publication_head_qualification_receipt": "https://github.com/KaisAbiyyi/sibambo-bomc-builder/pull/95#issuecomment-6888500849",
+  "cp2": {
+    "run_id": 43671671055,
+    "conclusion": "success",
+    "ubuntu": {
+      "job_id": 132682856749,
+      "targeted_pass": 34,
+      "full_pass": 821,
+      "full_skip": 0,
+      "fail": 0
+    },
+    "windows": {
+      "job_id": 132682857000,
+      "targeted_pass": 34,
+      "full_pass": 816,
+      "full_skip": 5,
+      "fail": 0,
+      "new_acl_tests_executed": true
+    },
+    "counts_note": "Targeted repeats inside full discovery; do not sum."
+  },
+  "predecessor_runs": {
+    "SE03": 43671670997,
+    "SE05": 43671670973,
+    "conclusion": "success"
+  },
+  "negative_tests": {
+    "new_count": 7,
+    "path": "tests/test_addon_isolation.py",
+    "assertions": [
+      "both slots deny all legacy tools and unmarked/unknown frames before actor access",
+      "bound slot authoritative",
+      "genuine separate legacy server preserved",
+      "owner-only permissions verified before secret write",
+      "broad existing permissions hardened",
+      "permission failure prevents publication",
+      "authenticated TCP actor state unchanged"
+    ]
+  },
+  "historical_failed_candidate": {
+    "sha": "74bb9542abe0785e9fcd456307079811c735d96d",
+    "run_id": 43671486673,
+    "reason": "Elevated Windows default TokenOwner differs from TokenUser; corrected without relaxing DACL readback."
+  },
+  "limits": [
+    "Local sandbox ACL mutations do not persist; no local positive ACL proof claimed.",
+    "No second physical OS-account test.",
+    "No owner LLM, native SketchUp or usability test.",
+    "WP3 not implemented; current v2.3 plan correction is not CP3 evidence."
+  ],
+  "governance": {
+    "independent_review_required": false,
+    "independent_review_requested": false,
+    "approval_claimed": false,
+    "merge_performed": false,
+    "status": "Draft/Review"
+  }
+}
