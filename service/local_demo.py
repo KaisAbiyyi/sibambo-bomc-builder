@@ -79,18 +79,19 @@ def _secure_private_path(path: Path, *, directory: bool) -> None:
         token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32security.TOKEN_QUERY)
         try:
             owner = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+            default_owner = win32security.GetTokenInformation(token, win32security.TokenOwner)
         finally:
             token.Close()
         flags = win32security.OWNER_SECURITY_INFORMATION | win32security.DACL_SECURITY_INFORMATION
         before = win32security.GetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT, flags)
-        if before.GetSecurityDescriptorOwner() != owner:
+        if before.GetSecurityDescriptorOwner() not in (owner, default_owner):
             raise PermissionError('Credential storage is owned by another principal')
         inheritance = win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE if directory else 0
         acl = win32security.ACL()
         acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, ntsecuritycon.FILE_ALL_ACCESS, owner)
         win32security.SetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT,
-            win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
-            None, None, acl, None)
+            flags | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+            owner, None, acl, None)
         after = win32security.GetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT, flags)
         actual = after.GetSecurityDescriptorDacl()
         if (after.GetSecurityDescriptorOwner() != owner or actual is None or actual.GetAceCount() != 1

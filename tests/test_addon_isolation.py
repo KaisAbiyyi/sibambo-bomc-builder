@@ -202,6 +202,7 @@ class WireIsolationTests(unittest.TestCase):
                             self.assertNotIn(bridge.secret, json.dumps(reply))
             with socket.create_connection(bridge.address, timeout=3) as connection:
                 connection.sendall((json.dumps({'secret': 'wrong', 'tool': 'read_project', 'args': {}}) + '\n').encode())
-                self.assertEqual(connection.makefile('rb').readline(), b'')
+                with connection.makefile('rb') as reader:
+                    self.assertEqual(reader.readline(), b'')
         self.assertIs(actor._state, before)
         self.assertEqual(actor._state.project.project_revision, 0)
