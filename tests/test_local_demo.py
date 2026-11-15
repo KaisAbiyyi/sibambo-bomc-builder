@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from service import local_demo as ld                                   # noqa: E402
-from service.bridge import ENV_ADDR, ENV_SECRET_FILE, bridge_call       # noqa: E402
+from service.bridge import ENV_ADDR, ENV_SECRET_FILE, BridgeServer, bridge_call  # noqa: E402
 from service.guide.tool_descriptions import GUIDE_SHA256, GUIDE_VERSION, TOOLS  # noqa: E402
 from service.mcp_http import INSTRUCTIONS                              # noqa: E402
 from service.owner_mcp import OwnerMcp                                 # noqa: E402
@@ -41,11 +41,11 @@ class VerifierTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RunnerTests(unittest.TestCase):
-    def test_exactly_two_named_clients_hold_exactly_read_write(self):
+    def test_default_three_named_clients_hold_exactly_read_write(self):
         d = demo()
         self.addCleanup(d.stop)
         actor = d.host.actor(ld.LOCAL_TENANT, "local-demo")
-        self.assertEqual(sorted(g.client for g in actor._grants.values()), ["claude-code", "codex"])
+        self.assertEqual(sorted(g.client for g in actor._grants.values()), ["claude-code", "codex", "other"])
         self.assertTrue(all(g.scopes == frozenset({"read", "write"}) for g in actor._grants.values()))
         stranger = ld.principal("someone-else", "claude-code")
         with self.assertRaises(ToolFailure) as caught:
@@ -56,28 +56,32 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             demo(clients=("claude-code", "evil"))
 
-    def test_both_bridges_share_one_actor_and_writers_contend(self):
+    def test_addon_bridges_do_not_expose_the_legacy_actor(self):
         d = demo()
         d.start_bridges()
         self.addCleanup(d.stop)
         env = {c: d.bridges[c].env() for c in d.clients}
         a = bridge_call("acquire_writer", {}, env=env["claude-code"])
         self.assertEqual(a["ok"], False)                                   # no viewer yet: E7
-        self.assertEqual(a["error"]["code"], "NO_ACTIVE_VIEWER")
+        self.assertEqual(a["error"]["code"], "INVALID_REQUEST")
         seen = [bridge_call("read_project", {}, env=env[c]) for c in d.clients]
-        self.assertTrue(all(r["ok"] for r in seen))
-        self.assertEqual({r["result"]["epoch"] for r in seen}, {1})
+        self.assertTrue(all(not r["ok"] and r['error']['code'] == 'INVALID_REQUEST' for r in seen))
         self.assertEqual(len(d.host.registry._actors), 1)
 
     def test_secret_file_works_and_failures_are_uniform_and_leak_nothing(self):
         d = demo()
         d.start_bridges()
         self.addCleanup(d.stop)
+        legacy = BridgeServer(Tools(d.host), d.agents['codex'], 'local-demo').start()
+        self.addCleanup(legacy.stop)
         with tempfile.TemporaryDirectory() as tmp:
             run = Path(tmp)
             manifest = d.write_client_files(run)
-            env = {ENV_ADDR: f"{d.bridges['codex'].address[0]}:{d.bridges['codex'].address[1]}",
+            env = {ENV_ADDR: f"{legacy.address[0]}:{legacy.address[1]}",
                    ENV_SECRET_FILE: (run / "private" / "bridge-codex.secret").as_posix()}
+            # Legacy secret-file environment remains supported, but add-on registration
+            # only generates atomic discovery JSON (no per-launch client configs).
+            (run / 'private' / 'bridge-codex.secret').write_text(legacy.secret, encoding='utf-8')
             self.assertTrue(bridge_call("read_project", {}, env=env)["ok"])
             for bad in (run / "missing", run):                               # missing file, directory
                 reply = bridge_call("read_project", {}, env={**env, ENV_SECRET_FILE: bad.as_posix()})
@@ -92,13 +96,18 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(bridge_call("read_project", {}, env={**env, ENV_SECRET_FILE: big.as_posix()})["error"]["code"],
                              "UNAUTHENTICATED")
             # generated configs and manifest carry no secret of any kind
-            texts = [(run / "agents" / n).read_text(encoding="utf-8") for n in ("claude.mcp.json", "codex.overrides.json")]
-            texts.append(json.dumps(manifest))
+            texts = [json.dumps(manifest)]
             for text in texts:
                 self.assertIsNone(re.search(r"[0-9a-f]{64}", text))
                 self.assertNotIn(SECRET, text)
-            self.assertIn("service.stdio_bridge", texts[0])
             self.assertEqual(manifest["mode"], "local-demo")
+            self.assertFalse((run / 'agents').exists())
+            for client in d.clients:
+                info = json.loads((run / 'private' / f'bridge-{client}.json').read_text())
+                self.assertEqual(info['slot'], client)
+                self.assertEqual(info['secret'], d.bridges[client].secret)
+            d.stop()
+            self.assertFalse(list((run / 'private').glob('bridge-*.json')))
 
     def test_main_refuses_non_loopback_missing_secret_unknown_client(self):
         with tempfile.TemporaryDirectory() as tmp:
