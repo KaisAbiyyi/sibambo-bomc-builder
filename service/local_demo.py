@@ -16,9 +16,11 @@ import hmac
 import json
 import os
 import signal
+import stat
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 
 from service.app import ServiceConfig, create_app
@@ -59,6 +61,50 @@ class LocalVerifier(JwtVerifier):
 
     async def verify_token(self, token: str):
         return None
+
+
+def _secure_private_path(path: Path, *, directory: bool) -> None:
+    """Restrict and read back credential ACLs before any secret is written.
+
+    The run root is protected too: writable parents could otherwise replace a
+    protected child directory. Reparse points/symlinks and foreign owners are
+    rejected rather than followed. Uses the existing hash-locked pywin32 on NT.
+    """
+    info = os.lstat(path)
+    expected_kind = stat.S_ISDIR if directory else stat.S_ISREG
+    if not expected_kind(info.st_mode) or getattr(info, 'st_file_attributes', 0) & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400):
+        raise PermissionError('Credential storage must use plain owner-controlled paths')
+    if os.name == 'nt':
+        import win32api, win32security, ntsecuritycon
+        token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32security.TOKEN_QUERY)
+        try:
+            owner = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+        finally:
+            token.Close()
+        flags = win32security.OWNER_SECURITY_INFORMATION | win32security.DACL_SECURITY_INFORMATION
+        before = win32security.GetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT, flags)
+        if before.GetSecurityDescriptorOwner() != owner:
+            raise PermissionError('Credential storage is owned by another principal')
+        inheritance = win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE if directory else 0
+        acl = win32security.ACL()
+        acl.AddAccessAllowedAceEx(win32security.ACL_REVISION, inheritance, ntsecuritycon.FILE_ALL_ACCESS, owner)
+        win32security.SetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT,
+            win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+            None, None, acl, None)
+        after = win32security.GetNamedSecurityInfo(str(path), win32security.SE_FILE_OBJECT, flags)
+        actual = after.GetSecurityDescriptorDacl()
+        if (after.GetSecurityDescriptorOwner() != owner or actual is None or actual.GetAceCount() != 1
+                or not after.GetSecurityDescriptorControl()[0] & win32security.SE_DACL_PROTECTED
+                or actual.GetAce(0) != ((win32security.ACCESS_ALLOWED_ACE_TYPE, inheritance), ntsecuritycon.FILE_ALL_ACCESS, owner)):
+            raise PermissionError('Unable to verify private credential ACL')
+    else:
+        if info.st_uid != os.geteuid():
+            raise PermissionError('Credential storage is owned by another principal')
+        mode = 0o700 if directory else 0o600
+        os.chmod(path, mode, follow_symlinks=False)
+        after = os.lstat(path)
+        if after.st_uid != os.geteuid() or stat.S_IMODE(after.st_mode) != mode:
+            raise PermissionError('Unable to verify private credential permissions')
 
 
 class LocalDemo:
@@ -111,17 +157,25 @@ class LocalDemo:
     def write_client_files(self, run_root: Path) -> dict:
         """Atomic per-slot discovery only; stable registrations are owned by WP11."""
         _refuse_c_drive(run_root)
+        run_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _secure_private_path(run_root, directory=True)
         private = run_root / "private"
-        private.mkdir(parents=True, exist_ok=True)
+        private.mkdir(mode=0o700, exist_ok=True)
+        _secure_private_path(private, directory=True)
         (run_root / "tmp").mkdir(parents=True, exist_ok=True)
         python = Path(sys.executable).as_posix()
         for client, bridge in self.bridges.items():
             path = private / f'bridge-{client}.json'
             body = {'addr': f'{bridge.address[0]}:{bridge.address[1]}', 'secret': bridge.secret,
                     'project': self.project, 'epoch': self.epoch(), 'slot': client}
-            temp = path.with_suffix('.json.tmp')
+            if path.exists() or path.is_symlink():
+                _secure_private_path(path, directory=False)
+            temp = private / f'.bridge-{client}-{uuid.uuid4().hex}.tmp'
             try:
-                temp.write_text(json.dumps(body, separators=(',', ':')), encoding='utf-8')
+                fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as handle:
+                    _secure_private_path(temp, directory=False)
+                    json.dump(body, handle, separators=(',', ':'))
                 os.replace(temp, path)
             finally:
                 temp.unlink(missing_ok=True)
@@ -168,14 +222,23 @@ def main(argv=None) -> int:
     server = uvicorn.Server(uvicorn.Config(demo.app, host="127.0.0.1", port=args.port, log_level="warning",
                                            access_log=False, lifespan="on"))
     demo.start_bridges()
+    ready = threading.Event()
 
     def announce():
         deadline = time.time() + 60
         while not server.started and time.time() < deadline:
             time.sleep(0.05)
         if server.started:
-            manifest = demo.write_client_files(args.run_root)
-            (args.run_root / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            try:
+                manifest = demo.write_client_files(args.run_root)
+                (args.run_root / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            except Exception:
+                # Storage errors must not leave a service advertising unprotected
+                # credentials. Do not log the credential-bearing object or error.
+                print('Local discovery storage could not be secured; service stopping.', file=sys.stderr)
+                server.should_exit = True
+                return
+            ready.set()
             print("LOCAL_DEMO_READY", flush=True)
         else:
             server.should_exit = True
@@ -189,7 +252,7 @@ def main(argv=None) -> int:
         server.run()
     finally:
         demo.stop()
-    return 0 if server.started else 2
+    return 0 if ready.is_set() else 2
 
 
 if __name__ == "__main__":                       # pragma: no cover

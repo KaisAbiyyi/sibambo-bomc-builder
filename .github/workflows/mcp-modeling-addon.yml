@@ -40,7 +40,7 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r service/requirements.lock
       - name: WP2 relay, recorder and real SDK protocol
-        run: python -m unittest tests.test_agent_relay tests.test_recorder tests.test_addon_protocol tests.test_addon_guide tests.test_local_demo -v
+        run: python -m unittest tests.test_addon_isolation tests.test_agent_relay tests.test_recorder tests.test_addon_protocol tests.test_addon_guide tests.test_local_demo -v
       - name: All Builder suites, including legacy v1
         run: python -m unittest discover -s tests -v
       - name: Preserve source identity

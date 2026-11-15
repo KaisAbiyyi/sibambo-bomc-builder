@@ -89,6 +89,13 @@ class BridgeServer:
         return {ENV_ADDR: f"{self.address[0]}:{self.address[1]}", ENV_SECRET: self.secret, ENV_PROJECT: self.project}
 
     def dispatch(self, frame: dict) -> dict:
+        # A discovery credential authorizes only the Editor add-on surface. It
+        # must never become a second path to the legacy Builder actor.
+        if self.relay is not None:
+            from service.agent_relay import RELAY_TOOLS
+            if frame.get('api') != 'addon-1' or not isinstance(frame.get('tool'), str) or frame['tool'] not in RELAY_TOOLS:
+                return {'id': frame.get('id'), 'ok': False,
+                        'error': errors.error_body('INVALID_REQUEST', 'This bridge accepts add-on tools through addon-1 only')}
         rid, tool, args = frame.get("id"), frame.get("tool"), frame.get("args") or {}
         if frame.get('api') == 'addon-1':
             args = frame.get('args')
