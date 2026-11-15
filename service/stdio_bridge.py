@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from uuid import uuid4
 
 from mcp.server import MCPServer
 
@@ -15,6 +16,17 @@ from service.mcp_http import INSTRUCTIONS, as_result, register_tools
 
 
 def build_stdio_server(env=os.environ) -> MCPServer:
+    if env.get('SIBAMBO_LOCAL_RUN_ROOT') and env.get('SIBAMBO_CLIENT_SLOT'):
+        from service.addon_tools import INSTRUCTIONS_ADDON, as_addon_result, register_addon_tools
+        from service.bridge import bridge_call_addon
+        session = uuid4().hex
+        server = MCPServer('sibambo', instructions=INSTRUCTIONS_ADDON)
+        async def run_addon(name: str, args: dict):
+            reply = await asyncio.to_thread(bridge_call_addon, name, args, env['SIBAMBO_LOCAL_RUN_ROOT'],
+                                            env['SIBAMBO_CLIENT_SLOT'], session)
+            return as_addon_result(reply)
+        register_addon_tools(server, run_addon)
+        return server
     server = MCPServer("sibambo-local-bridge", instructions=INSTRUCTIONS)
     project = env.get(ENV_PROJECT, "")
 

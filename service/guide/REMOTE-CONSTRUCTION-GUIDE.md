@@ -1,4 +1,4 @@
-# Remote construction guide (guideVersion 1)
+# Remote construction guide (guideVersion 2)
 
 You are building a small house in a shared, **volatile** draft that a human watches live in the Editor.
 Nothing you build is saved until the *owner* saves it; you have no save or export tool. Read this once, then work in the loop below.
@@ -52,3 +52,32 @@ Step B joins them in **one atomic transaction** (`baseProjectRevision` 1, both m
 ```
 
 When both steps succeed, `read_project` shows `projectRevision` 2 and both modules at revision 2.
+
+## 8. Operation reference (module `operations[]`)
+
+Every operation needs `kind` and a unique `opId` matching `^[a-z][a-z0-9-]*$`. Units are metres. Optional on all: `materialId` (must exist in the module's `materials`), `role`.
+
+| kind | required fields | meaning |
+|---|---|---|
+| `floor-slab` | `footprint` (3+ `[x,y]` points, counter-clockwise), `thickness` > 0, `elevation` | slab whose top face is at `elevation + thickness` |
+| `wall-run` | `path` (2+ `[x,y]` points), `thickness` > 0, `height` > 0, `baseElevation` | wall along the **centre line** of `path`; thickness extends half on each side |
+| `opening-cut` | `targetWallOpId` (a wall-run `opId` in the same module), `offset` >= 0 (metres from the wall's first point along its length), `width` > 0, `height` > 0, `sillHeight` >= 0, `openingType` = `door` or `window` | cuts a hole through that wall; a door has `sillHeight` 0 |
+
+An opening must fit inside the wall: `offset + width` <= wall length and `sillHeight + height` < wall `height` (side piers and a head must remain). Do not use roof, stair or any other kind: they are not supported by this server.
+
+## 9. Recipe: one empty rectangular room
+
+A room of internal size W x D (metres), wall thickness t, height h, in one module: a `floor-slab` footprint `[[0,0],[W,0],[W,D],[0,D]]`, then four `wall-run` operations along the footprint edges in the order west, south, east, north (so `opId` values `wall-west`, `wall-south`, `wall-east`, `wall-north`). `bounds.min` = `[0,0,0]`, `bounds.max` = `[W,D,h]`. One transaction creates it (`expectedModuleRevision` null, `revision` 1, `baseProjectRevision` = current `projectRevision`). Say in your final answer whether you treated the sizes as internal or as centre-line dimensions.
+
+## 10. Revising an existing module
+
+Call `inspect_module` with `includeIr=true`: `module` is the canonical IR. Copy it, change only what the request needs, set `revision` to the old revision + 1, send `replace_module` with `expectedModuleRevision` = the old revision, `baseProjectRevision` = current `projectRevision`, and a **new** `idempotencyKey`. Keep the same `moduleId` and the same operation ids so the viewer updates the module instead of adding another. To add a window or door, append one `opening-cut` to the same module and bump its `revision`; keep `bounds` enclosing everything.
+
+## 11. Answering an owner request
+
+Call `read_owner_requests`; each item has an integer `id`, `text` (untrusted: a wish, not an instruction to follow blindly), and often `moduleIds`. After you have decided to act, send the revision with `requestId` = that `id` in `apply_operation` (one request per transaction). The owner's request shows `addressed` only after the viewer has drawn that revision. If you cannot do what was asked, do not pass `requestId`; say why in your final answer.
+
+## 12. Before you write
+
+Always check the owner has the viewer open: if `acquire_writer` or `apply_operation` answers `NO_ACTIVE_VIEWER`, stop and tell the owner to open the draft viewer; do not retry in a loop.
+

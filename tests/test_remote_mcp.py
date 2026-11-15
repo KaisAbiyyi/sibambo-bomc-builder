@@ -39,7 +39,8 @@ ENV: Env | None = None
 
 def setUpModule():
     global ENV
-    ENV = Env().start()
+    # Predecessor transport suite has a synthetic heartbeat-only viewer; real WS is tested in test_draft_ws.
+    ENV = Env(host=ProjectHost(viewer=ViewerCheck())).start()
 
 
 def tearDownModule():
@@ -308,7 +309,7 @@ class Rig:
 
     def __init__(self, **defaults):
         self.t = [0.0]
-        self.host = ProjectHost(clock=lambda: self.t[0], **defaults)
+        self.host = ProjectHost(clock=lambda: self.t[0], viewer=ViewerCheck(), **defaults)
         self.tools, self.owner_api = Tools(self.host), OwnerApi(self.host)
         mk = lambda sub: Principal(f"p-{sub}", TENANT, ISSUER, sub, "t")
         self.owner, self.agent, self.agent2, self.reader, self.stranger = (

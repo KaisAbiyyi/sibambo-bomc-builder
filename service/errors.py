@@ -7,6 +7,7 @@ from core.project import state as S
 
 # code -> (retryable, nextAction, httpStatus for the owner REST surface)
 CATALOG: dict[str, tuple[bool, str, int]] = {
+    'RENDER_PENDING': (True, 'Wait for the primary Editor viewer to acknowledge this revision; query operation_status before retrying.', 409),
     # --- v1.3 / SE-02 codes, unchanged names -------------------------------------------
     S.REVISION_CONFLICT: (True, "Call read_project, rebuild the change on the new projectRevision, resend with a new idempotencyKey.", 409),
     S.DEPENDENCY_STALE: (True, "Call read_project, raise the dependency minRevision or rebuild against current revisions.", 409),
@@ -42,10 +43,27 @@ RETRY_AFTER_MS = {"BUSY": 250, S.QUEUE_FULL: 500, S.LEASE_HELD: 1000, "NO_ACTIVE
 SERVICE_NAME = {S.PAUSED: "PAUSED_BY_OWNER", S.QUEUE_FULL: "BUSY", S.OWNER_ABSENT: "NO_ACTIVE_VIEWER"}
 
 
+# Separate from the frozen v1 catalogue/receipts. Existing names keep their v1 semantics.
+ADDON_CATALOG = {
+    'EDITOR_OFFLINE': (True, 'Open the Editor, open or create a model in authoring mode and press Hubungkan agent.', 409),
+    'EDITOR_TIMEOUT': (True, 'The Editor may still finish; call describe_scene before retrying.', 504),
+    'SERVICE_OFFLINE': (True, 'Ask the owner to run: node tooling/local-demo/launch.mjs', 503),
+    'NO_EDITABLE_DOCUMENT': (False, 'Open or create an editable document in the Editor.', 409),
+    'STALE_REVISION': (True, 'Call describe_scene and rebuild the change on the current revision.', 409),
+    'INVALID_ELEMENT': (False, 'Fix the element at the reported JSON pointer.', 422),
+    'INVALID_GEOMETRY': (False, 'Fix the geometry reported by the Editor.', 422),
+    'MODULE_DETACHED': (False, 'Tell the owner; they may Undo their direct mesh edit.', 409),
+    'MANAGED_MODULE': (False, 'Use edit_model for managed architecture.', 409),
+    'UNDO_NOT_AGENT': (False, 'Tell the owner: the last history entry belongs to them.', 409),
+    'NOTHING_TO_UNDO': (False, 'There are no agent changes to undo.', 409),
+    'INVALID_COMMAND': (False, 'Fix the command rejected by the authoring kernel.', 422),
+}
+
+
 def error_body(code: str, message: str, **details) -> dict:
     """The one error shape every tool/REST failure uses."""
     code = SERVICE_NAME.get(code, code)
-    retryable, next_action, _status = CATALOG[code]
+    retryable, next_action, _status = (CATALOG if code in CATALOG else ADDON_CATALOG)[code]
     body = {"code": code, "message": str(message)[:500], "retryable": retryable, "nextAction": next_action}
     if code in RETRY_AFTER_MS and retryable:
         body["retryAfterMs"] = RETRY_AFTER_MS[code]

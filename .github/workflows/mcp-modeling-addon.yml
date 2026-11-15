@@ -1,0 +1,50 @@
+name: MCP modeling add-on CP2
+on:
+  push:
+    branches: ['work/mcp-modeling-001/**']
+  pull_request:
+    paths: ['service/**', 'tests/**', '.github/workflows/mcp-modeling-addon.yml']
+permissions:
+  contents: read
+jobs:
+  cp2:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact source and isolated artifact directories
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          if [ "$RUNNER_OS" = Windows ]; then
+            mkdir -p /d/sibambo-cp2/tmp
+            echo 'TEMP=D:/sibambo-cp2/tmp' >> "$GITHUB_ENV"
+            echo 'TMP=D:/sibambo-cp2/tmp' >> "$GITHUB_ENV"
+            echo 'PIP_CACHE_DIR=D:/sibambo-cp2/pip' >> "$GITHUB_ENV"
+          else
+            mkdir -p "$RUNNER_TEMP/sibambo-cp2"
+            echo "TMPDIR=$RUNNER_TEMP/sibambo-cp2" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - run: python -m pip install --require-hashes -r service/requirements.lock
+      - name: WP2 relay, recorder and real SDK protocol
+        run: python -m unittest tests.test_addon_isolation tests.test_agent_relay tests.test_recorder tests.test_addon_protocol tests.test_addon_guide tests.test_local_demo -v
+      - name: All Builder suites, including legacy v1
+        run: python -m unittest discover -s tests -v
+      - name: Preserve source identity
+        shell: bash
+        run: |
+          git diff --exit-code
+          echo "CP2 source $EXPECTED_SHA; automated/synthetic only, owner LLM tests NOT_RUN" >> "$GITHUB_STEP_SUMMARY"

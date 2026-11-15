@@ -1,0 +1,43 @@
+name: SE-05 live draft channel
+on:
+  push:
+    paths: ['service/**', 'core/**', 'tests/test_draft_ws.py', 'tests/remote_support.py', 'tests/se05_fixture_server.py', 'docs/stable/**', '.github/workflows/se05-live-draft.yml']
+  pull_request:
+    paths: ['service/**', 'core/**', 'tests/test_draft_ws.py', 'tests/remote_support.py', 'tests/se05_fixture_server.py', 'docs/stable/**', '.github/workflows/se05-live-draft.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  channel:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Isolate generated artifacts and assert exact source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          mkdir -p "$RUNNER_TEMP/se05"
+          for key in TEMP TMP PIP_CACHE_DIR; do echo "$key=$RUNNER_TEMP/se05" >> "$GITHUB_ENV"; done
+          echo "PYTHONPYCACHEPREFIX=$RUNNER_TEMP/se05/pycache" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install hash-locked service dependencies
+        run: python -m pip install --require-hashes -r service/requirements.lock
+      - name: Actual TLS owner, MCP and WebSocket regressions
+        run: python -m unittest tests.test_draft_ws -v
+      - name: Preserve historical SE-03 evidence pins
+        shell: bash
+        run: |
+          python -m examples.se03_evidence --out-dir "$RUNNER_TEMP/se05/se03-evidence" --check docs/stable/owner-handoff/se03-expected.json
+          echo "Exact tested source: $EXPECTED_SHA; synthetic TLS only; real IdP/clients NOT_RUN." >> "$GITHUB_STEP_SUMMARY"

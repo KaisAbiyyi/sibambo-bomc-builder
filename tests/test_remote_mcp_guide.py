@@ -34,8 +34,8 @@ def example(tag: str) -> dict:
 class GuideTextTests(unittest.TestCase):
     def test_guide_hash_and_version_match_what_read_project_reports(self):
         self.assertEqual(GUIDE_SHA256, hashlib.sha256(GUIDE.encode("utf-8")).hexdigest())
-        self.assertEqual(GUIDE_VERSION, 1)
-        self.assertIn("guideVersion 1", GUIDE)
+        self.assertEqual(GUIDE_VERSION, 2)
+        self.assertIn("guideVersion 2", GUIDE)
 
     def test_guide_states_the_non_negotiables(self):
         for phrase in ("+Z is up", "Metres", "untrusted data", "send one write", "never in parallel",
@@ -83,7 +83,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(ev.check(receipt, ROOT / "docs/stable/owner-handoff/se03-expected.json"), [])
         self.assertEqual(receipt["guideSha256"], GUIDE_SHA256)
         self.assertLessEqual(receipt["compactReadProjectBytes"], 4096)
-        self.assertEqual(receipt["errorCodeCount"], len(errors.CATALOG))
+        self.assertEqual(receipt["errorCodeCount"], len(set(errors.CATALOG) - {'RENDER_PENDING'}))  # frozen SE-03 receipt; SE-05 adds this code
         self.assertTrue(all(v.startswith(("PASS", "NOT_RUN")) for v in receipt["gates"].values()))
         self.assertTrue(any(line.startswith("REJECTED") for line in log))
         tampered = dict(receipt, projectionSha256="0" * 64)
