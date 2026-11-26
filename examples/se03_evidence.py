@@ -33,7 +33,8 @@ def _sha(value) -> str:
 
 def run() -> tuple[dict, list[str]]:
     clock = [0.0]
-    host = ProjectHost(clock=lambda: clock[0])
+    # This is the preserved SE-03 in-process receipt, not a claim of a live SE-05 viewer.
+    host = ProjectHost(clock=lambda: clock[0], viewer=ViewerCheck())
     tools, owner_api = Tools(host), OwnerApi(host)
     mk = lambda sub: Principal(f"p-{sub}", TENANT, ISSUER, sub, "display only")
     owner, agent, agent2, reader, stranger = mk("owner"), mk("agent"), mk("agent2"), mk("reader"), mk("stranger")
@@ -117,7 +118,7 @@ def run() -> tuple[dict, list[str]]:
     owner_api.post_request(owner, "home", "Please add a window to bedroom A")
     inbox = call(agent, "read_owner_requests")
     log.append(f"read_owner_requests: {len(inbox['requests'])} untrusted request(s)")
-    codes = sorted(errors.CATALOG)
+    codes = sorted(c for c in errors.CATALOG if c != 'RENDER_PENDING')  # SE-03 v1 catalogue projection; SE-05 adds a code
     receipt = {
         "guideVersion": GUIDE_VERSION, "guideSha256": GUIDE_SHA256,
         "toolDescriptionsSha256": _sha(TOOLS), "toolNames": sorted(TOOLS),

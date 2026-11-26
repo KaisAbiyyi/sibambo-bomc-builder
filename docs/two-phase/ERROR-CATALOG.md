@@ -34,6 +34,8 @@ The v1.3 / SE-02 codes keep their names. The actor's own `PAUSED`, `QUEUE_FULL` 
 
 ## Decisions
 
+SE-05 adds `RENDER_PENDING` (retryable, HTTP 409): wait for the primary Editor viewer's render ACK, query `operation_status` before retrying. It does not roll back or reapply an accepted transaction. The historical SE-03 receipt retains its 24-code projection; current schema/catalogue and SE-05 tests include this additional code.
+
 - `NO_ACTIVE_VIEWER`: writes are rejected while no viewer has the project open (owner heartbeat alive). Reads and `acquire_writer` for an absent viewer are rejected the same way.
 - `RENDER_ACK_TIMEOUT`: raised **before** a write is submitted, when the viewer channel does not acknowledge in time, so nothing is committed. The real channel arrives with SE-05; until then the viewer check is the owner heartbeat.
 - `PAUSED_BY_OWNER`: the owner's pause wins at the next operation boundary; `nextAction` says to wait and re-read `paused`.

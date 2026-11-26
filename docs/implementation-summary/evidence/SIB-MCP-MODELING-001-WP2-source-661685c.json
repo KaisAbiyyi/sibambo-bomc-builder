@@ -1,0 +1,77 @@
+{
+  "plan": "SIB-MCP-MODELING-001 v2.1",
+  "phase": "WP2",
+  "gate": "CP2",
+  "verdict": "PASS",
+  "dateAsiaJakarta": "2026-11-15",
+  "builder": {
+    "base": "6c358422abfb42bf203a8ac795703ba6512c5fea",
+    "source": "661685cdc371656823af60e6450d08c473a9eada",
+    "tree": "ee2fb8c4d27242f742d1e11353b0039478caf814",
+    "branch": "work/mcp-modeling-001/wp2-relay",
+    "pr": 95
+  },
+  "editorPrerequisite": {
+    "source": "5ec4e47ccd2fa744f640a9fdc7c8d24c827f5e7a",
+    "EL2": {
+      "pass": 8,
+      "fail": 0,
+      "assertions": 66,
+      "medianMs": 7.692
+    },
+    "EK1AndHistoricalEL1": {
+      "pass": 7,
+      "fail": 0,
+      "assertions": 37
+    },
+    "chromiumRerun": false
+  },
+  "ci": {
+    "cp2Run": 43630237670,
+    "ubuntu": {
+      "job": 132554994713,
+      "targeted": {
+        "pass": 27,
+        "fail": 0
+      },
+      "full": {
+        "discovered": 814,
+        "pass": 814,
+        "fail": 0,
+        "skip": 0
+      }
+    },
+    "windows": {
+      "job": 132554994895,
+      "targeted": {
+        "pass": 27,
+        "fail": 0
+      },
+      "full": {
+        "discovered": 814,
+        "pass": 809,
+        "fail": 0,
+        "skip": 5
+      }
+    },
+    "predecessorSE03": 43630362534,
+    "predecessorSE05": 43630362526
+  },
+  "WP3": {
+    "status": "BLOCKED_PLAN_REQUIRED",
+    "codeChanged": false,
+    "issue": "C5/C11 normal Undo recovery contradicts invariant 3 and T-E7",
+    "probe": {
+      "graphRestored": true,
+      "revisionBefore": 2,
+      "revisionAfter": 4,
+      "historyPreserved": false,
+      "ownerRedoPreserved": false,
+      "receiptSha256": "a681240c716ed73236665a5370788e5e857e45eb4bcfba9a5acfc0d2b1af52dd"
+    }
+  },
+  "ownerLLM": "NOT_RUN",
+  "independentReview": "PENDING",
+  "merged": false,
+  "approved": false
+}
